@@ -2,10 +2,10 @@
 OpenKamera Licensing Information & Third-Party Notices
 ================================================================================
 
-OpenKamera is an open-source Kotlin port and modernization of Open Camera for Android.
+OpenKamera is an open-source Kotlin port and modernization of Open Camera (v1.56.2) for Android.
 
 Copyright & Attribution:
-- Original Open Camera (Java): Copyright (C) 2013–2026 Mark Harman
+- Original Open Camera (Java v1.56.2): Copyright (C) 2013–2026 Mark Harman
 - Kotlin Version (OpenKamera): Copyright (C) 2026 Ridhan Fadhilah
 
 This project is licensed under the GNU General Public License Version 3 (GPLv3)
