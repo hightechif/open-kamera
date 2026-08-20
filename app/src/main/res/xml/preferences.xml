@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--<PreferenceCategory
+        android:key="preference_category_camera_effects"
+        android:title="@string/preference_category_camera_effects"
+        >
+        -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the readFromIntent() call -->
+    <!--
+    <ListPreference
+        android:key="preference_color_effect"
+        android:title="@string/preference_color_effect"
+        android:summary="@string/preference_color_effect_summary"
+        />
+    -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the readFromIntent() call -->
+    <!--
+    <ListPreference
+        android:key="preference_scene_mode"
+        android:title="@string/preference_scene_mode"
+        android:summary="@string/preference_scene_mode_summary"
+        />
+    -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the readFromIntent() call -->
+    <!--
+    <ListPreference
+        android:key="preference_white_balance"
+        android:title="@string/preference_white_balance"
+        android:summary="@string/preference_white_balance_summary"
+        />
+    -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the readFromIntent() call -->
+    <!--
+    <ListPreference
+        android:key="preference_iso"
+        android:title="@string/preference_iso"
+        android:summary="@string/preference_iso_summary"
+        />
+    -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the readFromIntent() call -->
+    <!--
+    <ListPreference
+        android:key="preference_exposure"
+        android:title="@string/preference_exposure"
+        android:summary="@string/preference_exposure_summary"
+        />
+    -->
+
+    <!--  if we move this to another PreferenceGroup, we should update code for the findPreference() call -->
+    <!--
+    <SwitchPreference
+        android:key="preference_auto_stabilise"
+        android:title="@string/preference_auto_stabilise"
+        android:summary="@string/preference_auto_stabilise_summary"
+        android:defaultValue="false"
+        />
+    -->
+
+    <!-- </PreferenceCategory> -->
+
+    <PreferenceCategory
+        android:key="preference_category_camera_controls"
+        android:title="@string/preference_category_camera_controls">
+
+        <!--  if we move this to another PreferenceGroup, we should update code for the findPreference() call -->
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="preference_face_detection"
+            android:summary="@string/preference_face_detection_summary"
+            android:title="@string/preference_face_detection" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:entries="@array/preference_timer_entries"
+            android:entryValues="@array/preference_timer_values"
+            android:icon="@drawable/ic_timer_white_48dp"
+            android:key="preference_timer"
+            android:summary="%s"
+            android:title="@string/preference_timer" />
+
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/preference_burst_mode_entries"
+            android:entryValues="@array/preference_burst_mode_values"
+            android:key="preference_burst_mode"
+            android:summary="%s"
+            android:title="@string/preference_burst_mode" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:entries="@array/preference_burst_interval_entries"
+            android:entryValues="@array/preference_burst_interval_values"
+            android:key="preference_burst_interval"
+            android:summary="%s"
+            android:title="@string/preference_burst_interval" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubCameraControlsMore"
+            android:icon="@drawable/ic_more_horiz_white_48dp"
+            android:key="preference_screen_camera_controls_more"
+            android:persistent="false"
+            android:title="@string/preference_screen_camera_controls_more" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubPreview"
+            android:icon="@drawable/ic_more_horiz_white_48dp"
+            android:key="preference_preview"
+            android:persistent="false"
+            android:title="@string/preference_preview" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubGUI"
+            android:icon="@drawable/ic_more_horiz_white_48dp"
+            android:key="preference_screen_gui"
+            android:persistent="false"
+            android:title="@string/preference_screen_gui" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="preference_category_camera_quality"
+        android:title="@string/preference_category_camera_quality">
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubPhoto"
+            android:icon="@drawable/take_photo_pref"
+            android:key="preference_screen_photo_settings"
+            android:persistent="false"
+            android:title="@string/preference_screen_photo_settings" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubVideo"
+            android:icon="@drawable/take_video_pref"
+            android:key="preference_screen_video_settings"
+            android:persistent="false"
+            android:title="@string/preference_screen_video_settings" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubLocation"
+            android:icon="@drawable/ic_gps_fixed_white_48dp"
+            android:key="preference_screen_location_settings"
+            android:persistent="false"
+            android:title="@string/preference_screen_location_settings" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubProcessing"
+            android:icon="@drawable/ic_more_horiz_white_48dp"
+            android:key="preference_screen_processing_settings"
+            android:persistent="false"
+            android:title="@string/preference_screen_processing_settings" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="preference_category_online"
+        android:title="@string/preference_category_online">
+
+        <Preference
+            android:icon="@drawable/ic_help_outline_white_48dp"
+            android:key="preference_online_help"
+            android:summary="@string/preference_online_help_summary"
+            android:title="@string/preference_online_help" />
+
+        <!--  if we move this to another PreferenceGroup, we should update code for the findPreference() call -->
+        <ListPreference
+            android:key="preference_camera_api"
+            android:summary="@string/preference_camera_api_summary"
+            android:title="@string/preference_camera_api" />
+
+        <Preference
+            android:icon="@drawable/ic_info_outline_white_48dp"
+            android:key="preference_about"
+            android:summary="@string/preference_about_summary"
+            android:title="@string/preference_about" />
+
+        <Preference
+            android:icon="@drawable/ic_info_outline_white_48dp"
+            android:key="preference_privacy_policy"
+            android:summary="@string/preference_privacy_policy_summary"
+            android:title="@string/preference_privacy_policy" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubLicences"
+            android:icon="@drawable/ic_info_outline_white_48dp"
+            android:key="preference_screen_licences"
+            android:persistent="false"
+            android:title="@string/preference_screen_licences" />
+
+        <PreferenceScreen
+            android:fragment="com.hightechif.openkamera.preferences.PreferenceSubSettingsManager"
+            android:icon="@drawable/settings"
+            android:key="preference_screen_settings_manager"
+            android:persistent="false"
+            android:title="@string/preference_screen_settings_manager" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

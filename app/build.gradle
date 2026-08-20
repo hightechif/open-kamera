@@ -1,0 +1,88 @@
+plugins {
+    alias(libs.plugins.kotlin.android)
+}
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.hightechif.openkamera'
+    compileSdk 36
+    compileOptions.encoding = 'UTF-8'
+
+    defaultConfig {
+        applicationId "com.hightechif.openkamera"
+        minSdk 23
+        targetSdk 36
+        versionCode 96
+        versionName "1.56.2"
+
+        renderscriptTargetApi 21
+        //renderscriptSupportModeEnabled true // don't use support library as it bloats the APK, and we don't need pre-4.4 support
+        // need build tools at least 20 at least to support ScriptIntrinsicHistogram
+        // also need build tools at least 21 to avoid Google Play 64-bit warning (required from 1 August 2019)
+
+        testApplicationId "com.hightechif.openkamera.test"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // needed to use android.test package (ActivityInstrumentationTestCase2 etc) when targetting sdk 28 (Android 9) -
+    // see https://developer.android.com/training/testing/set-up-project
+    useLibrary 'android.test.runner'
+    useLibrary 'android.test.base'
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+    buildFeatures {
+        renderScript true
+    }
+    testOptions {
+        unitTests {
+            returnDefaultValues = true
+            includeAndroidResources = true
+        }
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation libs.androidx.core.ktx
+    androidTestImplementation libs.androidx.junit
+
+    //implementation 'androidx.activity:activity:1.9.3' // needed for EdgeToEdge.enable(this)
+
+    // appcompat version must be 1.4.0 or later to satisfy emoji policy!
+    implementation libs.androidx.appcompat.v170
+
+    // implementation(platform(libs.kotlin.bom))
+
+    implementation libs.androidx.legacy.support.v4
+
+    // 1.4.0 has bug where exif_new.setAttribute(ExifInterface.TAG_XMP, null); in ImageSaver.removeExifTags() crashes - so only update
+    // when fixed in a newer version; can be tested via testTakePhotoRemoveExifKeepDatetime
+    implementation libs.androidx.exifinterface
+    //implementation 'androidx.exifinterface:exifinterface:1.4.0'
+
+    testImplementation libs.junit
+    testImplementation libs.robolectric
+    testImplementation libs.mockk
+
+    // newer AndroidJUnit4 InstrumentedTest
+    androidTestImplementation libs.androidx.runner
+    androidTestImplementation libs.androidx.rules
+    androidTestImplementation libs.androidx.espresso.core
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}

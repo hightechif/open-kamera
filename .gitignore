@@ -1,0 +1,188 @@
+# ============================================================
+# IDE / Editor
+# ============================================================
+*.iml
+*.eml
+*.ipr
+*.iws
+.idea/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/navEditor.xml
+.navigation/
+.vscode/
+
+# ============================================================
+# Build Directories and Caches
+# ============================================================
+build/
+bin/
+gen/
+out/
+release/
+.gradle/
+.gradle_home/
+gradle-app.setting
+!gradle-wrapper.jar
+.kotlin/
+.externalNativeBuild/
+.cxx/
+cmake-build-*/
+captures/
+local_gradle/
+
+# ============================================================
+# Local Configuration
+# ============================================================
+local.properties
+key.properties
+
+# ============================================================
+# Signing Files
+# ============================================================
+*.jks
+*.keystore
+.signing/
+*.pem
+
+# ============================================================
+# Built Application Files
+# ============================================================
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+*.db
+
+# ============================================================
+# Generated Files
+# ============================================================
+**/GeneratedPluginRegistrant.java
+
+# ============================================================
+# Kotlin / Java Compiled Files
+# ============================================================
+*.class
+
+# ============================================================
+# Crashlytics / Firebase
+# ============================================================
+com_crashlytics_export_strings.xml
+google-services.json
+fabric.properties
+
+# ============================================================
+# Release Output Metadata (per flavor)
+# ============================================================
+/app/production/release/output-metadata.json
+/app/production/debug/output-metadata.json
+/app/to/release/output-metadata.json
+/app/to/debug/output-metadata.json
+/app/uat/release/output-metadata.json
+/app/uat/debug/output-metadata.json
+/app/development/release/output-metadata.json
+/app/development/debug/output-metadata.json
+*/output-metadata.json
+
+# ============================================================
+# NDK / Native
+# ============================================================
+*.so
+obj/
+
+# ============================================================
+# Proguard
+# ============================================================
+proguard/
+
+# ============================================================
+# Lint
+# ============================================================
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+
+# ============================================================
+# Log Files
+# ============================================================
+*.log
+
+# ============================================================
+# Test Results
+# ============================================================
+test-results/
+htmlReport/
+
+# ============================================================
+# Node.js (React Native)
+# ============================================================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============================================================
+# macOS
+# ============================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ============================================================
+# Windows
+# ============================================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================================================
+# Linux
+# ============================================================
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================
+# Version Control
+# ============================================================
+*.orig
+
+# ============================================================
+# Version Control
+# ============================================================
+_archive/
+_devdocs/
+_docs/*.jpg
+_docs/ads.txt
+_docs/app-ads.txt
+_docs/gplay.html
+_other/
+_saved/
+
+app/release/
+gfx/
+testdata/
+
+uninstall.bat
