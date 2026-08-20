@@ -1061,7 +1061,7 @@
     <string name="preference_privacy_policy_text" translatable="false"> <!-- if changing this, remember to consider if the online privacy policy needs updating -->
         <!-- now interpreted as HTML so that we can have the mailto link, for the contact that's needed for Google Play policies! -->
         <!-- be careful of rewording/removing bits, as some things here may be required for Google Play policies -->
-        Open Kamera is developed by Mark Harman.
+        OpenKamera is a Kotlin port developed by Ridhan Fadhilah, based on Open Camera originally developed by Mark Harman.
         &lt;br/&gt;Open Kamera accesses camera sensor and microphone data to fulfil its purpose as a camera.
         Microphone is also used for the optional \"Audio control\".
         &lt;br/&gt;Access to files is needed (at least for Android 9 and earlier) to save resultant files such as photos and videos to your device.
@@ -1084,7 +1084,7 @@
 
     <string name="preference_screen_licences" translatable="false">Open Source licences</string>
     <string name="preference_licence_open_camera" translatable="false">Open Kamera</string>
-    <string name="preference_licence_open_camera_text" translatable="false">Open Kamera is © 2013–2026 Mark Harman, released under the GPL v3 or later. Tap here for full licence text and terms of service.</string>
+    <string name="preference_licence_open_camera_text" translatable="false">OpenKamera is developed by Ridhan Fadhilah, based on Open Camera © 2013–2026 Mark Harman, released under the GPL v3 or later. Tap here for full licence text and terms of service.</string>
     <string name="preference_licence_androidx" translatable="false">AndroidX libraries</string>
     <string name="preference_licence_androidx_text" translatable="false">Open Kamera uses the AndroidX/Jetpack libraries
         under the Apache license version 2.0. Tap here for full licence text.</string>
