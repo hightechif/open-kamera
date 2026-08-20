@@ -1,18 +1,19 @@
 # OpenKamera
 
+[![Version](https://img.shields.io/badge/Base%20Version-Open%20Camera%20v1.56.2-blue.svg)](https://opencamera.org.uk/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg?style=flat&logo=android)](https://developer.android.com)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-36-blue.svg)](https://developer.android.com)
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-23-orange.svg)](https://developer.android.com)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-> **Note:** **OpenKamera** is a modernized **Kotlin version** of the popular open-source [Open Camera](https://opencamera.org.uk/) application originally developed by **Mark Harman**. The Kotlin port, architecture modernization, and ongoing maintenance are developed by **Ridhan Fadhilah**.
+> **Note:** **OpenKamera** is a modernized **Kotlin version** of the popular open-source [Open Camera](https://opencamera.org.uk/) application (based on **v1.56.2**) originally developed by **Mark Harman**. The Kotlin port, architecture modernization, and ongoing maintenance are developed by **Ridhan Fadhilah**.
 
 ---
 
 ## 📷 Overview
 
-**OpenKamera** is a powerful, fully open-source camera application for Android smartphones and tablets. It translates the robust, feature-rich Java codebase of Open Camera into idiomatic Kotlin while targeting modern Android APIs and Gradle toolchains.
+**OpenKamera** is a powerful, fully open-source camera application for Android smartphones and tablets. It translates the robust, feature-rich Java codebase of Open Camera (v1.56.2) into idiomatic Kotlin while targeting modern Android APIs and Gradle toolchains.
 
 OpenKamera is designed with privacy and user control in mind: **no ads, no tracking, and no unnecessary permissions**.
 
@@ -128,7 +129,7 @@ OpenKamera includes unit tests, Robolectric JVM tests, and instrumentation tests
 
 ## 👥 Authors, Credits & License
 
-- **Original Author & Maintainer (Open Camera):** Mark Harman ([opencamera.org.uk](https://opencamera.org.uk/))
+- **Original Author & Base Codebase:** Mark Harman — [Open Camera v1.56.2](https://opencamera.org.uk/)
 - **Kotlin Version Developer (OpenKamera):** Ridhan Fadhilah
 - **License:** Released under the terms of the [GNU General Public License v3.0 (GPLv3)](LICENSE).
 - Third-party components, AndroidX libraries, and Google Material Design icons are licensed under their respective open-source licenses (see [LICENSE](LICENSE), `_docs/credits.html`, `androidx_LICENSE-2.0.txt`, and `google_material_design_icons_LICENSE-2.0.txt`).
