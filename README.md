@@ -98,9 +98,6 @@ com.hightechif.openkamera/
 Clone the repository and open the `OpenKamera` directory:
 
 ```bash
-# Navigate to the OpenKamera directory
-cd OpenKamera
-
 # Build the debug APK
 ./gradlew assembleDebug
 
