@@ -2365,7 +2365,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         freeScripts()
     }
 
-    internal class BrightnessDetails(// median brightness value of the median image
+    internal data class BrightnessDetails(// median brightness value of the median image
         val medianBrightness: Int
     )
 
@@ -3005,7 +3005,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         return BrightnessDetails(medianBrightness)
     }
 
-    class LuminanceInfo(
+    data class LuminanceInfo(
         val minValue: Int,
         val medianValue: Int,
         val hiValue: Int,
@@ -3753,7 +3753,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         return histogram
     }
 
-    class HistogramInfo(
+    data class HistogramInfo(
         val total: Int,
         val meanBrightness: Int,
         val medianBrightness: Int,

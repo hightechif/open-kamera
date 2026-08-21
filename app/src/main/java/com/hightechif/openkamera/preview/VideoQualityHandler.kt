@@ -19,7 +19,7 @@ import java.util.Collections
  * on it.
  */
 class VideoQualityHandler {
-    class Dimension2D(val width: Int, val height: Int)
+    data class Dimension2D(val width: Int, val height: Int)
 
     // videoQuality can either be:
     // - an int, in which case it refers to a CamcorderProfile

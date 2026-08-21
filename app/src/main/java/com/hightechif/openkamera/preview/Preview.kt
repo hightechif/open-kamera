@@ -270,31 +270,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * Important to call close() when the video recording is finished, to free up any resources
      * (e.g., supplied ParcelFileDescriptor).
      */
-    private class VideoFileInfo {
-        val videoMethod: ApplicationInterface.VideoMethod
-        val videoUri: Uri? // for VideoMethod.SAF, VideoMethod.URI or VideoMethod.MEDIASTORE
-        val videoFilename: String? // for VideoMethod.FILE
-        val videoPfdSaf: ParcelFileDescriptor? // for VideoMethod.SAF, VideoMethod.URI or VideoMethod.MEDIASTORE
-
-        constructor() {
-            this.videoMethod = ApplicationInterface.VideoMethod.FILE
-            this.videoUri = null
-            this.videoFilename = null
-            this.videoPfdSaf = null
-        }
-
-        constructor(
-            videoMethod: ApplicationInterface.VideoMethod,
-            videoUri: Uri?,
-            videoFilename: String?,
-            videoPfdSaf: ParcelFileDescriptor?
-        ) {
-            this.videoMethod = videoMethod
-            this.videoUri = videoUri
-            this.videoFilename = videoFilename
-            this.videoPfdSaf = videoPfdSaf
-        }
-
+    private data class VideoFileInfo(
+        val videoMethod: ApplicationInterface.VideoMethod = ApplicationInterface.VideoMethod.FILE,
+        val videoUri: Uri? = null,
+        val videoFilename: String? = null,
+        val videoPfdSaf: ParcelFileDescriptor? = null
+    ) {
         fun close() {
             if (this.videoPfdSaf != null) {
                 try {

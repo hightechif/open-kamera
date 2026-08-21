@@ -25,9 +25,9 @@ abstract class CameraControllerManager {
      */
     abstract fun getDescription(context: Context?, cameraId: Int): String?
 
-    class CameraInfo {
+    data class CameraInfo(
         var viewAngle: SizeF? = null
-    }
+    )
 
     /** Version of getDescription() that supports Camera2 camera ID strings (used for physical cameras), also returns the
      * view angles in info, if info is non-null.

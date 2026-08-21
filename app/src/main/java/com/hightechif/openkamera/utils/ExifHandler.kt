@@ -528,7 +528,7 @@ object ExifHandler {
         }
     }
 
-    private class ExifInterfaceHolder(val pfd: ParcelFileDescriptor?, val exif: ExifInterface?) {
+    private data class ExifInterfaceHolder(val pfd: ParcelFileDescriptor?, val exif: ExifInterface?) {
         fun close() {
             if (pfd != null) {
                 try {

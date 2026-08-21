@@ -914,18 +914,15 @@ class StorageUtils internal constructor(
         return createOutputFileSAF(mediaFilename, mimeType)
     }
 
-    class Media(// whether uri is from mediastore
+    data class Media(// whether uri is from mediastore
         val mediastore: Boolean, // for mediastore==true only
         val id: Long,
         val video: Boolean,
         val uri: Uri,
         val date: Long, // for mediastore==true, video==false only
         val orientation: Int,
-        filename: String?
+        val filename: String
     ) {
-        // this should correspond to DISPLAY_NAME (so available with scoped storage) - so this includes file extension, but not full path
-        val filename: String = filename!!
-
         /** Returns a mediastore uri. If this Media object was not created by a mediastore uri, then
          * this will try to convert using MediaStore.getMediaUri(), but if this fails the function
          * will return null.
@@ -1228,7 +1225,7 @@ class StorageUtils internal constructor(
                 }
                 if (MyDebug.LOG) Log.d(TAG, "video: $video")
 
-                media = Media(true, id, video, uri, date, orientation, filename)
+                media = Media(true, id, video, uri, date, orientation, filename!!)
 
                 if (MyDebug.LOG) {
                     // debug
@@ -1431,7 +1428,7 @@ class StorageUtils internal constructor(
                         latestUri,
                         latestDate,
                         0,
-                        latestFilename
+                        latestFilename!!
                     )
                 }
 

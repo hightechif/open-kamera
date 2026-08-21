@@ -84,7 +84,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
     @Volatile
     var testQueueBlocked: Boolean = false
 
-    class Request(
+    data class Request(
         val type: Type,
         val processType: ProcessType,
         val forceSuffix: Boolean,
@@ -153,56 +153,6 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
         enum class RemoveDeviceExif {
             OFF, ON, KEEP_DATETIME
-        }
-
-        fun copy(): Request {
-            return Request(
-                this.type,
-                this.processType,
-                this.forceSuffix,
-                this.suffixOffset,
-                this.saveBase,
-                this.jpegImages,
-                this.preshotBitmaps,
-                this.rawImage,
-                this.imageCaptureIntent,
-                this.imageCaptureIntentUri,
-                this.usingCamera2,
-                this.usingCameraExtensions,
-                this.imageFormat,
-                this.imageQuality,
-                this.doAutoStabilise,
-                this.levelAngle,
-                this.gyroRotationMatrix,
-                this.isFrontFacing,
-                this.mirror,
-                this.currentDate,
-                this.preferenceHdrTonemappingAlgorithm,
-                this.preferenceHdrContrastEnhancement,
-                this.iso,
-                this.exposureTime,
-                this.zoomFactor,
-                this.preferenceStamp,
-                this.preferenceTextstamp,
-                this.fontSize,
-                this.color,
-                this.prefStyle,
-                this.preferenceStampDateformat,
-                this.preferenceStampTimeformat,
-                this.preferenceStampGpsformat,
-                this.preferenceUnitsDistance,
-                this.panoramaCrop,
-                this.removeDeviceExif,
-                this.storeLocation,
-                this.location,
-                this.storeGeoDirection,
-                this.geoDirection,
-                this.pitchAngle,
-                this.storeYpr,
-                this.customTagArtist,
-                this.customTagCopyright,
-                this.sampleFactor
-            )
         }
     }
 
@@ -1811,7 +1761,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
     /** Alternative to android.util.Range&lt;Integer&gt;, since that is not mocked so can't be used
      * in unit testing.
      */
-    class IntRange(val lower: Int, val upper: Int) {
+    data class IntRange(val lower: Int, val upper: Int) {
         init {
             if (lower > upper) {
                 throw IllegalArgumentException("lower must be <= upper")
