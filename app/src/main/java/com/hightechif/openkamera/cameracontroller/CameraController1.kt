@@ -1378,10 +1378,13 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         if (MyDebug.LOG) Log.d(TAG, "reconnect")
         try {
             camera?.reconnect()
-        } catch (e: IOException) {
-            if (MyDebug.LOG) Log.e(TAG, "reconnect threw IOException")
-            e.printStackTrace()
-            throw CameraControllerException()
+        } catch (e: Exception) {
+            if (MyDebug.LOG) Log.e(TAG, "reconnect threw exception: ${e.message}")
+            try {
+                camera?.lock()
+            } catch (e2: Exception) {
+                if (MyDebug.LOG) Log.e(TAG, "lock threw exception: ${e2.message}")
+            }
         }
     }
 

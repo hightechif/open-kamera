@@ -996,7 +996,12 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private fun drawGrids(canvas: Canvas) {
         val preview: Preview = mainActivity.preview
         val cameraController: CameraController? = preview.cameraController ?: return
-        if (preferenceGridPref == "preference_grid_none") {
+        val gridKey = try {
+            mainActivity.cameraViewModel.uiState.value.gridType.key
+        } catch (_: Exception) {
+            preferenceGridPref
+        }
+        if (gridKey == "preference_grid_none") {
             return
         }
         if (preview.isPreviewPaused) {
@@ -1039,7 +1044,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
         p.strokeWidth = strokeWidth
 
-        when (preferenceGridPref) {
+        when (gridKey) {
             "preference_grid_3x3" -> {
                 p.color = Color.WHITE
                 canvas.drawLine(
@@ -2821,7 +2826,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val systemOrientationPortrait =
             systemOrientation === MainActivity.SystemOrientation.PORTRAIT
-        val hasLevelAngle: Boolean = preview.hasLevelAngle()
+        val uiState = try { mainActivity.cameraViewModel.uiState.value } catch (_: Exception) { null }
+        val horizonAngleState = uiState?.horizonAngle
+        val hasLevelAngle: Boolean = preview.hasLevelAngle() || (horizonAngleState != null)
         val actualShowAngleLinePref =
             if (photoMode === PhotoMode.Panorama) {
                 // in panorama mode, we should the level iff we aren't taking the panorama photos
@@ -2831,11 +2838,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val allowAngleLines = cameraController != null && !preview.isPreviewPaused
 
         if (allowAngleLines && hasLevelAngle && (actualShowAngleLinePref || showPitchLinesPref || showGeoDirectionLinesPref)) {
-            val levelAngle: Double = preview.levelAngle
+            val levelAngle: Double = horizonAngleState?.angleDegrees?.toDouble() ?: preview.levelAngle
             val hasPitchAngle: Boolean = preview.hasPitchAngle()
             val pitchAngle: Double = preview.pitchAngle
-            val hasGeoDirection: Boolean = preview.hasGeoDirection()
-            val geoDirection: Double = preview.geoDirection
+            val hasGeoDirection: Boolean = preview.hasGeoDirection() || ((uiState?.compassDegrees ?: 0.0f) != 0.0f)
+            val geoDirection: Double = if ((uiState?.compassDegrees ?: 0.0f) != 0.0f) uiState!!.compassDegrees.toDouble() else preview.geoDirection
             // n.b., must draw this without the standard canvas rotation
             // lines should be shorter in portrait
             val radiusDps = if (deviceUiRotation == 90 || deviceUiRotation == 270) 60 else 80
@@ -3451,7 +3458,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         // apply any orientation ourselves. However, we're we do want to know the true rotation of the
         // device, as it affects how certain elements of the UI are layed out.
         val deviceUiRotation: Int
-        if (MainActivity.lockToLandscape) {
+        if (MainActivity.LOCK_TO_LANDSCAPE) {
             deviceUiRotation = uiRotation
         } else {
             val systemOrientation: SystemOrientation = mainActivity.systemOrientation

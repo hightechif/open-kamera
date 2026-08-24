@@ -1,7 +1,9 @@
 plugins {
+    alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
-apply plugin: 'com.android.application'
 
 android {
     namespace 'com.hightechif.openkamera'
@@ -57,23 +59,29 @@ dependencies {
     implementation libs.androidx.core.ktx
     androidTestImplementation libs.androidx.junit
 
-    //implementation 'androidx.activity:activity:1.9.3' // needed for EdgeToEdge.enable(this)
-
     // appcompat version must be 1.4.0 or later to satisfy emoji policy!
     implementation libs.androidx.appcompat.v170
 
-    // implementation(platform(libs.kotlin.bom))
-
     implementation libs.androidx.legacy.support.v4
-
-    // 1.4.0 has bug where exif_new.setAttribute(ExifInterface.TAG_XMP, null); in ImageSaver.removeExifTags() crashes - so only update
-    // when fixed in a newer version; can be tested via testTakePhotoRemoveExifKeepDatetime
     implementation libs.androidx.exifinterface
-    //implementation 'androidx.exifinterface:exifinterface:1.4.0'
 
+    // Hilt Dependency Injection
+    implementation libs.hilt.android
+    ksp libs.hilt.compiler
+
+    // Coroutines & Lifecycle ViewModel
+    implementation libs.kotlinx.coroutines.core
+    implementation libs.kotlinx.coroutines.android
+    implementation libs.androidx.activity.ktx
+    implementation libs.androidx.lifecycle.viewmodel.ktx
+    implementation libs.androidx.lifecycle.runtime.ktx
+
+    // Test dependencies
     testImplementation libs.junit
     testImplementation libs.robolectric
     testImplementation libs.mockk
+    testImplementation libs.kotlinx.coroutines.test
+    testImplementation libs.turbine
 
     // newer AndroidJUnit4 InstrumentedTest
     androidTestImplementation libs.androidx.runner

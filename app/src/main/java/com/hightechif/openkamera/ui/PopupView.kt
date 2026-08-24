@@ -483,6 +483,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                                 ), resolutionString
                             )
                             editor.apply()
+                            mainActivity.settingsViewModel.setPhotoResolution(resolutionString)
 
                             // make it easier to scroll through the list of resolutions without a pause each time
                             // need a longer time for extension modes, due to the need to camera reopening (which will cause the
@@ -590,6 +591,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                                 ), quality
                             )
                             editor.apply()
+                            mainActivity.settingsViewModel.setVideoQuality(quality)
 
                             // make it easier to scroll through the list of resolutions without a pause each time
                             handler.removeCallbacks(updateRunnable)
@@ -1118,6 +1120,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                             val editor = sharedPreferences.edit()
                             editor.putString(PreferenceKeys.TIMER_PREFERENCE_KEY, newTimerValue)
                             editor.apply()
+                            mainActivity.settingsViewModel.setTimerSeconds(newTimerValue.toIntOrNull() ?: 0)
                         }
 
                         override fun onClickPrev(): Int {
@@ -1238,6 +1241,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                         val editor = sharedPreferences.edit()
                         editor.putString(PreferenceKeys.SHOW_GRID_PREFERENCE_KEY, newGridValue)
                         editor.apply()
+                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnGridTypeChanged(com.hightechif.openkamera.domain.model.GridType.fromKey(newGridValue)))
                         mainActivity.applicationInterface.drawPreview
                             .updateSettings() // because we cache the grid
                     }

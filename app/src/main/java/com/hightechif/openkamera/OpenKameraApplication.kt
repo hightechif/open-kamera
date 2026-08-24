@@ -11,7 +11,9 @@ import android.app.Application
 import android.os.Process
 import android.util.Log
 import com.hightechif.openkamera.utils.MyDebug
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class OpenKameraApplication : Application() {
     override fun onCreate() {
         if (MyDebug.LOG) Log.d(TAG, "onCreate")

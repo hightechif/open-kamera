@@ -1732,22 +1732,22 @@ class StorageUtils internal constructor(
          * Received filename should not include an extension.
          */
         private fun filenameIsSpecial(filenameWithoutExt: String): String? {
-            if (filenameWithoutExt.endsWith(ImageSaver.hdrSuffix)) {
+            if (filenameWithoutExt.endsWith(ImageSaver.HDR_SUFFIX)) {
                 return filenameWithoutExt.substring(
                     0,
-                    filenameWithoutExt.length - ImageSaver.hdrSuffix.length
+                    filenameWithoutExt.length - ImageSaver.HDR_SUFFIX.length
                 )
             }
-            if (filenameWithoutExt.endsWith(ImageSaver.nrSuffix)) {
+            if (filenameWithoutExt.endsWith(ImageSaver.NR_SUFFIX)) {
                 return filenameWithoutExt.substring(
                     0,
-                    filenameWithoutExt.length - ImageSaver.nrSuffix.length
+                    filenameWithoutExt.length - ImageSaver.NR_SUFFIX.length
                 )
             }
-            if (filenameWithoutExt.endsWith(ImageSaver.panoSuffix)) {
+            if (filenameWithoutExt.endsWith(ImageSaver.PANO_SUFFIX)) {
                 return filenameWithoutExt.substring(
                     0,
-                    filenameWithoutExt.length - ImageSaver.panoSuffix.length
+                    filenameWithoutExt.length - ImageSaver.PANO_SUFFIX.length
                 )
             }
             return null

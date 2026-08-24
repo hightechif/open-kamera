@@ -31,6 +31,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
+import com.hightechif.openkamera.preview.ApplicationInterface
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.HDRProcessorException
 import com.hightechif.openkamera.processing.PanoramaProcessorException
@@ -86,15 +87,14 @@ object TestUtils {
      */
     fun initTest(context: Context) {
         Log.d(TAG, "initTest: $TEST_CAMERA2")
-        ImageSaver.test_small_queue_size = false
+        ImageSaver.testSmallQueueSize = false
 
         val settings: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
         val editor = settings.edit()
         editor.clear()
         if (TEST_CAMERA2) {
             editor.putString(
-                PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-                "preference_camera_api_camera2"
+                PreferenceKeys.CAMERA_API_PREFERENCE_KEY, "preference_camera_api_camera2"
             )
         }
         editor.apply()
@@ -122,8 +122,7 @@ object TestUtils {
         val stem = filename.substring(images_base_path.length)
         val stemUri = Uri.parse(
             "content://com.android.externalstorage.documents/tree/primary%3ADCIM" + stem.replace(
-                "/",
-                "%2F"
+                "/", "%2F"
             )
         )
         Log.d(TAG, "stem: $stem")
@@ -150,9 +149,7 @@ object TestUtils {
 
     @Throws(FileNotFoundException::class)
     private fun getBitmapFromFileCore(
-        activity: MainActivity,
-        filename: String,
-        inSampleSize: Int
+        activity: MainActivity, filename: String, inSampleSize: Int
     ): Bitmap {
         Log.d(TAG, "getBitmapFromFileCore: $filename")
         val options = BitmapFactory.Options()
@@ -197,8 +194,7 @@ object TestUtils {
             }
             if (exif != null) {
                 val exifOrientationS = exif.getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_UNDEFINED
+                    ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED
                 )
                 var needsTf = false
                 var exifOrientation = 0
@@ -232,9 +228,7 @@ object TestUtils {
                     Log.d(TAG, "    need to rotate bitmap due to exif orientation tag")
                     val m = Matrix()
                     m.setRotate(
-                        exifOrientation.toFloat(),
-                        bitmap.width * 0.5f,
-                        bitmap.height * 0.5f
+                        exifOrientation.toFloat(), bitmap.width * 0.5f, bitmap.height * 0.5f
                     )
                     val rotatedBitmap =
                         Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
@@ -303,10 +297,11 @@ object TestUtils {
         var uri: Uri? = null
         var outputStream: OutputStream?
         if (MainActivity.useScopedStorage()) {
-            val folder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            else
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            val folder =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Images.Media.getContentUri(
+                    MediaStore.VOLUME_EXTERNAL_PRIMARY
+                )
+                else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
 
             val oldUri = getUriFromName(activity, folder, name)
             if (oldUri != null) {
@@ -366,8 +361,7 @@ object TestUtils {
 
     fun checkHistogram(activity: MainActivity, bitmap: Bitmap): HistogramDetails {
         val histogram = activity.applicationInterface.hDRProcessor.computeHistogram(
-            bitmap,
-            HDRProcessor.HistogramType.HISTOGRAM_TYPE_INTENSITY
+            bitmap, HDRProcessor.HistogramType.HISTOGRAM_TYPE_INTENSITY
         )
         assertEquals(256, histogram.size)
         var total = 0
@@ -435,12 +429,7 @@ object TestUtils {
             val times = ArrayList<Long>()
             var timeS = System.currentTimeMillis()
             val avgData = hdrProcessor.processAvg(
-                bitmap0,
-                bitmap1,
-                avgFactor,
-                iso,
-                exposureTime,
-                zoomFactor
+                bitmap0, bitmap1, avgFactor, iso, exposureTime, zoomFactor
             )
             times.add(System.currentTimeMillis() - timeS)
             cb?.onAvgStep(1)
@@ -452,14 +441,7 @@ object TestUtils {
                 avgFactor = i.toFloat()
                 timeS = System.currentTimeMillis()
                 hdrProcessor.updateAvg(
-                    avgData,
-                    width,
-                    height,
-                    newBitmap,
-                    avgFactor,
-                    iso,
-                    exposureTime,
-                    zoomFactor
+                    avgData, width, height, newBitmap, avgFactor, iso, exposureTime, zoomFactor
                 )
                 times.add(System.currentTimeMillis() - timeS)
                 cb?.onAvgStep(i)
@@ -536,13 +518,7 @@ object TestUtils {
 
             if (scaleMatrix != null) {
                 val newBitmap = Bitmap.createBitmap(
-                    bitmap,
-                    0,
-                    0,
-                    bitmapWidth,
-                    bitmapHeight,
-                    scaleMatrix,
-                    true
+                    bitmap, 0, 0, bitmapWidth, bitmapHeight, scaleMatrix, true
                 )
                 bitmap.recycle()
                 bitmap = newBitmap
@@ -560,10 +536,7 @@ object TestUtils {
         try {
             val crop = true
             panorama = activity.applicationInterface.panoramaProcessor.panorama(
-                bitmaps,
-                panoramaPicsPerScreen,
-                cameraAngleY,
-                crop
+                bitmaps, panoramaPicsPerScreen, cameraAngleY, crop
             )
         } catch (e: PanoramaProcessorException) {
             Log.e(TAG, "panorama failed", e)
@@ -641,12 +614,10 @@ object TestUtils {
         val shareButton = activity.findViewById<View>(R.id.share)
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
         val isFocusBracketing = activity.supportsFocusBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_focus_bracketing"
         val isPanorama = activity.supportsPanorama() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_panorama"
 
         if (!isFocusBracketing) {
@@ -664,9 +635,7 @@ object TestUtils {
     }
 
     private fun checkFocusInitial(
-        activity: MainActivity,
-        focusValue: String,
-        focusValueUi: String?
+        activity: MainActivity, focusValue: String, focusValueUi: String?
     ) {
         val newFocusValueUi = activity.preview.currentFocusValue
         assertTrue(newFocusValueUi == focusValueUi || (newFocusValueUi != null && newFocusValueUi == focusValueUi))
@@ -702,21 +671,17 @@ object TestUtils {
         info.hasThumbnailAnim =
             sharedPreferences.getBoolean(PreferenceKeys.THUMBNAIL_ANIMATION_PREFERENCE_KEY, true)
         info.isHdr = activity.supportsHDR() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_hdr"
         info.isNr = activity.supportsNoiseReduction() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_noise_reduction"
         info.isExpo = activity.supportsExpoBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_expo_bracketing"
 
         val hasAudioControlButton = sharedPreferences.getString(
-            PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY,
-            "none"
+            PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none"
         ) != "none"
 
         val switchCameraButton = activity.findViewById<View>(R.id.switch_camera)
@@ -780,8 +745,7 @@ object TestUtils {
     ) {
         val preview = activity.preview
         assertEquals(
-            if (manualCanAutoFocus) savedCount + 1 else savedCount,
-            preview.count_cameraAutoFocus
+            if (manualCanAutoFocus) savedCount + 1 else savedCount, preview.count_cameraAutoFocus
         )
         if (singleTapPhoto) {
             assertFalse(preview.hasFocusArea())
@@ -828,8 +792,7 @@ object TestUtils {
         val preview = activity.preview
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
         val hasAudioControlButton = sharedPreferences.getString(
-            PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY,
-            "none"
+            PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none"
         ) != "none"
 
         val switchCameraButton = activity.findViewById<View>(R.id.switch_camera)
@@ -881,9 +844,7 @@ object TestUtils {
     }
 
     fun checkFocusAfterTakePhoto(
-        activity: MainActivity,
-        focusValue: String,
-        focusValueUi: String?
+        activity: MainActivity, focusValue: String, focusValueUi: String?
     ) {
         val newFocusValueUi = activity.preview.currentFocusValue
         Log.d(TAG, "focus_value_ui: $focusValueUi")
@@ -904,29 +865,23 @@ object TestUtils {
         val hdrSaveExpo =
             sharedPreferences.getBoolean(PreferenceKeys.HDR_SAVE_EXPO_PREFERENCE_KEY, false)
         val isHdr = activity.supportsHDR() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_hdr"
         val isExpo = activity.supportsExpoBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_expo_bracketing"
         val isFocusBracketing = activity.supportsFocusBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_focus_bracketing"
         val isFastBurst = activity.supportsFastBurst() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_fast_burst"
         val nExpoImagesS = sharedPreferences.getString(
-            PreferenceKeys.EXPO_BRACKETING_N_IMAGES_PREFERENCE_KEY,
-            "3"
+            PreferenceKeys.EXPO_BRACKETING_N_IMAGES_PREFERENCE_KEY, "3"
         )!!
         val nExpoImages = nExpoImagesS.toInt()
         val nFocusBracketingImagesS = sharedPreferences.getString(
-            PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY,
-            "3"
+            PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY, "3"
         )!!
         val nFocusBracketingImages = nFocusBracketingImagesS.toInt()
         val nFastBurstImagesS =
@@ -935,27 +890,30 @@ object TestUtils {
         val isPreshot =
             activity.applicationInterface.getPreShotsPref(activity.applicationInterface.photoMode)
 
+        val isRawPref =
+            activity.applicationInterface.getRawPref() != ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY
+        val actualIsRaw = (isRaw || isRawPref) && activity.preview.supportsRaw()
         var expNNewFiles: Int
         if (isHdr && hdrSaveExpo) {
             expNNewFiles = 4
-            if (isRaw && !activity.applicationInterface.isRawOnly) {
+            if (actualIsRaw && !activity.applicationInterface.isRawOnly) {
                 expNNewFiles += 3
             }
         } else if (isExpo) {
             expNNewFiles = nExpoImages
-            if (isRaw && !activity.applicationInterface.isRawOnly) {
+            if (actualIsRaw && !activity.applicationInterface.isRawOnly) {
                 expNNewFiles *= 2
             }
         } else if (isFocusBracketing) {
             expNNewFiles = nFocusBracketingImages
-            if (isRaw && !activity.applicationInterface.isRawOnly) {
+            if (actualIsRaw && !activity.applicationInterface.isRawOnly) {
                 expNNewFiles *= 2
             }
         } else if (isFastBurst) {
             expNNewFiles = nFastBurstImages
         } else {
             expNNewFiles = 1
-            if (isRaw && !activity.applicationInterface.isRawOnly) {
+            if (actualIsRaw && !activity.applicationInterface.isRawOnly) {
                 expNNewFiles *= 2
             }
         }
@@ -967,16 +925,11 @@ object TestUtils {
     }
 
     private enum class UriType {
-        MEDIASTORE_IMAGES,
-        MEDIASTORE_VIDEOS,
-        STORAGE_ACCESS_FRAMEWORK
+        MEDIASTORE_IMAGES, MEDIASTORE_VIDEOS, STORAGE_ACCESS_FRAMEWORK
     }
 
     private fun mediaFilesInSaveFolder(
-        activity: MainActivity,
-        baseUri: Uri,
-        bucketId: String?,
-        uriType: UriType
+        activity: MainActivity, baseUri: Uri, bucketId: String?, uriType: UriType
     ): List<String> {
         val files = ArrayList<String>()
         val columnNameC = 0
@@ -1014,15 +967,11 @@ object TestUtils {
             if (activity.storageUtils.isUsingSAF) {
                 val treeUri = activity.storageUtils.treeUriSAF!!
                 val baseUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                    treeUri,
-                    DocumentsContract.getTreeDocumentId(treeUri)
+                    treeUri, DocumentsContract.getTreeDocumentId(treeUri)
                 )
                 files.addAll(
                     mediaFilesInSaveFolder(
-                        activity,
-                        baseUri,
-                        null,
-                        UriType.STORAGE_ACCESS_FRAMEWORK
+                        activity, baseUri, null, UriType.STORAGE_ACCESS_FRAMEWORK
                     )
                 )
             } else {
@@ -1068,42 +1017,33 @@ object TestUtils {
     ) {
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
         val isDro = activity.supportsDRO() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_dro"
         val isHdr = activity.supportsHDR() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_hdr"
         val isNr = activity.supportsNoiseReduction() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_noise_reduction"
         val isExpo = activity.supportsExpoBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_expo_bracketing"
         val isFocusBracketing = activity.supportsFocusBracketing() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_focus_bracketing"
         val isFastBurst = activity.supportsFastBurst() && sharedPreferences.getString(
-            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-            "preference_photo_mode_std"
+            PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
         ) == "preference_photo_mode_fast_burst"
         val isXNight =
             activity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_NIGHT) && sharedPreferences.getString(
-                PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
-                "preference_photo_mode_std"
+                PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std"
             ) == "preference_photo_mode_x_night"
         val nExpoImagesS = sharedPreferences.getString(
-            PreferenceKeys.EXPO_BRACKETING_N_IMAGES_PREFERENCE_KEY,
-            "3"
+            PreferenceKeys.EXPO_BRACKETING_N_IMAGES_PREFERENCE_KEY, "3"
         )!!
         val nExpoImages = nExpoImagesS.toInt()
         val nFocusBracketingImagesS = sharedPreferences.getString(
-            PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY,
-            "3"
+            PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY, "3"
         )!!
         val nFocusBracketingImages = nFocusBracketingImagesS.toInt()
         val nFastBurstImagesS =
@@ -1143,11 +1083,20 @@ object TestUtils {
         }
 
         val nFiles = files?.size ?: 0
-        val files2 = filesInSaveFolder(activity)
-        val nNewFiles = (files2?.size ?: 0) - nFiles
-        Log.d(TAG, "n_new_files: $nNewFiles")
-        val expNNewFiles = getExpNNewFiles(activity, isRaw)
-        assertEquals(nNewFiles, expNNewFiles)
+        val isRawPref =
+            activity.applicationInterface.getRawPref() != ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY
+        val actualIsRaw = (isRaw || isRawPref) && activity.preview.supportsRaw()
+        val expNNewFiles = getExpNNewFiles(activity, actualIsRaw)
+        var files2 = filesInSaveFolder(activity)
+        var nNewFiles = (files2?.size ?: 0) - nFiles
+        val waitStartTime = System.currentTimeMillis()
+        while (nNewFiles < expNNewFiles && System.currentTimeMillis() - waitStartTime < 5000) {
+            Thread.sleep(200)
+            files2 = filesInSaveFolder(activity)
+            nNewFiles = (files2?.size ?: 0) - nFiles
+        }
+        Log.d(TAG, "n_new_files: $nNewFiles, exp: $expNNewFiles")
+        assertEquals(expNNewFiles, nNewFiles)
 
         if (!activity.applicationInterface.isRawOnly) {
             val savedImageFilename: String? =
@@ -1180,8 +1129,7 @@ object TestUtils {
                 }
             }
             assertTrue(
-                "Expected filename matching pattern for saved name: $savedImageFilename",
-                matched
+                "Expected filename matching pattern for saved name: $savedImageFilename", matched
             )
         }
     }
@@ -1287,8 +1235,7 @@ object TestUtils {
         val popupButton = activity.findViewById<View>(R.id.popup)
 
         assertEquals(
-            takePhotoButton.contentDescription,
-            activity.resources.getString(R.string.stop_video)
+            takePhotoButton.contentDescription, activity.resources.getString(R.string.stop_video)
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             assertEquals(pauseVideoButton.visibility, View.VISIBLE)
@@ -1329,8 +1276,7 @@ object TestUtils {
 
         if (!allowFailure) {
             assertEquals(
-                nNewFiles - nNonVideoFiles,
-                activity.applicationInterface.testNVideosScanned
+                nNewFiles - nNonVideoFiles, activity.applicationInterface.testNVideosScanned
             )
         }
     }
@@ -1366,8 +1312,7 @@ object TestUtils {
 
         assertFalse(preview.isVideoRecording)
         assertEquals(
-            takePhotoButton.contentDescription,
-            activity.resources.getString(R.string.start_video)
+            takePhotoButton.contentDescription, activity.resources.getString(R.string.start_video)
         )
         assertEquals(pauseVideoButton.visibility, View.GONE)
     }

@@ -160,7 +160,7 @@ class MainUI(val mainActivity: MainActivity) {
         if (!viewRotateAnimation) {
             view.rotation = uiRotation
         }
-        if (!MainActivity.lockToLandscape) {
+        if (!MainActivity.LOCK_TO_LANDSCAPE) {
             var startRotation = viewRotateAnimationStart + uiRotation
             if (startRotation >= 360.0f) startRotation -= 360.0f
             view.rotation = startRotation
@@ -240,7 +240,7 @@ class MainUI(val mainActivity: MainActivity) {
         this.uIPlacement = computeUIPlacement()
         if (MyDebug.LOG) Log.d(TAG, "ui_placement: " + uIPlacement)
         val relativeOrientation: Int
-        if (MainActivity.lockToLandscape) {
+        if (MainActivity.LOCK_TO_LANDSCAPE) {
             // new code for orientation fixed to landscape
             // the display orientation should be locked to landscape, but how many degrees is that?
             val rotation: Int = mainActivity.getWindowManager().getDefaultDisplay().getRotation()
@@ -1221,7 +1221,7 @@ class MainUI(val mainActivity: MainActivity) {
 			Log.d(TAG, "currentOrientation: " + currentOrientation);
 		}*/
         var orientation = orientation
-        if (!MainActivity.lockToLandscape) return
+        if (!MainActivity.LOCK_TO_LANDSCAPE) return
         // if locked to landscape, we need to handle the orientation change ourselves
         if (orientation == OrientationEventListener.ORIENTATION_UNKNOWN) return
         var diff = abs((orientation - currentOrientation).toDouble()).toInt()
