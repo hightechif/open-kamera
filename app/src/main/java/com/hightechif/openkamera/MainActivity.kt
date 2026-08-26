@@ -851,6 +851,23 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                     }
                 }
                 launch {
+                    cameraViewModel.captureState.collect { progress ->
+                        val takePhotoButton = findViewById<ImageButton>(R.id.take_photo)
+                        when (progress) {
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Starting,
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.CapturingBurst,
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Processing -> {
+                                takePhotoButton?.animate()?.scaleX(0.88f)?.scaleY(0.88f)?.setDuration(70)?.start()
+                            }
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Idle,
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Completed,
+                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Failed -> {
+                                takePhotoButton?.animate()?.scaleX(1.0f)?.scaleY(1.0f)?.setDuration(100)?.start()
+                            }
+                        }
+                    }
+                }
+                launch {
                     cameraViewModel.uiEffect.collect { effect ->
                         when (effect) {
                             is CameraUiEffect.ShowToast -> {

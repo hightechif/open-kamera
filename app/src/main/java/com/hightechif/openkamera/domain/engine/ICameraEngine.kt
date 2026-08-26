@@ -29,6 +29,8 @@ sealed interface CameraEngineState {
 }
 
 sealed interface CaptureProgress {
+    object Idle : CaptureProgress
+    object Starting : CaptureProgress
     data class CapturingBurst(val frameIndex: Int, val totalFrames: Int) : CaptureProgress
     data class Processing(val progressPercentage: Int) : CaptureProgress
     data class Completed(val jpegBytes: ByteArray, val dngBytes: ByteArray? = null) : CaptureProgress {

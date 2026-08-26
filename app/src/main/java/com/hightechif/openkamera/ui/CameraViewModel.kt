@@ -6,9 +6,13 @@
  */
 package com.hightechif.openkamera.ui
 
+import android.graphics.PointF
+import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
+import com.hightechif.openkamera.domain.engine.ICameraEngine
 import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.GridType
@@ -28,16 +32,20 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class CameraViewModel @Inject constructor(
+    private val cameraEngine: ICameraEngine,
     private val capturePhotoUseCase: CapturePhotoUseCase,
     private val recordVideoUseCase: RecordVideoUseCase,
     private val adjustExposureUseCase: AdjustExposureUseCase,
@@ -53,6 +61,13 @@ class CameraViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
+
+    private val _captureState = MutableStateFlow<CaptureProgress>(CaptureProgress.Idle)
+    val captureState: StateFlow<CaptureProgress> = _captureState.asStateFlow()
+
+    val isRecordingVideo: StateFlow<Boolean> = cameraEngine.engineStateFlow
+        .map { it is CameraEngineState.Recording }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _uiEffect = MutableSharedFlow<CameraUiEffect>(
         replay = 0,
@@ -124,6 +139,48 @@ class CameraViewModel @Inject constructor(
                 _uiState.update { it.copy(isRawEnabled = isRaw) }
             }
         }
+
+        viewModelScope.launch {
+            cameraEngine.engineStateFlow.collectLatest { engineState ->
+                _uiState.update { it.copy(isRecording = engineState is CameraEngineState.Recording) }
+            }
+        }
+    }
+
+    fun attachSurface(surface: Surface) {
+        viewModelScope.launch {
+            cameraEngine.attachPreviewSurface(surface)
+        }
+    }
+
+    fun detachSurface() {
+        viewModelScope.launch {
+            cameraEngine.detachPreviewSurface()
+        }
+    }
+
+    fun capturePhoto(customConfig: CaptureConfig? = null) {
+        handleShutterClicked(customConfig)
+    }
+
+    fun toggleVideoRecording() {
+        handleRecordVideoClicked()
+    }
+
+    fun setZoom(ratio: Float) {
+        handleZoomChanged(ratio)
+    }
+
+    fun tapToFocus(point: PointF) {
+        handleTapToFocus(CameraUiEvent.OnTapToFocus(point))
+    }
+
+    fun adjustExposure(step: Int) {
+        handleExposureStepChanged(step)
+    }
+
+    fun toggleFlash() {
+        handleFlashToggleClicked()
     }
 
     fun onEvent(event: CameraUiEvent) {
@@ -145,16 +202,19 @@ class CameraViewModel @Inject constructor(
         }
     }
 
-    private fun handleShutterClicked() {
+    private fun handleShutterClicked(customConfig: CaptureConfig? = null) {
+        if (_uiState.value.isCapturing) return
         viewModelScope.launch {
             _uiState.update { it.copy(isCapturing = true) }
-            val config = CaptureConfig(
+            _captureState.value = CaptureProgress.Starting
+            val config = customConfig ?: CaptureConfig(
                 captureMode = _uiState.value.captureMode,
                 flashMode = _uiState.value.flashMode,
                 enableRaw = _uiState.value.isRawEnabled
             )
 
             capturePhotoUseCase(config).collect { progress ->
+                _captureState.value = progress
                 when (progress) {
                     is CaptureProgress.Completed -> {
                         _uiState.update { it.copy(isCapturing = false) }

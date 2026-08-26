@@ -110,6 +110,7 @@ class CameraUdfIntegrationTest {
         val getCameraCapabilitiesUseCase = GetCameraCapabilitiesUseCase(mockCameraEngine)
 
         viewModel = CameraViewModel(
+            cameraEngine = mockCameraEngine,
             capturePhotoUseCase = capturePhotoUseCase,
             recordVideoUseCase = recordVideoUseCase,
             adjustExposureUseCase = adjustExposureUseCase,

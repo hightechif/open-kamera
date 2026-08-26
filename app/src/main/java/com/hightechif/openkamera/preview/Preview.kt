@@ -840,6 +840,15 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (MyDebug.LOG) {
                     Log.d(TAG, "x, y: " + event.x + ", " + event.y)
                 }
+                val viewW = cameraSurface.view.width.toFloat()
+                val viewH = cameraSurface.view.height.toFloat()
+                if (viewW > 0 && viewH > 0) {
+                    val normX = (event.x / viewW).coerceIn(0.0f, 1.0f)
+                    val normY = (event.y / viewH).coerceIn(0.0f, 1.0f)
+                    (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.tapToFocus(
+                        android.graphics.PointF(normX, normY)
+                    )
+                }
                 val coords = floatArrayOf(event.x, event.y)
                 calculatePreviewToCameraMatrix()
                 _previewToCameraMatrix.mapPoints(coords)
@@ -908,6 +917,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (MyDebug.LOG) Log.d(TAG, "onScale: $scaleFactor")
                 // make pinch zoom more sensitive:
                 if (touchWasMultitouch) scaleFactor = 1.0f + 2.0f * (scaleFactor - 1.0f)
+                (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.setZoom(scaleFactor)
                 this@Preview.scaleZoom(scaleFactor)
             }
             return true
@@ -1142,6 +1152,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (MyDebug.LOG) Log.d(TAG, "surfaceCreated()")
         // The Surface has been created, acquire the camera and tell it where
         // to draw.
+        if (holder.surface != null && holder.surface.isValid) {
+            (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.attachSurface(
+                holder.surface
+            )
+        }
         mySurfaceCreated()
         cameraSurface.view
             .setWillNotDraw(false) // see http://stackoverflow.com/questions/2687015/extended-surfaceviews-ondraw-method-never-called
@@ -1149,6 +1164,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         if (MyDebug.LOG) Log.d(TAG, "surfaceDestroyed()")
+        (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.detachSurface()
         // Surface will be destroyed when we return, so stop the preview.
         // Because the CameraDevice object is not a shared resource, it's very
         // important to release it when the activity is paused.
@@ -1160,6 +1176,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (holder.surface == null) {
             // preview surface does not exist
             return
+        }
+        if (holder.surface.isValid) {
+            (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.attachSurface(
+                holder.surface
+            )
         }
         mySurfaceChanged()
     }
@@ -1174,6 +1195,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     override fun onSurfaceTextureDestroyed(arg0: SurfaceTexture): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "onSurfaceTextureDestroyed()")
+        (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.detachSurface()
         this.setTextureviewSize = false
         this.textureviewW = 0
         this.textureviewH = 0

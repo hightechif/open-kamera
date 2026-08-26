@@ -6,9 +6,12 @@
  */
 package com.hightechif.openkamera.ui
 
+import android.graphics.PointF
+import android.view.Surface
 import app.cash.turbine.test
+import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
-import com.hightechif.openkamera.domain.model.CameraFacing
+import com.hightechif.openkamera.domain.engine.ICameraEngine
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.ExposureCompensation
 import com.hightechif.openkamera.domain.model.FlashMode
@@ -29,6 +32,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +54,7 @@ class CameraViewModelUnitTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
+    private val mockCameraEngine = mockk<ICameraEngine>(relaxed = true)
     private val mockCapturePhotoUseCase = mockk<CapturePhotoUseCase>(relaxed = true)
     private val mockRecordVideoUseCase = mockk<RecordVideoUseCase>(relaxed = true)
     private val mockAdjustExposureUseCase = mockk<AdjustExposureUseCase>(relaxed = true)
@@ -78,6 +83,7 @@ class CameraViewModelUnitTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
+        every { mockCameraEngine.engineStateFlow } returns MutableStateFlow(CameraEngineState.Ready)
         every { mockSettingsRepository.flashModeFlow } returns flashModeFlow
         every { mockSettingsRepository.gridTypeFlow } returns gridTypeFlow
         every { mockSettingsRepository.captureModeFlow } returns captureModeFlow
@@ -89,6 +95,7 @@ class CameraViewModelUnitTest {
         every { mockSetZoomUseCase.maxZoomRatio } returns maxZoomRatioFlow
 
         viewModel = CameraViewModel(
+            cameraEngine = mockCameraEngine,
             capturePhotoUseCase = mockCapturePhotoUseCase,
             recordVideoUseCase = mockRecordVideoUseCase,
             adjustExposureUseCase = mockAdjustExposureUseCase,
@@ -114,7 +121,7 @@ class CameraViewModelUnitTest {
         advanceUntilIdle()
 
         assertEquals(CaptureMode.HDR, viewModel.uiState.value.captureMode)
-        coVerify { mockSettingsRepository.setCaptureMode(CaptureMode.HDR) }
+        verify { mockSettingsRepository.setCaptureMode(CaptureMode.HDR) }
     }
 
     @Test
@@ -123,7 +130,7 @@ class CameraViewModelUnitTest {
         advanceUntilIdle()
 
         assertEquals(GridType.RULE_OF_THIRDS, viewModel.uiState.value.gridType)
-        coVerify { mockSettingsRepository.setGridType(GridType.RULE_OF_THIRDS) }
+        verify { mockSettingsRepository.setGridType(GridType.RULE_OF_THIRDS) }
     }
 
     @Test
@@ -143,7 +150,7 @@ class CameraViewModelUnitTest {
         )
 
         viewModel.uiEffect.test {
-            viewModel.onEvent(CameraUiEvent.OnShutterClicked)
+            viewModel.capturePhoto()
             advanceUntilIdle()
 
             val effect = awaitItem()
@@ -151,5 +158,33 @@ class CameraViewModelUnitTest {
             assertFalse(viewModel.uiState.value.isCapturing)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun surfaceLifecycle_attachesAndDetachesCleanly() = runTest(testDispatcher) {
+        val mockSurface = mockk<Surface>(relaxed = true)
+        viewModel.attachSurface(mockSurface)
+        advanceUntilIdle()
+        coVerify { mockCameraEngine.attachPreviewSurface(mockSurface) }
+
+        viewModel.detachSurface()
+        advanceUntilIdle()
+        coVerify { mockCameraEngine.detachPreviewSurface() }
+    }
+
+    @Test
+    fun touchFocusAndZoom_delegatesToUseCases() = runTest(testDispatcher) {
+        val focusPoint = PointF(0.5f, 0.5f)
+        viewModel.tapToFocus(focusPoint)
+        advanceUntilIdle()
+        coVerify { mockTapToFocusUseCase.focusAtPoint(focusPoint) }
+
+        viewModel.setZoom(2.5f)
+        advanceUntilIdle()
+        coVerify { mockSetZoomUseCase(2.5f) }
+
+        viewModel.adjustExposure(2)
+        advanceUntilIdle()
+        coVerify { mockAdjustExposureUseCase(2) }
     }
 }
