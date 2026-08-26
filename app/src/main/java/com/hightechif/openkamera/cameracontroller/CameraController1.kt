@@ -25,6 +25,10 @@ import kotlin.math.min
 /** Provides support using Android's original camera API
  * android.hardware.Camera.
  */
+@Deprecated(
+    message = "Legacy Camera1 HAL. Use Camera2EngineImpl / ICameraEngine.",
+    level = DeprecationLevel.WARNING
+)
 class CameraController1 private constructor(cameraId: Int) : CameraController(cameraId) {
 
     private var camera: Camera? = null
