@@ -9,8 +9,12 @@ package com.hightechif.openkamera.cameracontroller
 import android.content.Context
 import android.graphics.PointF
 import app.cash.turbine.test
+import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
+import com.hightechif.openkamera.domain.model.CameraFacing
+import com.hightechif.openkamera.domain.model.CameraFrameMetadata
 import com.hightechif.openkamera.domain.model.CaptureConfig
+import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.FocusState
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -84,6 +89,47 @@ class Camera2EngineUnitTest {
     fun setExposureCompensation_clampsWithinBounds() = runTest(testDispatcher) {
         cameraEngine.setExposureCompensation(2)
         assertEquals(2, cameraEngine.exposureCompensationFlow.value.currentStep)
+    }
+
+    @Test
+    fun setFlashMode_updatesWithoutError() = runTest(testDispatcher) {
+        cameraEngine.setFlashMode(FlashMode.ON)
+        cameraEngine.setFlashMode(FlashMode.TORCH)
+        cameraEngine.setFlashMode(FlashMode.AUTO)
+        cameraEngine.setFlashMode(FlashMode.OFF)
+    }
+
+    @Test
+    fun updateFrameMetadata_emitsOnFlow() = runTest(testDispatcher) {
+        val metadata = CameraFrameMetadata(
+            iso = 400,
+            exposureTimeNs = 20_000_000L,
+            aperture = 1.8f,
+            focalLengthMm = 26.0f,
+            focusDistanceMeters = 1.2f
+        )
+        cameraEngine.updateFrameMetadata(metadata)
+        assertEquals(400, cameraEngine.frameMetadataFlow.value.iso)
+        assertEquals(20_000_000L, cameraEngine.frameMetadataFlow.value.exposureTimeNs)
+        assertEquals(1.8f, cameraEngine.frameMetadataFlow.value.aperture ?: 0f, 0.01f)
+    }
+
+    @Test
+    fun videoRecording_transitionsState() = runTest(testDispatcher) {
+        val dummyFile = File("/tmp/test_video.mp4")
+        val startResult = cameraEngine.startVideoRecording(dummyFile)
+        assertTrue(startResult.isSuccess)
+        assertEquals(CameraEngineState.Recording, cameraEngine.engineStateFlow.value)
+
+        val stopResult = cameraEngine.stopVideoRecording()
+        assertTrue(stopResult.isSuccess)
+        assertEquals(CameraEngineState.Ready, cameraEngine.engineStateFlow.value)
+    }
+
+    @Test
+    fun closeCamera_resetsStateToUninitialized() = runTest(testDispatcher) {
+        cameraEngine.closeCamera()
+        assertEquals(CameraEngineState.Uninitialized, cameraEngine.engineStateFlow.value)
     }
 
     @Test
