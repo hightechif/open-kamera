@@ -17,7 +17,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -87,93 +86,88 @@ class SettingsRepositoryImpl @Inject constructor(
         sharedPreferences.getBoolean(KEY_SHOW_HORIZON, false)
     }
 
-    override suspend fun getFlashMode(): FlashMode = withContext(ioDispatcher) {
+    override fun getFlashMode(): FlashMode {
         val raw =
             sharedPreferences.getString(KEY_FLASH_MODE, FlashMode.AUTO.key) ?: FlashMode.AUTO.key
-        FlashMode.fromKey(raw)
+        return FlashMode.fromKey(raw)
     }
 
-    override suspend fun setFlashMode(flashMode: FlashMode) = withContext(ioDispatcher) {
+    override fun setFlashMode(flashMode: FlashMode) {
         sharedPreferences.edit().putString(KEY_FLASH_MODE, flashMode.key).apply()
     }
 
-    override suspend fun getGridType(): GridType = withContext(ioDispatcher) {
+    override fun getGridType(): GridType {
         val raw = sharedPreferences.getString(KEY_GRID_TYPE, GridType.NONE.key) ?: GridType.NONE.key
-        GridType.fromKey(raw)
+        return GridType.fromKey(raw)
     }
 
-    override suspend fun setGridType(gridType: GridType) = withContext(ioDispatcher) {
+    override fun setGridType(gridType: GridType) {
         sharedPreferences.edit().putString(KEY_GRID_TYPE, gridType.key).apply()
     }
 
-    override suspend fun getCaptureMode(): CaptureMode = withContext(ioDispatcher) {
+    override fun getCaptureMode(): CaptureMode {
         val raw = sharedPreferences.getString(KEY_CAPTURE_MODE, CaptureMode.PHOTO.name)
             ?: CaptureMode.PHOTO.name
-        try {
+        return try {
             CaptureMode.valueOf(raw)
         } catch (_: Exception) {
             CaptureMode.PHOTO
         }
     }
 
-    override suspend fun setCaptureMode(mode: CaptureMode) = withContext(ioDispatcher) {
+    override fun setCaptureMode(mode: CaptureMode) {
         sharedPreferences.edit().putString(KEY_CAPTURE_MODE, mode.name).apply()
     }
 
-    override suspend fun isRawEnabled(): Boolean = withContext(ioDispatcher) {
+    override fun isRawEnabled(): Boolean {
         val raw = sharedPreferences.getString(KEY_RAW, "preference_raw_no") ?: "preference_raw_no"
-        raw != "preference_raw_no"
+        return raw != "preference_raw_no"
     }
 
-    override suspend fun setRawEnabled(enabled: Boolean) = withContext(ioDispatcher) {
+    override fun setRawEnabled(enabled: Boolean) {
         val value = if (enabled) "preference_raw_yes" else "preference_raw_no"
         sharedPreferences.edit().putString(KEY_RAW, value).apply()
     }
 
-    override suspend fun getTimerSeconds(): Int = withContext(ioDispatcher) {
+    override fun getTimerSeconds(): Int {
         val raw = sharedPreferences.getString(KEY_TIMER, "0") ?: "0"
-        raw.toIntOrNull() ?: 0
+        return raw.toIntOrNull() ?: 0
     }
 
-    override suspend fun setTimerSeconds(seconds: Int) = withContext(ioDispatcher) {
+    override fun setTimerSeconds(seconds: Int) {
         val safeSeconds = seconds.coerceAtLeast(0)
         sharedPreferences.edit().putString(KEY_TIMER, safeSeconds.toString()).apply()
     }
 
-    override suspend fun isHorizonLevelEnabled(): Boolean = withContext(ioDispatcher) {
-        sharedPreferences.getBoolean(KEY_SHOW_HORIZON, false)
+    override fun isHorizonLevelEnabled(): Boolean {
+        return sharedPreferences.getBoolean(KEY_SHOW_HORIZON, false)
     }
 
-    override suspend fun setHorizonLevelEnabled(enabled: Boolean) = withContext(ioDispatcher) {
+    override fun setHorizonLevelEnabled(enabled: Boolean) {
         sharedPreferences.edit().putBoolean(KEY_SHOW_HORIZON, enabled).apply()
     }
 
-    override suspend fun getStringPreference(key: String, defaultValue: String): String =
-        withContext(ioDispatcher) {
-            sharedPreferences.getString(key, defaultValue) ?: defaultValue
-        }
+    override fun getStringPreference(key: String, defaultValue: String): String {
+        return sharedPreferences.getString(key, defaultValue) ?: defaultValue
+    }
 
-    override suspend fun setStringPreference(key: String, value: String) =
-        withContext(ioDispatcher) {
-            sharedPreferences.edit().putString(key, value).apply()
-        }
+    override fun setStringPreference(key: String, value: String) {
+        sharedPreferences.edit().putString(key, value).apply()
+    }
 
-    override suspend fun getBooleanPreference(key: String, defaultValue: Boolean): Boolean =
-        withContext(ioDispatcher) {
-            sharedPreferences.getBoolean(key, defaultValue)
-        }
+    override fun getBooleanPreference(key: String, defaultValue: Boolean): Boolean {
+        return sharedPreferences.getBoolean(key, defaultValue)
+    }
 
-    override suspend fun setBooleanPreference(key: String, value: Boolean) =
-        withContext(ioDispatcher) {
-            sharedPreferences.edit().putBoolean(key, value).apply()
-        }
+    override fun setBooleanPreference(key: String, value: Boolean) {
+        sharedPreferences.edit().putBoolean(key, value).apply()
+    }
 
-    override suspend fun getIntPreference(key: String, defaultValue: Int): Int =
-        withContext(ioDispatcher) {
-            sharedPreferences.getInt(key, defaultValue)
-        }
+    override fun getIntPreference(key: String, defaultValue: Int): Int {
+        return sharedPreferences.getInt(key, defaultValue)
+    }
 
-    override suspend fun setIntPreference(key: String, value: Int) = withContext(ioDispatcher) {
+    override fun setIntPreference(key: String, value: Int) {
         sharedPreferences.edit().putInt(key, value).apply()
     }
 }

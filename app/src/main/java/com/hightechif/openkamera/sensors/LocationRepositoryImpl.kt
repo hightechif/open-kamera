@@ -53,8 +53,8 @@ class LocationRepositoryImpl @Inject constructor(
         return fineGranted || coarseGranted
     }
 
-    override suspend fun getLastKnownLocation(): LocationCoordinates? = withContext(ioDispatcher) {
-        if (!isLocationPermissionGranted() || locationManager == null) return@withContext null
+    override fun getLastKnownLocation(): LocationCoordinates? {
+        if (!isLocationPermissionGranted() || locationManager == null) return null
 
         try {
             val gpsLoc: Location? =
@@ -68,7 +68,7 @@ class LocationRepositoryImpl @Inject constructor(
                 else -> netLoc
             }
 
-            bestLoc?.let { loc ->
+            return bestLoc?.let { loc ->
                 val coords = LocationCoordinates(
                     latitude = loc.latitude,
                     longitude = loc.longitude,
@@ -78,7 +78,7 @@ class LocationRepositoryImpl @Inject constructor(
                 coords
             }
         } catch (_: SecurityException) {
-            null
+            return null
         }
     }
 

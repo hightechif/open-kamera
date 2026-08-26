@@ -10,9 +10,9 @@ import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.GridType
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,48 +63,48 @@ class SettingsViewModelUnitTest {
     fun setFlashMode_callsRepository() = runTest(testDispatcher) {
         viewModel.setFlashMode(FlashMode.TORCH)
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setFlashMode(FlashMode.TORCH) }
+        verify { mockSettingsRepository.setFlashMode(FlashMode.TORCH) }
     }
 
     @Test
     fun setGridType_callsRepository() = runTest(testDispatcher) {
         viewModel.setGridType(GridType.GOLDEN_SPIRAL)
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setGridType(GridType.GOLDEN_SPIRAL) }
+        verify { mockSettingsRepository.setGridType(GridType.GOLDEN_SPIRAL) }
     }
 
     @Test
     fun setRawEnabled_callsRepository() = runTest(testDispatcher) {
         viewModel.setRawEnabled(true)
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setRawEnabled(true) }
+        verify { mockSettingsRepository.setRawEnabled(true) }
     }
 
     @Test
     fun setTimerSeconds_callsRepository() = runTest(testDispatcher) {
         viewModel.setTimerSeconds(10)
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setTimerSeconds(10) }
+        verify { mockSettingsRepository.setTimerSeconds(10) }
     }
 
     @Test
     fun setHorizonLevelEnabled_callsRepository() = runTest(testDispatcher) {
         viewModel.setHorizonLevelEnabled(false)
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setHorizonLevelEnabled(false) }
+        verify { mockSettingsRepository.setHorizonLevelEnabled(false) }
     }
 
     @Test
     fun setPhotoResolution_callsRepository() = runTest(testDispatcher) {
         viewModel.setPhotoResolution("1920x1080")
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setStringPreference("preference_resolution", "1920x1080") }
+        verify { mockSettingsRepository.setStringPreference("preference_resolution", "1920x1080") }
     }
 
     @Test
     fun setVideoQuality_callsRepository() = runTest(testDispatcher) {
         viewModel.setVideoQuality("1080p")
         advanceUntilIdle()
-        coVerify { mockSettingsRepository.setStringPreference("preference_video_quality", "1080p") }
+        verify { mockSettingsRepository.setStringPreference("preference_video_quality", "1080p") }
     }
 }

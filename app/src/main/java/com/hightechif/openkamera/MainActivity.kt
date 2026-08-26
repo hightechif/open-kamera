@@ -130,6 +130,10 @@ import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.SaveLocationHandler
 import com.hightechif.openkamera.utils.TextFormatter
 import com.hightechif.openkamera.utils.ToastBoxer
+import com.hightechif.openkamera.domain.repository.ILocationRepository
+import com.hightechif.openkamera.domain.repository.IMediaRepository
+import com.hightechif.openkamera.domain.repository.ISensorRepository
+import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.io.File
@@ -139,6 +143,7 @@ import java.text.DecimalFormat
 import java.util.Hashtable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import javax.inject.Inject
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -151,6 +156,11 @@ import kotlin.math.min
 class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
     val cameraViewModel: CameraViewModel by viewModels()
     val settingsViewModel: SettingsViewModel by viewModels()
+
+    @Inject lateinit var settingsRepository: ISettingsRepository
+    @Inject lateinit var mediaRepository: IMediaRepository
+    @Inject lateinit var locationRepository: ILocationRepository
+    @Inject lateinit var sensorRepository: ISensorRepository
 
     var isAppPaused: Boolean = true
         private set
@@ -400,7 +410,14 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         settingsManager = SettingsManager(this)
         mainUI = MainUI(this)
         manualSeekbars = ManualSeekbars()
-        applicationInterface = MyApplicationInterface(this, savedInstanceState)
+        applicationInterface = MyApplicationInterface(
+            this,
+            savedInstanceState,
+            settingsRepository,
+            mediaRepository,
+            locationRepository,
+            sensorRepository
+        )
         if (MyDebug.LOG) Log.d(
             TAG,
             "onCreate: time after creating application interface: " + (System.currentTimeMillis() - debugTime)

@@ -58,6 +58,10 @@ import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.preview.VideoProfile
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.PanoramaProcessor
+import com.hightechif.openkamera.domain.repository.ILocationRepository
+import com.hightechif.openkamera.domain.repository.IMediaRepository
+import com.hightechif.openkamera.domain.repository.ISensorRepository
+import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.sensors.GyroSensor
 import com.hightechif.openkamera.sensors.LocationSupplier
 import com.hightechif.openkamera.storage.ImageSaver
@@ -86,7 +90,11 @@ import kotlin.math.sin
  */
 class MyApplicationInterface internal constructor(
     mainActivity: MainActivity,
-    savedInstanceState: Bundle?
+    savedInstanceState: Bundle?,
+    val settingsRepository: ISettingsRepository? = null,
+    val mediaRepository: IMediaRepository? = null,
+    val locationRepository: ILocationRepository? = null,
+    val sensorRepository: ISensorRepository? = null
 ) : BasicApplicationInterface() {
     // note, okay to change the order of enums in future versions, as getPhotoMode() does not rely on the order for the saved photo mode
     enum class PhotoMode {
@@ -234,7 +242,10 @@ class MyApplicationInterface internal constructor(
 
     override fun useCamera2(): Boolean {
         if (mainActivity.supportsCamera2()) {
-            val cameraApi = sharedPreferences.getString(
+            val cameraApi = settingsRepository?.getStringPreference(
+                PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
+                PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
+            ) ?: sharedPreferences.getString(
                 PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
                 PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
             )
@@ -246,10 +257,14 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun getLocation(): Location? {
-        /** If adding extra calls to this, consider whether explicit user permission is required, and whether
-         * privacy policy or data privacy section needs updating.
-         * Returns null if location not available.
-         */
+        val repoLocation = locationRepository?.getLastKnownLocation()
+        if (repoLocation != null) {
+            return Location("LocationRepository").apply {
+                latitude = repoLocation.latitude
+                longitude = repoLocation.longitude
+                repoLocation.altitude?.let { altitude = it }
+            }
+        }
         return locationSupplier.location
     }
 
@@ -408,13 +423,22 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun getFlashPref(): String {
-        return sharedPreferences.getString(
+        return settingsRepository?.getStringPreference(
+            PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
+            ""
+        ) ?: sharedPreferences.getString(
             PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
             ""
         )!!
     }
 
     override fun setFlashPref(flashValue: String?) {
+        if (flashValue != null) {
+            settingsRepository?.setStringPreference(
+                PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
+                flashValue
+            )
+        }
         val editor = sharedPreferences.edit()
         editor.putString(PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()), flashValue)
         editor.apply()
@@ -540,13 +564,22 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun getISOPref(): String {
-        return sharedPreferences.getString(
+        return settingsRepository?.getStringPreference(
+            PreferenceKeys.ISO_PREFERENCE_KEY,
+            CameraController.ISO_DEFAULT
+        ) ?: sharedPreferences.getString(
             PreferenceKeys.ISO_PREFERENCE_KEY,
             CameraController.ISO_DEFAULT
         )!!
     }
 
     override fun setISOPref(iso: String?) {
+        if (iso != null) {
+            settingsRepository?.setStringPreference(
+                PreferenceKeys.ISO_PREFERENCE_KEY,
+                iso
+            )
+        }
         val editor = sharedPreferences.edit()
         editor.putString(PreferenceKeys.ISO_PREFERENCE_KEY, iso)
         editor.apply()
@@ -1918,6 +1951,10 @@ class MyApplicationInterface internal constructor(
     override fun getRawPref(): RawPref {
         val photoMode = photoMode
         if (isRawAllowed(photoMode)) {
+            val isRaw = settingsRepository?.isRawEnabled()
+            if (isRaw == true) {
+                return RawPref.RAWPREF_JPEG_DNG
+            }
             when (sharedPreferences.getString(
                 PreferenceKeys.RAW_PREFERENCE_KEY,
                 "preference_raw_no"

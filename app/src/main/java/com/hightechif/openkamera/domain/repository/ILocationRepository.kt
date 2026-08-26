@@ -12,6 +12,6 @@ import kotlinx.coroutines.flow.Flow
 interface ILocationRepository {
     val currentLocationFlow: Flow<LocationCoordinates?>
 
-    suspend fun getLastKnownLocation(): LocationCoordinates?
+    fun getLastKnownLocation(): LocationCoordinates?
     fun isLocationPermissionGranted(): Boolean
 }

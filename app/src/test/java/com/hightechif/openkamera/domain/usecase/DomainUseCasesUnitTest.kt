@@ -22,14 +22,17 @@ import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -49,8 +52,8 @@ class DomainUseCasesUnitTest {
 
     @Before
     fun setUp() {
-        coEvery { mockSettingsRepository.getBooleanPreference(any(), any()) } returns false
-        coEvery { mockSettingsRepository.isRawEnabled() } returns false
+        every { mockSettingsRepository.getBooleanPreference(any(), any()) } returns false
+        every { mockSettingsRepository.isRawEnabled() } returns false
     }
 
     @Test
@@ -121,12 +124,12 @@ class DomainUseCasesUnitTest {
             settingsRepository = mockSettingsRepository
         )
 
-        coEvery { mockSettingsRepository.getFlashMode() } returns FlashMode.AUTO
+        every { mockSettingsRepository.getFlashMode() } returns FlashMode.AUTO
 
         val nextMode = useCase()
         assertEquals(FlashMode.ON, nextMode)
         coVerify { mockCameraEngine.setFlashMode(FlashMode.ON) }
-        coVerify { mockSettingsRepository.setFlashMode(FlashMode.ON) }
+        verify { mockSettingsRepository.setFlashMode(FlashMode.ON) }
     }
 
     @Test
@@ -136,13 +139,13 @@ class DomainUseCasesUnitTest {
             settingsRepository = mockSettingsRepository
         )
 
-        coEvery { mockSettingsRepository.getStringPreference("preference_camera_facing", any()) } returns CameraFacing.BACK.name
+        every { mockSettingsRepository.getStringPreference("preference_camera_facing", any()) } returns CameraFacing.BACK.name
         coEvery { mockCameraEngine.openCamera(CameraFacing.FRONT) } returns Result.success(Unit)
 
         val result = useCase()
         assertTrue(result.isSuccess)
         assertEquals(CameraFacing.FRONT, result.getOrNull())
-        coVerify { mockSettingsRepository.setStringPreference("preference_camera_facing", CameraFacing.FRONT.name) }
+        verify { mockSettingsRepository.setStringPreference("preference_camera_facing", CameraFacing.FRONT.name) }
     }
 }
 
@@ -197,7 +200,9 @@ class FakeTestMediaRepository : IMediaRepository {
     }
 
     override suspend fun createVideoOutputFile(extension: String): Result<File> {
-        return Result.success(File.createTempFile("VID_FAKE", ".$extension"))
+        return Result.success(withContext(Dispatchers.IO) {
+            File.createTempFile("VID_FAKE", ".$extension")
+        })
     }
 
     override suspend fun finalizeVideoFile(
