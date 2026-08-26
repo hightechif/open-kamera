@@ -688,58 +688,98 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         photoMode = applicationInterface.photoMode
         if (MyDebug.LOG) Log.d(TAG, "photoMode: $photoMode")
 
-        showTimePref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+        val settingsRepo = applicationInterface.settingsRepository
+        showTimePref = settingsRepo?.getBooleanPreference(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+            ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
         // reset in case user changes the preference:
         dateFormatTimeInstance = DateFormat.getTimeInstance()
         currentTimeString = null
         lastCurrentTimeTime = 0
         textBoundsTime = null
 
-        showCameraIdPref = mainActivity.isMultiCam && sharedPreferences.getBoolean(
+        showCameraIdPref = mainActivity.isMultiCam && (settingsRepo?.getBooleanPreference(
             PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY,
             true
-        )
+        ) ?: sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY,
+            true
+        ))
         //showCameraIdPref = true; // test
-        showFreeMemoryPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, true)
-        showIsoPref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, true)
-        showVideoMaxAmpPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY, false)
-        showZoomPref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY, true)
-        showBatteryPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY, true)
+        showFreeMemoryPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, true)
+        showIsoPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ISO_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, true)
+        showVideoMaxAmpPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY, false)
+        showZoomPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY, true)
+        showBatteryPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY, true)
 
-        showAnglePref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY, false)
-        val angleHighlightColor =
-            sharedPreferences.getString(
-                PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
-                "#14e715"
-            )!!
+        showAnglePref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY, false)
+        val angleHighlightColor = settingsRepo?.getStringPreference(
+            PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
+            "#14e715"
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
+            "#14e715"
+        )!!
         angleHighlightColorPref = Color.parseColor(angleHighlightColor)
-        showGeoDirectionPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
+        showGeoDirectionPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
 
-        takePhotoBorderPref =
-            sharedPreferences.getBoolean(PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY, true)
-        previewSizeWysiwygPref = sharedPreferences.getString(
+        takePhotoBorderPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY, true)
+        val previewSizePrefVal = settingsRepo?.getStringPreference(
             PreferenceKeys.PREVIEW_SIZE_PREFERENCE_KEY,
             "preference_preview_size_wysiwyg"
-        ) == "preference_preview_size_wysiwyg"
-        storeLocationPref =
-            sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.PREVIEW_SIZE_PREFERENCE_KEY,
+            "preference_preview_size_wysiwyg"
+        )
+        previewSizeWysiwygPref = previewSizePrefVal == "preference_preview_size_wysiwyg"
+        storeLocationPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.LOCATION_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
 
-        showAngleLinePref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY, false)
-        showPitchLinesPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY, false)
-        showGeoDirectionLinesPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY, false)
+        showAngleLinePref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY, false)
+        showPitchLinesPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY, false)
+        showGeoDirectionLinesPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY, false)
 
-        val immersiveMode =
-            sharedPreferences.getString(
-                PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
-                "immersive_mode_off"
-            )!!
+        val immersiveMode = settingsRepo?.getStringPreference(
+            PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
+            "immersive_mode_off"
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
+            "immersive_mode_off"
+        )!!
         immersiveModeEverythingPref = immersiveMode == "immersive_mode_everything"
 
         storedHasStampPref = applicationInterface.stampPref.equals("preference_stamp_yes")
