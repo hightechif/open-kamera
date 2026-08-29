@@ -688,58 +688,98 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         photoMode = applicationInterface.photoMode
         if (MyDebug.LOG) Log.d(TAG, "photoMode: $photoMode")
 
-        showTimePref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+        val settingsRepo = applicationInterface.settingsRepository
+        showTimePref = settingsRepo?.getBooleanPreference(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+            ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
         // reset in case user changes the preference:
         dateFormatTimeInstance = DateFormat.getTimeInstance()
         currentTimeString = null
         lastCurrentTimeTime = 0
         textBoundsTime = null
 
-        showCameraIdPref = mainActivity.isMultiCam && sharedPreferences.getBoolean(
+        showCameraIdPref = mainActivity.isMultiCam && (settingsRepo?.getBooleanPreference(
             PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY,
             true
-        )
+        ) ?: sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY,
+            true
+        ))
         //showCameraIdPref = true; // test
-        showFreeMemoryPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, true)
-        showIsoPref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, true)
-        showVideoMaxAmpPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY, false)
-        showZoomPref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY, true)
-        showBatteryPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY, true)
+        showFreeMemoryPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, true)
+        showIsoPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ISO_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, true)
+        showVideoMaxAmpPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY, false)
+        showZoomPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ZOOM_PREFERENCE_KEY, true)
+        showBatteryPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY, true)
 
-        showAnglePref = sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY, false)
-        val angleHighlightColor =
-            sharedPreferences.getString(
-                PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
-                "#14e715"
-            )!!
+        showAnglePref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_PREFERENCE_KEY, false)
+        val angleHighlightColor = settingsRepo?.getStringPreference(
+            PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
+            "#14e715"
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
+            "#14e715"
+        )!!
         angleHighlightColorPref = Color.parseColor(angleHighlightColor)
-        showGeoDirectionPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
+        showGeoDirectionPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
 
-        takePhotoBorderPref =
-            sharedPreferences.getBoolean(PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY, true)
-        previewSizeWysiwygPref = sharedPreferences.getString(
+        takePhotoBorderPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY,
+            true
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.TAKE_PHOTO_BORDER_PREFERENCE_KEY, true)
+        val previewSizePrefVal = settingsRepo?.getStringPreference(
             PreferenceKeys.PREVIEW_SIZE_PREFERENCE_KEY,
             "preference_preview_size_wysiwyg"
-        ) == "preference_preview_size_wysiwyg"
-        storeLocationPref =
-            sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.PREVIEW_SIZE_PREFERENCE_KEY,
+            "preference_preview_size_wysiwyg"
+        )
+        previewSizeWysiwygPref = previewSizePrefVal == "preference_preview_size_wysiwyg"
+        storeLocationPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.LOCATION_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
 
-        showAngleLinePref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY, false)
-        showPitchLinesPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY, false)
-        showGeoDirectionLinesPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY, false)
+        showAngleLinePref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY, false)
+        showPitchLinesPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY, false)
+        showGeoDirectionLinesPref = settingsRepo?.getBooleanPreference(
+            PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
+            false
+        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY, false)
 
-        val immersiveMode =
-            sharedPreferences.getString(
-                PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
-                "immersive_mode_off"
-            )!!
+        val immersiveMode = settingsRepo?.getStringPreference(
+            PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
+            "immersive_mode_off"
+        ) ?: sharedPreferences.getString(
+            PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
+            "immersive_mode_off"
+        )!!
         immersiveModeEverythingPref = immersiveMode == "immersive_mode_everything"
 
         storedHasStampPref = applicationInterface.stampPref.equals("preference_stamp_yes")
@@ -996,7 +1036,12 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private fun drawGrids(canvas: Canvas) {
         val preview: Preview = mainActivity.preview
         val cameraController: CameraController? = preview.cameraController ?: return
-        if (preferenceGridPref == "preference_grid_none") {
+        val gridKey = try {
+            mainActivity.cameraViewModel.uiState.value.gridType.key
+        } catch (_: Exception) {
+            preferenceGridPref
+        }
+        if (gridKey == "preference_grid_none") {
             return
         }
         if (preview.isPreviewPaused) {
@@ -1039,7 +1084,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
         p.strokeWidth = strokeWidth
 
-        when (preferenceGridPref) {
+        when (gridKey) {
             "preference_grid_3x3" -> {
                 p.color = Color.WHITE
                 canvas.drawLine(
@@ -2821,7 +2866,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val systemOrientationPortrait =
             systemOrientation === MainActivity.SystemOrientation.PORTRAIT
-        val hasLevelAngle: Boolean = preview.hasLevelAngle()
+        val uiState = try { mainActivity.cameraViewModel.uiState.value } catch (_: Exception) { null }
+        val horizonAngleState = uiState?.horizonAngle
+        val hasLevelAngle: Boolean = preview.hasLevelAngle() || (horizonAngleState != null)
         val actualShowAngleLinePref =
             if (photoMode === PhotoMode.Panorama) {
                 // in panorama mode, we should the level iff we aren't taking the panorama photos
@@ -2831,11 +2878,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val allowAngleLines = cameraController != null && !preview.isPreviewPaused
 
         if (allowAngleLines && hasLevelAngle && (actualShowAngleLinePref || showPitchLinesPref || showGeoDirectionLinesPref)) {
-            val levelAngle: Double = preview.levelAngle
+            val levelAngle: Double = horizonAngleState?.angleDegrees?.toDouble() ?: preview.levelAngle
             val hasPitchAngle: Boolean = preview.hasPitchAngle()
             val pitchAngle: Double = preview.pitchAngle
-            val hasGeoDirection: Boolean = preview.hasGeoDirection()
-            val geoDirection: Double = preview.geoDirection
+            val hasGeoDirection: Boolean = preview.hasGeoDirection() || ((uiState?.compassDegrees ?: 0.0f) != 0.0f)
+            val geoDirection: Double = if ((uiState?.compassDegrees ?: 0.0f) != 0.0f) uiState!!.compassDegrees.toDouble() else preview.geoDirection
             // n.b., must draw this without the standard canvas rotation
             // lines should be shorter in portrait
             val radiusDps = if (deviceUiRotation == 90 || deviceUiRotation == 270) 60 else 80
@@ -3451,7 +3498,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         // apply any orientation ourselves. However, we're we do want to know the true rotation of the
         // device, as it affects how certain elements of the UI are layed out.
         val deviceUiRotation: Int
-        if (MainActivity.lockToLandscape) {
+        if (MainActivity.LOCK_TO_LANDSCAPE) {
             deviceUiRotation = uiRotation
         } else {
             val systemOrientation: SystemOrientation = mainActivity.systemOrientation

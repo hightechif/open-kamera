@@ -11,6 +11,4 @@ import android.widget.Toast
 
 /** Allows methods to update a Toast with a new Toast.
  */
-class ToastBoxer {
-    var toast: Toast? = null
-}
+data class ToastBoxer(var toast: Toast? = null)

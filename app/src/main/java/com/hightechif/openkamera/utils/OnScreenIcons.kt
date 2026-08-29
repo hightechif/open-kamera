@@ -383,6 +383,9 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
             editor.putString(PreferenceKeys.RAW_PREFERENCE_KEY, new_value)
             editor.apply()
 
+            val isRaw = new_value != "preference_raw_no"
+            mainActivity.cameraViewModel.onEvent(com.hightechif.openkamera.ui.CameraUiEvent.OnRawToggled(isRaw))
+
             updateCycleRawIcon()
             mainActivity.applicationInterface.drawPreview.updateSettings()
             mainActivity.preview.reOpenKamera()

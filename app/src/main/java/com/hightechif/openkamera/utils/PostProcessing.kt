@@ -365,7 +365,7 @@ class PostProcessing(private val mainActivity: MainActivity) {
         return bitmap
     }
 
-    class PostProcessBitmapResult(val bitmap: Bitmap?)
+    data class PostProcessBitmapResult(val bitmap: Bitmap?)
 
     /** Performs post-processing on the data, or bitmap if non-null, for saveSingleImageNow. */
     @Throws(IOException::class)

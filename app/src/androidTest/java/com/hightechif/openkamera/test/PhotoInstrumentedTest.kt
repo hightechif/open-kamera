@@ -96,6 +96,15 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         onActivity { activity ->
             activity.testLastSavedImage = null
             activity.testLastSavedImageuri = null
+            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
+            if (!isRaw && sharedPreferences.getString(
+                    PreferenceKeys.RAW_PREFERENCE_KEY,
+                    "preference_raw_no"
+                ) != "preference_raw_no"
+            ) {
+                sharedPreferences.edit()
+                    .putString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no").apply()
+            }
         }
 
         val info = getActivityValue { activity ->

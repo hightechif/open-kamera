@@ -65,7 +65,6 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.ScriptC_histogram_compute
 import com.hightechif.openkamera.TakePhoto
@@ -270,31 +269,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * Important to call close() when the video recording is finished, to free up any resources
      * (e.g., supplied ParcelFileDescriptor).
      */
-    private class VideoFileInfo {
-        val videoMethod: ApplicationInterface.VideoMethod
-        val videoUri: Uri? // for VideoMethod.SAF, VideoMethod.URI or VideoMethod.MEDIASTORE
-        val videoFilename: String? // for VideoMethod.FILE
-        val videoPfdSaf: ParcelFileDescriptor? // for VideoMethod.SAF, VideoMethod.URI or VideoMethod.MEDIASTORE
-
-        constructor() {
-            this.videoMethod = ApplicationInterface.VideoMethod.FILE
-            this.videoUri = null
-            this.videoFilename = null
-            this.videoPfdSaf = null
-        }
-
-        constructor(
-            videoMethod: ApplicationInterface.VideoMethod,
-            videoUri: Uri?,
-            videoFilename: String?,
-            videoPfdSaf: ParcelFileDescriptor?
-        ) {
-            this.videoMethod = videoMethod
-            this.videoUri = videoUri
-            this.videoFilename = videoFilename
-            this.videoPfdSaf = videoPfdSaf
-        }
-
+    private data class VideoFileInfo(
+        val videoMethod: ApplicationInterface.VideoMethod = ApplicationInterface.VideoMethod.FILE,
+        val videoUri: Uri? = null,
+        val videoFilename: String? = null,
+        val videoPfdSaf: ParcelFileDescriptor? = null
+    ) {
         fun close() {
             if (this.videoPfdSaf != null) {
                 try {
@@ -398,6 +378,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             this.zoomRatios = null
         }
     }
+
     var maxZoom: Int = 0
         private set
     private val gestureDetector: GestureDetector
@@ -859,6 +840,15 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (MyDebug.LOG) {
                     Log.d(TAG, "x, y: " + event.x + ", " + event.y)
                 }
+                val viewW = cameraSurface.view.width.toFloat()
+                val viewH = cameraSurface.view.height.toFloat()
+                if (viewW > 0 && viewH > 0) {
+                    val normX = (event.x / viewW).coerceIn(0.0f, 1.0f)
+                    val normY = (event.y / viewH).coerceIn(0.0f, 1.0f)
+                    (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.tapToFocus(
+                        android.graphics.PointF(normX, normY)
+                    )
+                }
                 val coords = floatArrayOf(event.x, event.y)
                 calculatePreviewToCameraMatrix()
                 _previewToCameraMatrix.mapPoints(coords)
@@ -927,6 +917,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (MyDebug.LOG) Log.d(TAG, "onScale: $scaleFactor")
                 // make pinch zoom more sensitive:
                 if (touchWasMultitouch) scaleFactor = 1.0f + 2.0f * (scaleFactor - 1.0f)
+                (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.setZoom(scaleFactor)
                 this@Preview.scaleZoom(scaleFactor)
             }
             return true
@@ -1161,6 +1152,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (MyDebug.LOG) Log.d(TAG, "surfaceCreated()")
         // The Surface has been created, acquire the camera and tell it where
         // to draw.
+        if (holder.surface != null && holder.surface.isValid) {
+            (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.attachSurface(
+                holder.surface
+            )
+        }
         mySurfaceCreated()
         cameraSurface.view
             .setWillNotDraw(false) // see http://stackoverflow.com/questions/2687015/extended-surfaceviews-ondraw-method-never-called
@@ -1168,6 +1164,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         if (MyDebug.LOG) Log.d(TAG, "surfaceDestroyed()")
+        (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.detachSurface()
         // Surface will be destroyed when we return, so stop the preview.
         // Because the CameraDevice object is not a shared resource, it's very
         // important to release it when the activity is paused.
@@ -1179,6 +1176,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (holder.surface == null) {
             // preview surface does not exist
             return
+        }
+        if (holder.surface.isValid) {
+            (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.attachSurface(
+                holder.surface
+            )
         }
         mySurfaceChanged()
     }
@@ -1193,6 +1195,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     override fun onSurfaceTextureDestroyed(arg0: SurfaceTexture): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "onSurfaceTextureDestroyed()")
+        (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.detachSurface()
         this.setTextureviewSize = false
         this.textureviewW = 0
         this.textureviewH = 0
@@ -1352,12 +1355,17 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         videoRecorderIsPaused = false
         applicationInterface.cameraInOperation(false, true)
         reconnectCamera(false) // n.b., if something went wrong with video, then we reopen the camera - which may fail (or simply not reopen, e.g., if app is now paused)
+        val validVideoToBroadcast =
+            videoFileInfo.videoUri != null || videoFileInfo.videoFilename != null
         videoFileInfo.close()
-        applicationInterface.stoppedVideo(
-            videoFileInfo.videoMethod,
-            videoFileInfo.videoUri,
-            videoFileInfo.videoFilename
-        )
+        if (validVideoToBroadcast) {
+            applicationInterface.stoppedVideo(
+                videoFileInfo.videoMethod,
+                videoFileInfo.videoUri,
+                videoFileInfo.videoFilename
+            )
+            videoFileInfo = VideoFileInfo()
+        }
         if (nextVideoFileInfo != null) {
             // if nextVideoFileInfo is not-null, it means we received MEDIA_RECORDER_INFO_MAX_FILESIZE_APPROACHING but not
             // MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED, so it is the application responsibility to create the zero-size
@@ -1447,10 +1455,26 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 cameraController!!.reconnect()
                 this.isPreviewPaused = false
             } catch (e: CameraControllerException) {
-                if (MyDebug.LOG) Log.e(TAG, "failed to reconnect to camera")
+                if (MyDebug.LOG) Log.e(
+                    TAG,
+                    "failed to reconnect to camera, attempting recovery by reopening"
+                )
                 e.printStackTrace()
-                applicationInterface.onFailedReconnectError()
-                closeCamera(false, null)
+                this.previewStartedState = PREVIEW_NOT_STARTED
+                cameraController?.release()
+                cameraController = null
+                cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+                try {
+                    OpenKamera()
+                } catch (reopenException: Exception) {
+                    if (MyDebug.LOG) Log.e(
+                        TAG,
+                        "failed to recover camera: ${reopenException.message}"
+                    )
+                    if (!quiet) {
+                        applicationInterface.onFailedReconnectError()
+                    }
+                }
             }
             try {
                 tryAutoFocus(false, false)
@@ -1742,7 +1766,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         }
         // need to init everything now, in case we don't open the camera (but these may already be initialised from an earlier call - e.g., if we are now switching to another camera)
         // n.b., don't reset hasSetLocation, as we can remember the location when switching camera
-        previewStartedState = PREVIEW_NOT_STARTED // theoretically should be PREVIEW_NOT_STARTED anyway, but I had one RuntimeException from surfaceCreated()->OpenKamera()->setupCamera()->setPreviewSize() because previewStartedState was PREVIEW_STARTED, even though the preview couldn't have been started
+        previewStartedState =
+            PREVIEW_NOT_STARTED // theoretically should be PREVIEW_NOT_STARTED anyway, but I had one RuntimeException from surfaceCreated()->OpenKamera()->setupCamera()->setPreviewSize() because previewStartedState was PREVIEW_STARTED, even though the preview couldn't have been started
         setPreviewSize = false
         previewW = 0
         previewH = 0
@@ -2026,8 +2051,10 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (applicationInterface.useCamera2FakeFlash()) {
                     cameraControllerLocal.useCamera2FakeFlash = true
                 }
-            } else cameraControllerLocal =
-                CameraController1.createInstance(cameraId, cameraErrorCallback)
+            } else {
+                @Suppress("DEPRECATION")
+                cameraControllerLocal = CameraController1.createInstance(cameraId, cameraErrorCallback)
+            }
             //throw new CameraControllerException; // uncomment to test camera not opening
         } catch (e: CameraControllerException) {
             if (MyDebug.LOG) Log.e(TAG, "Failed to Open Kamera: " + e.message)
@@ -3719,17 +3746,30 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             return CamcorderProfile.get(0, CamcorderProfile.QUALITY_HIGH)
         }
         val cameraId: Int = cameraController!!.cameraId
-        // default
-        var camcorderProfile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH)
+        // default with safe fallback
+        var camcorderProfile = try {
+            if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_HIGH)) {
+                CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH)
+            } else if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_LOW)) {
+                CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_LOW)
+            } else {
+                CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH)
+            }
+        } catch (_: Exception) {
+            try {
+                CamcorderProfile.get(0, CamcorderProfile.QUALITY_HIGH)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        if (camcorderProfile == null) {
+            return CamcorderProfile.get(0, CamcorderProfile.QUALITY_LOW)
+        }
         try {
             var profileString = quality
             var index = profileString.indexOf('_')
             if (index != -1) {
                 profileString = quality.substring(0, index)
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "    profile_string: $profileString"
-                )
             }
             val profile = profileString.toInt()
             camcorderProfile = CamcorderProfile.get(cameraId, profile)
@@ -3820,13 +3860,18 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 // videoHighSpeed should only be for Camera2, where we don't support force4k option, but
                 // put the check here just in case - don't want to be forcing 4K resolution if high speed
                 // frame rate!
-                if (force4k && !videoHighSpeed) {
+                val isFront = cameraController?.facing === CameraController.Facing.FACING_FRONT
+                if (force4k && !videoHighSpeed && !isFront) {
                     if (MyDebug.LOG) Log.d(TAG, "force 4K UHD video")
-                    camProfile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH)
-                    camProfile.videoFrameWidth = 3840
-                    camProfile.videoFrameHeight = 2160
-                    camProfile.videoBitRate =
-                        (camProfile.videoBitRate * 2.8).toInt() // need a higher bitrate for the better quality - this is roughly based on the bitrate used by an S5's native camera app at 4K (47.6 Mbps, compared to 16.9 Mbps which is what's returned by the QUALITY_HIGH profile)
+                    camProfile = try {
+                        val profile = CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_HIGH)
+                        profile.videoFrameWidth = 3840
+                        profile.videoFrameHeight = 2160
+                        profile.videoBitRate = (profile.videoBitRate * 2.8).toInt()
+                        profile
+                    } catch (_: Exception) {
+                        null
+                    }
                 } else if (videoQualityHandler.currentVideoQualityIndex != -1) {
                     camProfile = getCamcorderProfile(videoQualityHandler.currentVideoQuality!!)
                 } else {
@@ -4550,27 +4595,27 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private val zoom_transition_handler = Handler(Looper.getMainLooper())
     private var zoom_transition_runnable: Runnable? = null
 
-    private fun zoomTo(new_zoom_factor: Int, allow_smooth_zoom: Boolean) {
-        zoomTo(new_zoom_factor, allow_smooth_zoom, false)
+    private fun zoomTo(newZoomFactor: Int, allowSmoothZoom: Boolean) {
+        zoomTo(newZoomFactor, allowSmoothZoom, false)
     }
 
     /** Zooms to the supplied index (within the zoom_ratios array).
-     * @param new_zoom_factor The index to zoom to.
-     * @param allow_smooth_zoom Whether zooming as part of pinch zooming.
-     * @param allow_zoom_transition If true, then change zoom gradually towards the requested zoom,
+     * @param newZoomFactor The index to zoom to.
+     * @param allowSmoothZoom Whether zooming as part of pinch zooming.
+     * @param allowZoomTransition If true, then change zoom gradually towards the requested zoom,
      *                              rather than zooming immediately to the requested zoom. Only
      *                              supported if allow_smooth_zoom==false.
      */
-    fun zoomTo(new_zoom_factor: Int, allow_smooth_zoom: Boolean, allow_zoom_transition: Boolean) {
-        var newZoomFactor = new_zoom_factor
-        var allowSmoothZoom = allow_smooth_zoom
-        var allowZoomTransition = allow_zoom_transition
+    fun zoomTo(newZoomFactor: Int, allowSmoothZoom: Boolean, allowZoomTransition: Boolean) {
+        var mutNewZoomFactor = newZoomFactor
+        var mutAllowSmoothZoom = allowSmoothZoom
+        var mutAllowZoomTransition = allowZoomTransition
         if (MyDebug.LOG)
-            Log.d(TAG, "ZoomTo(): $newZoomFactor")
-        if (newZoomFactor < 0)
-            newZoomFactor = 0
-        else if (newZoomFactor > maxZoom)
-            newZoomFactor = maxZoom
+            Log.d(TAG, "ZoomTo(): $mutNewZoomFactor")
+        if (mutNewZoomFactor < 0)
+            mutNewZoomFactor = 0
+        else if (mutNewZoomFactor > maxZoom)
+            mutNewZoomFactor = maxZoom
         if (zoom_transition_runnable != null) {
             // cancel an existing runnable
             zoom_transition_handler.removeCallbacks(zoom_transition_runnable!!)
@@ -4580,16 +4625,16 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (cameraController != null) {
             if (this.hasZoom) {
                 // don't cancelAutoFocus() here, otherwise we get sluggish zoom behaviour on Camera2 API
-                allowZoomTransition = allowZoomTransition && usingAndroidL // only for Camera2
-                allowZoomTransition =
-                    allowZoomTransition && !allowSmoothZoom // only if not smooth zooming
-                if (allowZoomTransition && Math.abs(cameraController!!.zoom - newZoomFactor) < 6) {
+                mutAllowZoomTransition = mutAllowZoomTransition && usingAndroidL // only for Camera2
+                mutAllowZoomTransition =
+                    mutAllowZoomTransition && !mutAllowSmoothZoom // only if not smooth zooming
+                if (mutAllowZoomTransition && Math.abs(cameraController!!.zoom - mutNewZoomFactor) < 6) {
                     // don't bother with transition if only changing a small amount
-                    allowZoomTransition = false
+                    mutAllowZoomTransition = false
                 }
-                if (allowZoomTransition) {
+                if (mutAllowZoomTransition) {
                     val startZoomValue = cameraController!!.zoom
-                    val targetZoomValue = newZoomFactor
+                    val targetZoomValue = mutNewZoomFactor
                     //val startZoom = zoom_ratios.get(startZoomValue)/100.0f
                     val startTime = System.currentTimeMillis()
                     val delay = 16L
@@ -4626,11 +4671,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     // if pinch zooming, pass through the "smooth" zoom factor so for Camera2 API we get perfectly smooth zoom, rather than it
                     // being snapped to the discrete zoom values
                     cameraController!!.setZoom(
-                        newZoomFactor,
-                        if (allowSmoothZoom && hasSmoothZoom) smoothZoom else -1.0f
+                        mutNewZoomFactor,
+                        if (mutAllowSmoothZoom && hasSmoothZoom) smoothZoom else -1.0f
                     )
                 }
-                applicationInterface.setZoomPref(newZoomFactor)
+                applicationInterface.setZoomPref(mutNewZoomFactor)
                 clearFocusAreas()
             }
         }

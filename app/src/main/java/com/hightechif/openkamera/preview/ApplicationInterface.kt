@@ -87,9 +87,10 @@ interface ApplicationInterface {
     fun getISOPref(): String // "auto" for auto-ISO, otherwise a numerical value; see documentation for Preview.supportsISORange().
     fun getExposureCompensationPref(): Int // 0 for default
 
-    class CameraResolutionConstraints {
-        var hasMaxMp: Boolean = false
+    data class CameraResolutionConstraints(
+        var hasMaxMp: Boolean = false,
         var maxMp: Int = 0
+    ) {
 
         fun hasConstraints(): Boolean {
             return hasMaxMp

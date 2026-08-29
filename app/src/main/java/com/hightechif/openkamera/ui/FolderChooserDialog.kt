@@ -64,10 +64,10 @@ open class FolderChooserDialog : DialogFragment() {
     var chosenFile: String? = null // only set if modeFolder==false
         private set
 
-    private class FileWrapper(
+    private data class FileWrapper(
         val file: File, // if non-null, use this as the display name instead
-        private val overrideName: String?, // items are sorted first by sortOrder, then alphabetically
-        private val sortOrder: Int
+        val overrideName: String?, // items are sorted first by sortOrder, then alphabetically
+        val sortOrder: Int
     ) : Comparable<FileWrapper?> {
 
         override fun toString(): String {
