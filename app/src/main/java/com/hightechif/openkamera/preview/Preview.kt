@@ -2051,8 +2051,10 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 if (applicationInterface.useCamera2FakeFlash()) {
                     cameraControllerLocal.useCamera2FakeFlash = true
                 }
-            } else cameraControllerLocal =
-                CameraController1.createInstance(cameraId, cameraErrorCallback)
+            } else {
+                @Suppress("DEPRECATION")
+                cameraControllerLocal = CameraController1.createInstance(cameraId, cameraErrorCallback)
+            }
             //throw new CameraControllerException; // uncomment to test camera not opening
         } catch (e: CameraControllerException) {
             if (MyDebug.LOG) Log.e(TAG, "Failed to Open Kamera: " + e.message)

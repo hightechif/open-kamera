@@ -202,5 +202,42 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
 
     companion object {
         private const val TAG = "AudioListener"
+
+        /**
+         * Converts short sample buffer into [com.hightechif.openkamera.domain.model.AudioAmplitudeData] containing RMS and peak decibels.
+         */
+        fun calculateAmplitudeData(
+            buffer: ShortArray,
+            readCount: Int
+        ): com.hightechif.openkamera.domain.model.AudioAmplitudeData {
+            if (readCount <= 0) return com.hightechif.openkamera.domain.model.AudioAmplitudeData()
+
+            var sumSquares = 0.0
+            var maxVal = 0
+
+            for (i in 0 until readCount) {
+                val sample = buffer[i].toInt()
+                sumSquares += (sample * sample).toDouble()
+                val absVal = abs(sample)
+                if (absVal > maxVal) {
+                    maxVal = absVal
+                }
+            }
+
+            val rms = kotlin.math.sqrt(sumSquares / readCount)
+            val maxPossibleRms = 32767.0
+            val peakDb = if (rms > 0) {
+                (20.0 * kotlin.math.log10(rms / maxPossibleRms)).toFloat().coerceIn(-90.0f, 0.0f)
+            } else {
+                -90.0f
+            }
+
+            return com.hightechif.openkamera.domain.model.AudioAmplitudeData(
+                currentRms = rms,
+                peakDecibels = peakDb,
+                isClipped = maxVal >= 32760,
+                sampleTimestampNs = System.nanoTime()
+            )
+        }
     }
 }

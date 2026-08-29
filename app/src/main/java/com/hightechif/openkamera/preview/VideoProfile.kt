@@ -10,6 +10,7 @@ package com.hightechif.openkamera.preview
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
 import android.util.Log
+import com.hightechif.openkamera.domain.model.VideoProfileConfig
 import com.hightechif.openkamera.utils.MyDebug
 
 /** This is essentially similar to CamcorderProfile in that it encapsulates a set of video settings
@@ -112,7 +113,47 @@ class VideoProfile {
         if (MyDebug.LOG) Log.d(TAG, "done: $mediaRecorder")
     }
 
+    /**
+     * Converts mutable [VideoProfile] to immutable [VideoProfileConfig].
+     */
+    fun toVideoProfileConfig(): VideoProfileConfig {
+        return VideoProfileConfig(
+            width = this.videoFrameWidth,
+            height = this.videoFrameHeight,
+            frameRate = this.videoFrameRate,
+            bitRate = this.videoBitRate,
+            videoCodec = this.videoCodec,
+            videoFormat = this.fileFormat,
+            audioCodec = this.audioCodec,
+            audioSource = this.audioSource,
+            audioSampleRate = this.audioSampleRate,
+            audioBitRate = this.audioBitRate,
+            audioChannels = this.audioChannels,
+            isHighSpeed = this.videoCaptureRate > this.videoFrameRate,
+            captureRateFactor = if (this.videoFrameRate > 0) (this.videoCaptureRate / this.videoFrameRate).toFloat() else 1.0f
+        )
+    }
+
     companion object {
         private const val TAG = "VideoProfile"
+
+        fun fromConfig(config: VideoProfileConfig): VideoProfile {
+            return VideoProfile().apply {
+                this.recordAudio = true
+                this.videoFrameWidth = config.width
+                this.videoFrameHeight = config.height
+                this.videoFrameRate = config.frameRate
+                this.videoCaptureRate = (config.frameRate * config.captureRateFactor).toDouble()
+                this.videoBitRate = config.bitRate
+                this.videoCodec = config.videoCodec
+                this.fileFormat = config.videoFormat
+                this.audioCodec = config.audioCodec
+                this.audioSource = config.audioSource
+                this.audioSampleRate = config.audioSampleRate
+                this.audioBitRate = config.audioBitRate
+                this.audioChannels = config.audioChannels
+                this.videoSource = MediaRecorder.VideoSource.CAMERA
+            }
+        }
     }
 }
