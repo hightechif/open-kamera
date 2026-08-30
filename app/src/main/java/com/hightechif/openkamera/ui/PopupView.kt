@@ -44,8 +44,6 @@ import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.utils.MyDebug
 import java.text.DecimalFormat
-import java.util.Arrays
-import java.util.Collections
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -181,7 +179,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                             TAG,
                             "clicked focus: $option"
                         )
-                        preview.updateFocus(option, false, true)
+                        preview.updateFocus(focusValue = option, quiet = false, autoFocus = true)
                         mainActivity.mainUI
                             .destroyPopup() // need to recreate popup for new selection
                     }
@@ -226,23 +224,23 @@ class PopupView(context: Context) : LinearLayout(context) {
             }
             if (mainActivity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_AUTOMATIC)) {
                 photoModes.add(resources.getString(if (useExpandedMenu) R.string.photo_mode_x_auto_full else R.string.photo_mode_x_auto))
-                photoModeValues.add(PhotoMode.X_Auto)
+                photoModeValues.add(PhotoMode.XAuto)
             }
             if (mainActivity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_HDR)) {
                 photoModes.add(resources.getString(if (useExpandedMenu) R.string.photo_mode_x_hdr_full else R.string.photo_mode_x_hdr))
-                photoModeValues.add(PhotoMode.X_HDR)
+                photoModeValues.add(PhotoMode.XHDR)
             }
             if (mainActivity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_NIGHT)) {
                 photoModes.add(resources.getString(if (useExpandedMenu) R.string.photo_mode_x_night_full else R.string.photo_mode_x_night))
-                photoModeValues.add(PhotoMode.X_Night)
+                photoModeValues.add(PhotoMode.XNight)
             }
             if (mainActivity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_BOKEH)) {
                 photoModes.add(resources.getString(if (useExpandedMenu) R.string.photo_mode_x_bokeh_full else R.string.photo_mode_x_bokeh))
-                photoModeValues.add(PhotoMode.X_Bokeh)
+                photoModeValues.add(PhotoMode.XBokeh)
             }
             if (mainActivity.supportsCameraExtension(CameraExtensionCharacteristics.EXTENSION_BEAUTY)) {
                 photoModes.add(resources.getString(if (useExpandedMenu) R.string.photo_mode_x_beauty_full else R.string.photo_mode_x_beauty))
-                photoModeValues.add(PhotoMode.X_Beauty)
+                photoModeValues.add(PhotoMode.XBeauty)
             }
             if (preview.isVideo) {
                 // only show photo modes when in photo mode, not video mode!
@@ -330,7 +328,7 @@ class PopupView(context: Context) : LinearLayout(context) {
 
                 //String nrModeValue = sharedPreferences.getString(PreferenceKeys.NRModePreferenceKey, "preference_nr_mode_normal");
                 val nrModeValue: String = mainActivity.applicationInterface.nRMode
-                nrModeIndex = Arrays.asList(*nrModeValues).indexOf(nrModeValue)
+                nrModeIndex = listOf(*nrModeValues).indexOf(nrModeValue)
                 if (nrModeIndex == -1) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -339,14 +337,14 @@ class PopupView(context: Context) : LinearLayout(context) {
                     nrModeIndex = 0
                 }
                 addArrayOptionsToPopup(
-                    Arrays.asList<String>(*nrModeEntries),
-                    resources.getString(R.string.preference_nr_mode),
-                    true,
-                    true,
-                    nrModeIndex,
-                    false,
-                    "NR_MODE",
-                    object : ArrayOptionsPopupListener() {
+                    supportedOptions = listOf(*nrModeEntries),
+                    title = resources.getString(R.string.preference_nr_mode),
+                    titleInOptions = true,
+                    titleInOptionsFirstOnly = true,
+                    currentIndex = nrModeIndex,
+                    cyclic = false,
+                    testKey = "NR_MODE",
+                    listener = object : ArrayOptionsPopupListener() {
                         private fun update() {
                             if (nrModeIndex == -1) return
                             val newNrModeValue = nrModeValues[nrModeIndex]
@@ -401,7 +399,10 @@ class PopupView(context: Context) : LinearLayout(context) {
                 }
 
                 val autoStabilise =
-                    sharedPreferences.getBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, false)
+                    sharedPreferences.getBoolean(
+                        PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY,
+                        false
+                    )
                 if (autoStabilise) checkBox.isChecked = autoStabilise
                 checkBox.setOnCheckedChangeListener { buttonView, isChecked ->
                     mainActivity.mainUI.getOnScreenIcons().clickedAutoLevel()
@@ -433,7 +434,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                                 pictureSize.height
                             ) + ")"
                         pictureSizeStrings.add(sizeString)
-                        if (pictureSize.equals(currentPictureSize)) {
+                        if (pictureSize == currentPictureSize) {
                             pictureSizeIndex = i
                         }
                     }
@@ -447,42 +448,41 @@ class PopupView(context: Context) : LinearLayout(context) {
                     )
                 }
                 addArrayOptionsToPopup(
-                    pictureSizeStrings,
-                    resources.getString(R.string.preference_resolution),
-                    false,
-                    false,
-                    pictureSizeIndex,
-                    false,
-                    "PHOTO_RESOLUTIONS",
-                    object : ArrayOptionsPopupListener() {
+                    supportedOptions = pictureSizeStrings,
+                    title = resources.getString(R.string.preference_resolution),
+                    titleInOptions = false,
+                    titleInOptionsFirstOnly = false,
+                    currentIndex = pictureSizeIndex,
+                    cyclic = false,
+                    testKey = "PHOTO_RESOLUTIONS",
+                    listener = object : ArrayOptionsPopupListener() {
                         val handler: Handler = Handler()
                         val updateRunnable: Runnable = Runnable {
                             if (MyDebug.LOG) Log.d(TAG, "update settings due to resolution change")
                             mainActivity.updateForSettings(
-                                true,
-                                "",
-                                true,
-                                false
+                                updateCamera = true,
+                                toastMessage = "",
+                                keepPopup = true,
+                                allowDim = false
                             ) // keep the popupview open
                         }
 
                         private fun update() {
                             if (pictureSizeIndex == -1) return
-                            val newSize: CameraController.Size =
-                                pictureSizes[pictureSizeIndex] ?: return
+                            val newSize: CameraController.Size = pictureSizes[pictureSizeIndex]
                             val resolutionString: String =
                                 "${newSize.width}" + " " + newSize.height
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.getResolutionPreferenceKey(
-                                    preview.cameraId,
-                                    mainActivity.applicationInterface
-                                        .getCameraIdSPhysicalPref()
-                                ), resolutionString
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.getResolutionPreferenceKey(
+                                        preview.cameraId,
+                                        mainActivity.applicationInterface
+                                            .getCameraIdSPhysicalPref()
+                                    ), resolutionString
+                                )
+                            }
                             mainActivity.settingsViewModel.setPhotoResolution(resolutionString)
 
                             // make it easier to scroll through the list of resolutions without a pause each time
@@ -523,7 +523,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 var videoSizes: List<String> = preview.getSupportedVideoQuality(
                     mainActivity.applicationInterface.getVideoFPSPref()
                 )
-                if (videoSizes.size == 0) {
+                if (videoSizes.isEmpty()) {
                     Log.e(TAG, "can't find any supported video sizes for current fps!")
                     // fall back to unfiltered list
                     videoSizes = preview.videoQualityHander.supportedVideoQuality
@@ -531,7 +531,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 // take a copy so that we can reorder
                 videoSizes = ArrayList(videoSizes)
                 // videoSizes is sorted high to low, but we want to order low to high
-                Collections.reverse(videoSizes)
+                videoSizes.reverse()
 
                 val videoSizesF = videoSizes
                 videoSizeIndex =
@@ -554,14 +554,14 @@ class PopupView(context: Context) : LinearLayout(context) {
                     videoSizeStrings.add(qualityString)
                 }
                 addArrayOptionsToPopup(
-                    videoSizeStrings,
-                    resources.getString(R.string.video_quality),
-                    false,
-                    false,
-                    videoSizeIndex,
-                    false,
-                    "VIDEO_RESOLUTIONS",
-                    object : ArrayOptionsPopupListener() {
+                    supportedOptions = videoSizeStrings,
+                    title = resources.getString(R.string.video_quality),
+                    titleInOptions = false,
+                    titleInOptionsFirstOnly = false,
+                    currentIndex = videoSizeIndex,
+                    cyclic = false,
+                    testKey = "VIDEO_RESOLUTIONS",
+                    listener = object : ArrayOptionsPopupListener() {
                         val handler: Handler = Handler()
                         val updateRunnable: Runnable = Runnable {
                             if (MyDebug.LOG) Log.d(
@@ -569,10 +569,10 @@ class PopupView(context: Context) : LinearLayout(context) {
                                 "update settings due to video resolution change"
                             )
                             mainActivity.updateForSettings(
-                                true,
-                                "",
-                                true,
-                                false
+                                updateCamera = true,
+                                toastMessage = "",
+                                keepPopup = true,
+                                allowDim = false
                             ) // keep the popupview open
                         }
 
@@ -581,16 +581,16 @@ class PopupView(context: Context) : LinearLayout(context) {
                             val quality = videoSizesF[videoSizeIndex]
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.getVideoQualityPreferenceKey(
-                                    preview.cameraId,
-                                    mainActivity.applicationInterface
-                                        .getCameraIdSPhysicalPref(),
-                                    mainActivity.applicationInterface.fpsIsHighSpeed()
-                                ), quality
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.getVideoQualityPreferenceKey(
+                                        preview.cameraId,
+                                        mainActivity.applicationInterface
+                                            .getCameraIdSPhysicalPref(),
+                                        mainActivity.applicationInterface.fpsIsHighSpeed()
+                                    ), quality
+                                )
+                            }
                             mainActivity.settingsViewModel.setVideoQuality(quality)
 
                             // make it easier to scroll through the list of resolutions without a pause each time
@@ -754,8 +754,11 @@ class PopupView(context: Context) : LinearLayout(context) {
                 val burstModeEntries = burstModeEntriesL.toTypedArray<String>()
 
                 val burstModeValue =
-                    sharedPreferences.getString(PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY, "5")!!
-                burstNImagesIndex = Arrays.asList(*burstModeValues).indexOf(burstModeValue)
+                    sharedPreferences.getString(
+                        PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY,
+                        "5"
+                    )!!
+                burstNImagesIndex = listOf(*burstModeValues).indexOf(burstModeValue)
                 if (burstNImagesIndex == -1) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -764,25 +767,25 @@ class PopupView(context: Context) : LinearLayout(context) {
                     burstNImagesIndex = 0
                 }
                 addArrayOptionsToPopup(
-                    Arrays.asList<String>(*burstModeEntries),
-                    resources.getString(R.string.preference_fast_burst_n_images),
-                    true,
-                    false,
-                    burstNImagesIndex,
-                    false,
-                    "FAST_BURST_N_IMAGES",
-                    object : ArrayOptionsPopupListener() {
+                    supportedOptions = listOf(*burstModeEntries),
+                    title = resources.getString(R.string.preference_fast_burst_n_images),
+                    titleInOptions = true,
+                    titleInOptionsFirstOnly = false,
+                    currentIndex = burstNImagesIndex,
+                    cyclic = false,
+                    testKey = "FAST_BURST_N_IMAGES",
+                    listener = object : ArrayOptionsPopupListener() {
                         private fun update() {
                             if (burstNImagesIndex == -1) return
                             val newBurstModeValue = burstModeValues[burstNImagesIndex]
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY,
-                                newBurstModeValue
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY,
+                                    newBurstModeValue
+                                )
+                            }
                             if (preview.cameraController != null) {
                                 preview.cameraController!!.setBurstNImages(
                                     mainActivity.applicationInterface.getBurstNImages()
@@ -828,7 +831,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                     PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY,
                     "3"
                 )!!
-                burstNImagesIndex = Arrays.asList(*burstModeValues).indexOf(burstModeValue)
+                burstNImagesIndex = listOf(*burstModeValues).indexOf(burstModeValue)
                 if (burstNImagesIndex == -1) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -837,25 +840,25 @@ class PopupView(context: Context) : LinearLayout(context) {
                     burstNImagesIndex = 0
                 }
                 addArrayOptionsToPopup(
-                    Arrays.asList<String>(*burstModeEntries),
-                    resources.getString(R.string.preference_focus_bracketing_n_images),
-                    true,
-                    false,
-                    burstNImagesIndex,
-                    false,
-                    "FOCUS_BRACKETING_N_IMAGES",
-                    object : ArrayOptionsPopupListener() {
+                    supportedOptions = listOf(*burstModeEntries),
+                    title = resources.getString(R.string.preference_focus_bracketing_n_images),
+                    titleInOptions = true,
+                    titleInOptionsFirstOnly = false,
+                    currentIndex = burstNImagesIndex,
+                    cyclic = false,
+                    testKey = "FOCUS_BRACKETING_N_IMAGES",
+                    listener = object : ArrayOptionsPopupListener() {
                         private fun update() {
                             if (burstNImagesIndex == -1) return
                             val newBurstModeValue = burstModeValues[burstNImagesIndex]
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY,
-                                newBurstModeValue
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.FOCUS_BRACKETING_N_IMAGES_PREFERENCE_KEY,
+                                    newBurstModeValue
+                                )
+                            }
                             if (preview.cameraController != null) {
                                 preview.cameraController!!.setFocusBracketingNImages(
                                     mainActivity.applicationInterface
@@ -894,12 +897,12 @@ class PopupView(context: Context) : LinearLayout(context) {
                 ) { buttonView, isChecked ->
                     val sharedPreferences =
                         PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                    val editor = sharedPreferences.edit()
-                    editor.putBoolean(
-                        PreferenceKeys.FOCUS_BRACKETING_ADD_INFINITY_PREFERENCE_KEY,
-                        isChecked
-                    )
-                    editor.apply()
+                    sharedPreferences.edit {
+                        putBoolean(
+                            PreferenceKeys.FOCUS_BRACKETING_ADD_INFINITY_PREFERENCE_KEY,
+                            isChecked
+                        )
+                    }
                     if (preview.cameraController != null) {
                         preview.cameraController!!.setFocusBracketingAddInfinity(
                             mainActivity.applicationInterface
@@ -922,9 +925,9 @@ class PopupView(context: Context) : LinearLayout(context) {
                             .setFocusBracketingSourceAutoPref(isChecked)
                         if (!isChecked) {
                             preview.setFocusDistance(
-                                mainActivity.preview.cameraController!!.captureResultFocusDistance(),
-                                false,
-                                false
+                                newFocusDistance = mainActivity.preview.cameraController!!.captureResultFocusDistance(),
+                                isTargetDistance = false,
+                                showToast = false
                             )
                         }
                     }
@@ -966,14 +969,14 @@ class PopupView(context: Context) : LinearLayout(context) {
                         }
                     }
                     addArrayOptionsToPopup(
-                        captureRateStr,
-                        resources.getString(R.string.preference_video_capture_rate),
-                        true,
-                        false,
-                        videoCaptureRateIndex,
-                        false,
-                        "VIDEOCAPTURERATE",
-                        object : ArrayOptionsPopupListener() {
+                        supportedOptions = captureRateStr,
+                        title = resources.getString(R.string.preference_video_capture_rate),
+                        titleInOptions = true,
+                        titleInOptionsFirstOnly = false,
+                        currentIndex = videoCaptureRateIndex,
+                        cyclic = false,
+                        testKey = "VIDEOCAPTURERATE",
+                        listener = object : ArrayOptionsPopupListener() {
                             private var oldVideoCaptureRateIndex = videoCaptureRateIndex
 
                             val handler: Handler = Handler()
@@ -983,10 +986,10 @@ class PopupView(context: Context) : LinearLayout(context) {
                                     "update settings due to video capture rate change"
                                 )
                                 mainActivity.updateForSettings(
-                                    true,
-                                    "",
-                                    true,
-                                    false
+                                    updateCamera = true,
+                                    toastMessage = "",
+                                    keepPopup = true,
+                                    allowDim = false
                                 ) // keep the popupview open
                             }
 
@@ -996,15 +999,15 @@ class PopupView(context: Context) : LinearLayout(context) {
                                     captureRateValues[videoCaptureRateIndex]
                                 val sharedPreferences =
                                     PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                                val editor = sharedPreferences.edit()
-                                editor.putFloat(
-                                    PreferenceKeys.getVideoCaptureRatePreferenceKey(
-                                        preview.cameraId,
-                                        mainActivity.applicationInterface
-                                            .getCameraIdSPhysicalPref()
-                                    ), newCaptureRateValue
-                                )
-                                editor.apply()
+                                sharedPreferences.edit {
+                                    putFloat(
+                                        PreferenceKeys.getVideoCaptureRatePreferenceKey(
+                                            preview.cameraId,
+                                            mainActivity.applicationInterface
+                                                .getCameraIdSPhysicalPref()
+                                        ), newCaptureRateValue
+                                    )
+                                }
 
                                 val oldCaptureRateValue =
                                     captureRateValues[oldVideoCaptureRateIndex]
@@ -1018,9 +1021,9 @@ class PopupView(context: Context) : LinearLayout(context) {
                                 var toastMessage = ""
                                 if (!keepPopup) {
                                     toastMessage = if (newSlowMotion) """
-     ${resources.getString(R.string.slow_motion_enabled)}
-     ${resources.getString(R.string.preference_video_capture_rate)}: ${captureRateStr[videoCaptureRateIndex]}
-     """.trimIndent()
+                             ${resources.getString(R.string.slow_motion_enabled)}
+                             ${resources.getString(R.string.preference_video_capture_rate)}: ${captureRateStr[videoCaptureRateIndex]}
+                             """.trimIndent()
                                     else resources.getString(R.string.slow_motion_disabled)
                                 }
                                 if (MyDebug.LOG) {
@@ -1094,7 +1097,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 val timerEntries = resources.getStringArray(R.array.preference_timer_entries)
                 val timerValue =
                     sharedPreferences.getString(PreferenceKeys.TIMER_PREFERENCE_KEY, "0")!!
-                timerIndex = Arrays.asList(*timerValues).indexOf(timerValue)
+                timerIndex = listOf(*timerValues).indexOf(timerValue)
                 if (timerIndex == -1) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -1104,7 +1107,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 }
                 // titleInOptions should be false for small screens: e.g., problems with pt-rBR or pt-rPT on 4.5" screens or less, see https://sourceforge.net/p/OpenKamera/discussion/photography/thread/3aa940c636/
                 addArrayOptionsToPopup(
-                    Arrays.asList<String>(*timerEntries),
+                    listOf(*timerEntries),
                     resources.getString(R.string.preference_timer),
                     !smallScreen,
                     false,
@@ -1117,10 +1120,12 @@ class PopupView(context: Context) : LinearLayout(context) {
                             val newTimerValue = timerValues[timerIndex]
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(PreferenceKeys.TIMER_PREFERENCE_KEY, newTimerValue)
-                            editor.apply()
-                            mainActivity.settingsViewModel.setTimerSeconds(newTimerValue.toIntOrNull() ?: 0)
+                            sharedPreferences.edit {
+                                putString(PreferenceKeys.TIMER_PREFERENCE_KEY, newTimerValue)
+                            }
+                            mainActivity.settingsViewModel.setTimerSeconds(
+                                newTimerValue.toIntOrNull() ?: 0
+                            )
                         }
 
                         override fun onClickPrev(): Int {
@@ -1153,7 +1158,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                     resources.getStringArray(R.array.preference_burst_mode_entries)
                 val repeatModeValue =
                     sharedPreferences.getString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1")!!
-                repeatModeIndex = Arrays.asList(*repeatModeValues).indexOf(repeatModeValue)
+                repeatModeIndex = listOf(*repeatModeValues).indexOf(repeatModeValue)
                 if (repeatModeIndex == -1) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -1164,7 +1169,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 // titleInOptions should be false for small screens: e.g., problems with pt-rBR or pt-rPT on 4.5" screens or less, see https://sourceforge.net/p/OpenKamera/discussion/photography/thread/3aa940c636/
                 // set titleInOptionsFirstOnly to true, as displaying "Repeat: Unlimited" can be too long in some languages, e.g., Vietnamese (vi)
                 addArrayOptionsToPopup(
-                    Arrays.asList<String>(*repeatModeEntries),
+                    listOf(*repeatModeEntries),
                     resources.getString(R.string.preference_burst_mode),
                     !smallScreen,
                     true,
@@ -1177,12 +1182,12 @@ class PopupView(context: Context) : LinearLayout(context) {
                             val newRepeatModeValue = repeatModeValues[repeatModeIndex]
                             val sharedPreferences =
                                 PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY,
-                                newRepeatModeValue
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY,
+                                    newRepeatModeValue
+                                )
+                            }
                         }
 
                         override fun onClickPrev(): Int {
@@ -1216,7 +1221,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                     PreferenceKeys.SHOW_GRID_PREFERENCE_KEY,
                     "preference_grid_none"
                 )!!
-            gridIndex = Arrays.asList(*gridValues).indexOf(gridValue)
+            gridIndex = listOf(*gridValues).indexOf(gridValue)
             if (gridIndex == -1) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
@@ -1225,23 +1230,29 @@ class PopupView(context: Context) : LinearLayout(context) {
                 gridIndex = 0
             }
             addArrayOptionsToPopup(
-                Arrays.asList<String>(*gridEntries),
-                resources.getString(R.string.grid),
-                true,
-                true,
-                gridIndex,
-                true,
-                "GRID",
-                object : ArrayOptionsPopupListener() {
+                supportedOptions = listOf(*gridEntries),
+                title = resources.getString(R.string.grid),
+                titleInOptions = true,
+                titleInOptionsFirstOnly = true,
+                currentIndex = gridIndex,
+                cyclic = true,
+                testKey = "GRID",
+                listener = object : ArrayOptionsPopupListener() {
                     private fun update() {
                         if (gridIndex == -1) return
                         val newGridValue = gridValues[gridIndex]
                         val sharedPreferences =
                             PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                        val editor = sharedPreferences.edit()
-                        editor.putString(PreferenceKeys.SHOW_GRID_PREFERENCE_KEY, newGridValue)
-                        editor.apply()
-                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnGridTypeChanged(com.hightechif.openkamera.domain.model.GridType.fromKey(newGridValue)))
+                        sharedPreferences.edit {
+                            putString(PreferenceKeys.SHOW_GRID_PREFERENCE_KEY, newGridValue)
+                        }
+                        mainActivity.cameraViewModel.onEvent(
+                            CameraUiEvent.OnGridTypeChanged(
+                                com.hightechif.openkamera.domain.model.GridType.fromKey(
+                                    newGridValue
+                                )
+                            )
+                        )
                         mainActivity.applicationInterface.drawPreview
                             .updateSettings() // because we cache the grid
                     }
@@ -1425,19 +1436,19 @@ class PopupView(context: Context) : LinearLayout(context) {
                 PhotoMode.Panorama -> toastMessage =
                     resources.getString(R.string.photo_mode_panorama_full)
 
-                PhotoMode.X_Auto -> toastMessage =
+                PhotoMode.XAuto -> toastMessage =
                     resources.getString(R.string.photo_mode_x_auto_full)
 
-                PhotoMode.X_HDR -> toastMessage =
+                PhotoMode.XHDR -> toastMessage =
                     resources.getString(R.string.photo_mode_x_hdr_full)
 
-                PhotoMode.X_Night -> toastMessage =
+                PhotoMode.XNight -> toastMessage =
                     resources.getString(R.string.photo_mode_x_night_full)
 
-                PhotoMode.X_Bokeh -> toastMessage =
+                PhotoMode.XBokeh -> toastMessage =
                     resources.getString(R.string.photo_mode_x_bokeh_full)
 
-                PhotoMode.X_Beauty -> toastMessage =
+                PhotoMode.XBeauty -> toastMessage =
                     resources.getString(R.string.photo_mode_x_beauty_full)
 
                 else -> {}
@@ -1485,27 +1496,27 @@ class PopupView(context: Context) : LinearLayout(context) {
                         "preference_photo_mode_panorama"
                     )
 
-                    PhotoMode.X_Auto -> putString(
+                    PhotoMode.XAuto -> putString(
                         PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
                         "preference_photo_mode_x_auto"
                     )
 
-                    PhotoMode.X_HDR -> putString(
+                    PhotoMode.XHDR -> putString(
                         PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
                         "preference_photo_mode_x_hdr"
                     )
 
-                    PhotoMode.X_Night -> putString(
+                    PhotoMode.XNight -> putString(
                         PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
                         "preference_photo_mode_x_night"
                     )
 
-                    PhotoMode.X_Bokeh -> putString(
+                    PhotoMode.XBokeh -> putString(
                         PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
                         "preference_photo_mode_x_bokeh"
                     )
 
-                    PhotoMode.X_Beauty -> putString(
+                    PhotoMode.XBeauty -> putString(
                         PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY,
                         "preference_photo_mode_x_beauty"
                     )
@@ -1549,11 +1560,11 @@ class PopupView(context: Context) : LinearLayout(context) {
             mainActivity.applicationInterface.drawPreview
                 .updateSettings() // because we cache the photomode
             mainActivity.updateForSettings(
-                true,
-                toastMessage,
-                false,
-                true
-            ) // need to setup the camera again, as options may change (e.g., required burst mode, or whether RAW is allowed in this mode)
+                updateCamera = true,
+                toastMessage = toastMessage,
+                keepPopup = false,
+                allowDim = true
+            ) // need to set up the camera again, as options may change (e.g., required burst mode, or whether RAW is allowed in this mode)
             mainActivity.mainUI.destroyPopup() // need to recreate popup for new selection
         }
     }
@@ -1583,12 +1594,12 @@ class PopupView(context: Context) : LinearLayout(context) {
                         )
                         val sharedPreferences =
                             PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                        val editor = sharedPreferences.edit()
-                        editor.putInt(
-                            PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY,
-                            temperature
-                        )
-                        editor.apply()
+                        sharedPreferences.edit {
+                            putInt(
+                                PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY,
+                                temperature
+                            )
+                        }
                     }
 
                     // otherwise default to the saved value
@@ -1765,7 +1776,7 @@ class PopupView(context: Context) : LinearLayout(context) {
             val rg = RadioGroup(this.context)
             rg.orientation = VERTICAL
             rg.visibility = GONE
-            mainActivity.mainUI.testUIButtonsMap.put(testKey, rg)
+            mainActivity.mainUI.testUIButtonsMap[testKey] = rg
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "addRadioOptionsToPopup time 2: " + (System.nanoTime() - debugTime)
@@ -1863,8 +1874,7 @@ class PopupView(context: Context) : LinearLayout(context) {
             sharedPreferences.getString(preferenceKey, defaultValue)
         val debugTime = System.nanoTime()
         val mainActivity: MainActivity = this.context as MainActivity
-        var count = 0
-        for (i in supportedOptionsEntries.indices) {
+        for ((count, i) in supportedOptionsEntries.indices.withIndex()) {
             val supportedOptionEntry = supportedOptionsEntries[i]
             val supportedOptionValue = supportedOptionsValues[i]
             if (MyDebug.LOG) {
@@ -1919,7 +1929,6 @@ class PopupView(context: Context) : LinearLayout(context) {
                 //button.setChecked(true);
                 rg.check(count)
             }
-            count++
 
             button.contentDescription = supportedOptionEntry
             if (MyDebug.LOG) Log.d(
@@ -1940,9 +1949,9 @@ class PopupView(context: Context) : LinearLayout(context) {
                 if (preferenceKey != null) {
                     val sharedPreferences =
                         PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                    val editor = sharedPreferences.edit()
-                    editor.putString(preferenceKey, supportedOptionValue)
-                    editor.apply()
+                    sharedPreferences.edit {
+                        putString(preferenceKey, supportedOptionValue)
+                    }
                 }
                 if (listener != null) {
                     listener.onClick(supportedOptionValue)
@@ -1955,8 +1964,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                 TAG,
                 "addRadioOptionsToGroup time 7: " + (System.nanoTime() - debugTime)
             )
-            mainActivity.mainUI.testUIButtonsMap
-                .put(testKey + "_" + supportedOptionValue, button)
+            mainActivity.mainUI.testUIButtonsMap[testKey + "_" + supportedOptionValue] = button
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "addRadioOptionsToGroup time 8: " + (System.nanoTime() - debugTime)
@@ -2057,10 +2065,10 @@ class PopupView(context: Context) : LinearLayout(context) {
             prevButton.layoutParams = vgParams
             prevButton.visibility = if (cyclic || currentIndex > 0) VISIBLE else INVISIBLE
             prevButton.contentDescription = resources.getString(R.string.previous) + " " + title
-            mainActivity.mainUI.testUIButtonsMap.put(testKey + "_PREV", prevButton)
+            mainActivity.mainUI.testUIButtonsMap[testKey + "_PREV"] = prevButton
 
             //ll2.addView(textView);
-            mainActivity.mainUI.testUIButtonsMap.put(testKey, textView)
+            mainActivity.mainUI.testUIButtonsMap[testKey] = textView
 
             nextButton.setBackgroundColor(Color.TRANSPARENT) // workaround for Android 6 crash!
             //ll2.addView(nextButton);
@@ -2075,7 +2083,7 @@ class PopupView(context: Context) : LinearLayout(context) {
             nextButton.visibility =
                 if (cyclic || currentIndex < supportedOptions.size - 1) VISIBLE else INVISIBLE
             nextButton.contentDescription = resources.getString(R.string.next) + " " + title
-            mainActivity.mainUI.testUIButtonsMap.put(testKey + "_NEXT", nextButton)
+            mainActivity.mainUI.testUIButtonsMap[testKey + "_NEXT"] = nextButton
 
             // test:
             /*prev_button.setText(prev_button.getContentDescription());
@@ -2285,7 +2293,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                     )
                     // hacks for ISO mode ISO_HJR (e.g., on Samsung S5)
                     // also some devices report e.g. "ISO100" etc
-                    val buttonString = if (prefixString.length == 0) {
+                    val buttonString = if (prefixString.isEmpty()) {
                         supportedOption
                     } else if (prefixString.equals(
                             "ISO",
@@ -2428,7 +2436,7 @@ class PopupView(context: Context) : LinearLayout(context) {
                     val scroll = HorizontalScrollView(context)
                     scroll.addView(ll2)
                     run {
-                        val params: ViewGroup.LayoutParams = LayoutParams(
+                        val params = LayoutParams(
                             totalWidth,
                             LayoutParams.WRAP_CONTENT
                         )

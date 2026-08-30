@@ -18,7 +18,6 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.AdapterView
 import android.widget.AdapterView.OnItemClickListener
 import android.widget.ArrayAdapter
 import android.widget.EditText
@@ -28,7 +27,6 @@ import com.hightechif.openkamera.R
 import com.hightechif.openkamera.storage.StorageUtils
 import com.hightechif.openkamera.utils.MyDebug
 import java.io.File
-import java.util.Collections
 import java.util.Locale
 
 /** Dialog to pick a folder or file. Also allows creating new folders. Used when not
@@ -36,7 +34,7 @@ import java.util.Locale
  */
 open class FolderChooserDialog : DialogFragment() {
     private var showNewFolderButton = true // whether to show a button for creating a new folder
-    private var showDcimShortcut = true // whether to show a shortcut to the DCIM/ folder
+    private var showDCIMShortcut = true // whether to show a shortcut to the DCIM/ folder
     private var modeFolder =
         true // if true, the dialog is for selecting a folder; if false, the dialog is for selecting a file
     private var extension: String? =
@@ -53,13 +51,13 @@ open class FolderChooserDialog : DialogFragment() {
     private var list: ListView? = null
 
     /** Returns the folder selected by the user (or the folder containing the selected folder if
-     * modeFolder==false). Returns null if the dialog was cancelled.
+     * modeFolder==false). Returns null if the dialog was canceled.
      */
     var chosenFolder: String? = null
         private set
 
     /** Returns the file selected by the user, if modeFolder==false. Returns null if the dialog was
-     * cancelled or modeFolder==true.
+     * canceled or modeFolder==true.
      */
     var chosenFile: String? = null // only set if modeFolder==false
         private set
@@ -87,7 +85,7 @@ open class FolderChooserDialog : DialogFragment() {
             // important to override equals(), since we're overriding compareTo()
             if (other !is FileWrapper) return false
             if (this.sortOrder != other.sortOrder) return false
-            return file.name.lowercase() == other.file.name.lowercase()
+            return file.name.equals(other.file.name, ignoreCase = true)
         }
 
         override fun hashCode(): Int {
@@ -104,28 +102,26 @@ open class FolderChooserDialog : DialogFragment() {
         )
 
         list = ListView(activity)
-        list!!.onItemClickListener = object : OnItemClickListener {
-            override fun onItemClick(parent: AdapterView<*>, view: View, position: Int, id: Long) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "onItemClick: $position"
-                )
-                val fileWrapper = parent.getItemAtPosition(position) as FileWrapper
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "clicked: $fileWrapper"
-                )
-                val file = fileWrapper.file
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "file: $file"
-                )
-                if (file.isDirectory) {
-                    refreshList(file)
-                } else if (!modeFolder && file.isFile) {
-                    this@FolderChooserDialog.chosenFile = file.absolutePath
-                    folderDialog.dismiss()
-                }
+        list!!.onItemClickListener = OnItemClickListener { parent, view, position, id ->
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "onItemClick: $position"
+            )
+            val fileWrapper = parent.getItemAtPosition(position) as FileWrapper
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "clicked: $fileWrapper"
+            )
+            val file = fileWrapper.file
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "file: $file"
+            )
+            if (file.isDirectory) {
+                refreshList(file)
+            } else if (!modeFolder && file.isFile) {
+                this@FolderChooserDialog.chosenFile = file.absolutePath
+                folderDialog.dismiss()
             }
         }
         // good to use as short a text as possible for the icons, to reduce chance that the three buttons will have to appear on top of each other rather than in a row, in portrait mode
@@ -154,7 +150,7 @@ open class FolderChooserDialog : DialogFragment() {
                 bPositive.setOnClickListener {
                     if (MyDebug.LOG) Log.d(
                         TAG,
-                        "choose folder: " + currentFolder.toString()
+                        "choose folder: $currentFolder"
                     )
                     if (useFolder()) {
                         folderDialog.dismiss()
@@ -166,7 +162,7 @@ open class FolderChooserDialog : DialogFragment() {
                 bNeutral.setOnClickListener {
                     if (MyDebug.LOG) Log.d(
                         TAG,
-                        "new folder in: " + currentFolder.toString()
+                        "new folder in: $currentFolder"
                     )
                     newFolder()
                 }
@@ -188,7 +184,7 @@ open class FolderChooserDialog : DialogFragment() {
             // see testFolderChooserInvalid()
             if (MyDebug.LOG) Log.d(TAG, "failed to read folder")
 
-            if (showDcimShortcut) {
+            if (showDCIMShortcut) {
                 if (MyDebug.LOG) Log.d(TAG, "fall back to DCIM")
                 // note that we reset to DCIM rather than DCIM/OpenKamera, just to increase likelihood of getting back to a valid state
                 refreshList(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM))
@@ -217,8 +213,8 @@ open class FolderChooserDialog : DialogFragment() {
         this.showNewFolderButton = showNewFolderButton
     }
 
-    fun setShowDCIMShortcut(showDcimShortcut: Boolean) {
-        this.showDcimShortcut = showDcimShortcut
+    fun setShowDCIMShortcut(showDCIMShortcut: Boolean) {
+        this.showDCIMShortcut = showDCIMShortcut
     }
 
     fun setModeFolder(modeFolder: Boolean) {
@@ -262,7 +258,7 @@ open class FolderChooserDialog : DialogFragment() {
                 )
             }
         }
-        if (showDcimShortcut) {
+        if (showDCIMShortcut) {
             val defaultFolder =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
             if (defaultFolder != newFolder && defaultFolder != newFolder.parentFile) listedFiles.add(
@@ -293,7 +289,7 @@ open class FolderChooserDialog : DialogFragment() {
                 }
             }
         }
-        Collections.sort(listedFiles)
+        listedFiles.sort()
 
         val adapter = ArrayAdapter(this.activity, android.R.layout.simple_list_item_1, listedFiles)
         list!!.adapter = adapter
@@ -306,7 +302,7 @@ open class FolderChooserDialog : DialogFragment() {
     private fun canWrite(): Boolean {
         try {
             if (this.currentFolder != null && currentFolder!!.canWrite()) return true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             if (MyDebug.LOG) Log.d(TAG, "exception in canWrite()")
         }
         return false
@@ -317,7 +313,7 @@ open class FolderChooserDialog : DialogFragment() {
         if (currentFolder == null) return false
         if (canWrite()) {
             var newSaveLocation = currentFolder!!.absolutePath
-            if (this.showDcimShortcut) {
+            if (this.showDCIMShortcut) {
                 val baseFolder: File = StorageUtils.baseFolder
                 if (currentFolder!!.parentFile != null && currentFolder!!.parentFile == baseFolder) {
                     if (MyDebug.LOG) Log.d(TAG, "parent folder is base folder")
@@ -346,7 +342,7 @@ open class FolderChooserDialog : DialogFragment() {
             dend: Int
         ): CharSequence? {
             for (i in start..<end) {
-                if (disallowed.indexOf(source[i]) != -1) {
+                if (DISALLOWED.indexOf(source[i]) != -1) {
                     return ""
                 }
             }
@@ -355,7 +351,7 @@ open class FolderChooserDialog : DialogFragment() {
 
         companion object {
             // whilst Android seems to allow any characters on internal memory, SD cards are typically formatted with FAT32
-            private const val disallowed = "|\\?*<\":>"
+            private const val DISALLOWED = "|\\?*<\":>"
         }
     }
 
@@ -379,7 +375,7 @@ open class FolderChooserDialog : DialogFragment() {
                 AlertDialog.Builder(activity) //.setIcon(R.drawable.alert_dialog_icon)
                     .setTitle(R.string.enter_new_folder)
                     .setView(dialogView)
-                    .setPositiveButton(android.R.string.ok) { dialog, which ->
+                    .setPositiveButton(android.R.string.ok) { _, _ -> // dialog, which
                         if (editText.text.isEmpty()) {
                             // do nothing
                         } else {

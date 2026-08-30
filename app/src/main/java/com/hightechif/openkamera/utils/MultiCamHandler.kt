@@ -23,7 +23,7 @@ class MultiCamHandler(cameraControllerManager: CameraControllerManager) {
     // this can be done via isMultiCamEnabled().
     private var is_multi_cam = false
     // These lists are lists of camera IDs with the same "facing" (front, back or external).
-    // Only initialised if is_multi_cam==true.
+    // Only initialized if is_multi_cam==true.
     private var back_camera_ids: MutableList<Int>? = null
     private var front_camera_ids: MutableList<Int>? = null
     private var other_camera_ids: MutableList<Int>? = null
@@ -79,7 +79,7 @@ class MultiCamHandler(cameraControllerManager: CameraControllerManager) {
         return is_multi_cam && sharedPreferences.getBoolean(PreferenceKeys.MULTI_CAM_BUTTON_PREFERENCE_KEY, true)
     }
 
-    /** Whether this is a multi camera device, whether or not the user preference is set to enable
+    /** Whether this is a multi camera device, whether the user preference is set to enable
      * the multi-camera button.
      */
     fun isMultiCam(): Boolean {

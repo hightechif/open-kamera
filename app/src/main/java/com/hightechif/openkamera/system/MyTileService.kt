@@ -25,28 +25,12 @@ class MyTileService : TileService() {
         super.onDestroy()
     }
 
-    override fun onTileAdded() {
-        super.onTileAdded()
-    }
-
-    override fun onTileRemoved() {
-        super.onTileRemoved()
-    }
-
-    override fun onStartListening() {
-        super.onStartListening()
-    }
-
-    override fun onStopListening() {
-        super.onStopListening()
-    }
-
     override fun onClick() {
         if (MyDebug.LOG) Log.d(TAG, "onClick")
         super.onClick()
         val intent = Intent(this, MainActivity::class.java)
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.setAction(TILE_ID)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        intent.action = TILE_ID
         // use startActivityAndCollapse() instead of startActivity() so that the notification panel doesn't remain pulled down
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             // startActivityAndCollapse(Intent) throws UnsupportedOperationException on Android 14+

@@ -7,6 +7,7 @@
 package com.hightechif.openkamera.preferences
 
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.hightechif.openkamera.di.IoDispatcher
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.FlashMode
@@ -93,7 +94,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setFlashMode(flashMode: FlashMode) {
-        sharedPreferences.edit().putString(KEY_FLASH_MODE, flashMode.key).apply()
+        sharedPreferences.edit { putString(KEY_FLASH_MODE, flashMode.key) }
     }
 
     override fun getGridType(): GridType {
@@ -102,7 +103,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setGridType(gridType: GridType) {
-        sharedPreferences.edit().putString(KEY_GRID_TYPE, gridType.key).apply()
+        sharedPreferences.edit { putString(KEY_GRID_TYPE, gridType.key) }
     }
 
     override fun getCaptureMode(): CaptureMode {
@@ -116,7 +117,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setCaptureMode(mode: CaptureMode) {
-        sharedPreferences.edit().putString(KEY_CAPTURE_MODE, mode.name).apply()
+        sharedPreferences.edit { putString(KEY_CAPTURE_MODE, mode.name) }
     }
 
     override fun isRawEnabled(): Boolean {
@@ -126,7 +127,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override fun setRawEnabled(enabled: Boolean) {
         val value = if (enabled) "preference_raw_yes" else "preference_raw_no"
-        sharedPreferences.edit().putString(KEY_RAW, value).apply()
+        sharedPreferences.edit { putString(KEY_RAW, value) }
     }
 
     override fun getTimerSeconds(): Int {
@@ -136,7 +137,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override fun setTimerSeconds(seconds: Int) {
         val safeSeconds = seconds.coerceAtLeast(0)
-        sharedPreferences.edit().putString(KEY_TIMER, safeSeconds.toString()).apply()
+        sharedPreferences.edit { putString(KEY_TIMER, safeSeconds.toString()) }
     }
 
     override fun isHorizonLevelEnabled(): Boolean {
@@ -144,7 +145,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setHorizonLevelEnabled(enabled: Boolean) {
-        sharedPreferences.edit().putBoolean(KEY_SHOW_HORIZON, enabled).apply()
+        sharedPreferences.edit { putBoolean(KEY_SHOW_HORIZON, enabled) }
     }
 
     override fun getStringPreference(key: String, defaultValue: String): String {
@@ -152,7 +153,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setStringPreference(key: String, value: String) {
-        sharedPreferences.edit().putString(key, value).apply()
+        sharedPreferences.edit { putString(key, value) }
     }
 
     override fun getBooleanPreference(key: String, defaultValue: Boolean): Boolean {
@@ -160,7 +161,7 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setBooleanPreference(key: String, value: Boolean) {
-        sharedPreferences.edit().putBoolean(key, value).apply()
+        sharedPreferences.edit { putBoolean(key, value) }
     }
 
     override fun getIntPreference(key: String, defaultValue: Int): Int {
@@ -168,6 +169,6 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     override fun setIntPreference(key: String, value: Int) {
-        sharedPreferences.edit().putInt(key, value).apply()
+        sharedPreferences.edit { putInt(key, value) }
     }
 }

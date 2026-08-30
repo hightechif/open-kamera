@@ -43,9 +43,9 @@ class MainUiFormattingUnitTest {
                 val buttonText: String = PopupView.getButtonOptionString(
                     false,
                     "ISO",
-                    MainUI.ISOToButtonText(isoButtonValues[i])
+                    MainUI.convertISOToButtonText(isoButtonValues[i])
                 )
-                assertEquals(i == index, MainUI.ISOTextEquals(buttonText, currentIso.toString()))
+                assertEquals(i == index, MainUI.checkISOTextEquals(buttonText, currentIso.toString()))
             }
         }
     }

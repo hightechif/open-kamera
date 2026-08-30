@@ -57,7 +57,7 @@ class MyEditTextPreference(context: Context, attrs: AttributeSet) :
         super.onBindDialogView(view)
 
         this.edittext = view.findViewById(R.id.myedittextpreference_edittext)
-        edittext.setInputType(inputType)
+        edittext.inputType = inputType
 
         val textView = view.findViewById<TextView>(R.id.myedittextpreference_summary)
         textView.text = dialogMessage

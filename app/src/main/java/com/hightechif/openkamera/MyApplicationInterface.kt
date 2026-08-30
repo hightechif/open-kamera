@@ -16,7 +16,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Point
 import android.graphics.Rect
@@ -44,9 +43,16 @@ import android.view.WindowInsets
 import android.widget.ImageButton
 import androidx.annotation.RequiresApi
 import androidx.core.content.edit
+import androidx.core.graphics.scale
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.Facing
 import com.hightechif.openkamera.cameracontroller.RawImage
+import com.hightechif.openkamera.domain.repository.ILocationRepository
+import com.hightechif.openkamera.domain.repository.IMediaRepository
+import com.hightechif.openkamera.domain.repository.ISensorRepository
+import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
@@ -58,10 +64,6 @@ import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.preview.VideoProfile
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.PanoramaProcessor
-import com.hightechif.openkamera.domain.repository.ILocationRepository
-import com.hightechif.openkamera.domain.repository.IMediaRepository
-import com.hightechif.openkamera.domain.repository.ISensorRepository
-import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.sensors.GyroSensor
 import com.hightechif.openkamera.sensors.LocationSupplier
 import com.hightechif.openkamera.storage.ImageSaver
@@ -84,6 +86,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Our implementation of ApplicationInterface, see there for details.
@@ -108,11 +111,11 @@ class MyApplicationInterface internal constructor(
         Panorama,
 
         // camera vendor extensions:
-        X_Auto,
-        X_HDR,
-        X_Night,
-        X_Bokeh,
-        X_Beauty
+        XAuto,
+        XHDR,
+        XNight,
+        XBokeh,
+        XBeauty
     }
 
     val mainActivity: MainActivity
@@ -170,12 +173,12 @@ class MyApplicationInterface internal constructor(
             this.name = filename
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 // previous to Android 7, we could just use a "file://" uri, but this is no longer supported on Android 7, and
-                // results in a android.os.FileUriExposedException when trying to share!
+                // results in an android.os.FileUriExposedException when trying to share!
                 // see https://stackoverflow.com/questions/38200282/android-os-fileuriexposedexception-file-storage-emulated-0-test-txt-exposed
                 // so instead we leave null for now, and set it from MyApplicationInterface.scannedFile().
                 this.uri = null
             } else {
-                this.uri = Uri.parse("file://" + this.name)
+                this.uri = ("file://" + this.name).toUri()
             }
             this.share = share
         }
@@ -185,8 +188,8 @@ class MyApplicationInterface internal constructor(
 
     private val photoDeleteToast: ToastBoxer = ToastBoxer()
 
-    private var has_set_cameraId = false
-    private var _cameraIdPref: Int = cameraId_default
+    private var hasSetCameraId = false
+    private var _cameraIdPref: Int = CAMERA_ID_DEFAULT
     override fun getCameraIdPref(): Int = _cameraIdPref
 
     private var _cameraIdSPhysicalPref: String? = null
@@ -194,8 +197,8 @@ class MyApplicationInterface internal constructor(
 
     /*if( MyDebug.LOG )
 			Log.d(TAG, "nrMode: " + nrMode);*/
-    var nRMode: String = nrModeDefault
-    private var _aperturePref: Float = apertureDefault
+    var nRMode: String = NR_MODE_DEFAULT
+    private var _aperturePref: Float = APERTURE_DEFAULT
     override fun getAperturePref(): Float = _aperturePref
 
     // camera properties that aren't saved even in the bundle; these should be initialised/reset in reset()
@@ -219,22 +222,17 @@ class MyApplicationInterface internal constructor(
         state.putInt("cameraId", getCameraIdPref())
         if (MyDebug.LOG) Log.d(TAG, "save cameraIdSPhysical: " + getCameraIdSPhysicalPref())
         state.putString("cameraIdSPhysical", getCameraIdSPhysicalPref())
-        if (MyDebug.LOG) Log.d(TAG, "save nr_mode: " + nRMode)
-        state.putString("nr_mode", nRMode)
+        if (MyDebug.LOG) Log.d(TAG, "save nRMode: $nRMode")
+        state.putString("nRMode", nRMode)
         if (MyDebug.LOG) Log.d(TAG, "save aperture: " + getAperturePref())
         state.putFloat("aperture", getAperturePref())
     }
 
     fun onDestroy() {
         if (MyDebug.LOG) Log.d(TAG, "on_destroy")
-        if (drawPreview != null) {
-            drawPreview.onDestroy()
-        }
-        if (imageSaver != null) {
-            imageSaver.onDestroy()
-        }
+        drawPreview.onDestroy()
+        imageSaver.onDestroy()
     }
-
 
 
     override val context: Context
@@ -439,9 +437,9 @@ class MyApplicationInterface internal constructor(
                 flashValue
             )
         }
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()), flashValue)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()), flashValue)
+        }
     }
 
     override fun getFocusPref(isVideo: Boolean): String {
@@ -486,9 +484,9 @@ class MyApplicationInterface internal constructor(
         sharedPreferences.getBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, false)
 
     override fun setVideoPref(isVideo: Boolean) {
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, isVideo)
-        editor.apply()
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, isVideo)
+        }
     }
 
     override fun getSceneModePref(): String {
@@ -499,9 +497,9 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun setSceneModePref(sceneMode: String?) {
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.SCENE_MODE_PREFERENCE_KEY, sceneMode)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.SCENE_MODE_PREFERENCE_KEY, sceneMode)
+        }
     }
 
     override fun getColorEffectPref(): String {
@@ -512,9 +510,9 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun setColorEffectPref(colorEffect: String?) {
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY, colorEffect)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY, colorEffect)
+        }
     }
 
     override fun getWhiteBalancePref(): String {
@@ -525,21 +523,21 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun setWhiteBalancePref(whiteBalance: String?) {
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY, whiteBalance)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY, whiteBalance)
+        }
     }
 
     override fun getWhiteBalanceTemperaturePref(): Int =
         sharedPreferences.getInt(PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY, 5000)
 
     override fun setWhiteBalanceTemperaturePref(whiteBalanceTemperature: Int) {
-        val editor = sharedPreferences.edit()
-        editor.putInt(
-            PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY,
-            whiteBalanceTemperature
-        )
-        editor.apply()
+        sharedPreferences.edit {
+            putInt(
+                PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY,
+                whiteBalanceTemperature
+            )
+        }
     }
 
     override fun getAntiBandingPref(): String {
@@ -580,9 +578,9 @@ class MyApplicationInterface internal constructor(
                 iso
             )
         }
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.ISO_PREFERENCE_KEY, iso)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.ISO_PREFERENCE_KEY, iso)
+        }
     }
 
     override fun getExposureCompensationPref(): Int {
@@ -599,23 +597,23 @@ class MyApplicationInterface internal constructor(
                 TAG,
                 "exposure: $exposure"
             )
-        } catch (exception: NumberFormatException) {
+        } catch (_: NumberFormatException) {
             if (MyDebug.LOG) Log.d(TAG, "exposure invalid format, can't parse to int")
         }
         return exposure
     }
 
     override fun setExposureCompensationPref(exposure: Int) {
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.EXPOSURE_PREFERENCE_KEY, exposure.toString())
-        editor.apply()
+        sharedPreferences.edit {
+            putString(PreferenceKeys.EXPOSURE_PREFERENCE_KEY, exposure.toString())
+        }
     }
 
     override fun getCameraResolutionPref(constraints: CameraResolutionConstraints): Pair<Int, Int>? {
         val photoMode = photoMode
         if (photoMode == PhotoMode.Panorama) {
             val bestSize: CameraController.Size = choosePanoramaResolution(
-                mainActivity.preview.getSupportedPictureSizes(false) ?: emptyList()
+                mainActivity.preview.getSupportedPictureSizes(false)
             )
             return Pair(bestSize.width, bestSize.height)
         }
@@ -631,7 +629,7 @@ class MyApplicationInterface internal constructor(
             "resolution_value: $resolutionValue"
         )
         var result: Pair<Int, Int>? = null
-        if (resolutionValue.length > 0) {
+        if (resolutionValue.isNotEmpty()) {
             // parse the saved size, and make sure it is still valid
             val index = resolutionValue.indexOf(' ')
             if (index == -1) {
@@ -661,7 +659,7 @@ class MyApplicationInterface internal constructor(
                         "resolution_h: $resolutionH"
                     )
                     result = Pair(resolutionW, resolutionH)
-                } catch (exception: NumberFormatException) {
+                } catch (_: NumberFormatException) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
                         "resolution_value invalid format, can't parse w or h to int"
@@ -697,7 +695,7 @@ class MyApplicationInterface internal constructor(
             var imageQuality: Int
             try {
                 imageQuality = imageQualityS.toInt()
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.e(
                     TAG,
                     "image_quality_s invalid format: $imageQualityS"
@@ -782,14 +780,14 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun setVideoQualityPref(videoQuality: String?) {
-        val editor = sharedPreferences.edit()
-        editor.putString(
-            PreferenceKeys.getVideoQualityPreferenceKey(
-                getCameraIdPref(),
-                getCameraIdSPhysicalPref(), fpsIsHighSpeed()
-            ), videoQuality
-        )
-        editor.apply()
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.getVideoQualityPreferenceKey(
+                    getCameraIdPref(),
+                    getCameraIdSPhysicalPref(), fpsIsHighSpeed()
+                ), videoQuality
+            )
+        }
     }
 
     override fun getVideoStabilizationPref(): Boolean =
@@ -957,7 +955,7 @@ class MyApplicationInterface internal constructor(
     override fun getVideoTonemapProfile(): CameraController.TonemapProfile {
         val videoLog =
             sharedPreferences.getString(PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY, "off")!!
-        // only return TONEMAPPROFILE_LOG for values recognised by getVideoLogProfileStrength()
+        // only return TONEMAPPROFILE_LOG for values recognized by getVideoLogProfileStrength()
         when (videoLog) {
             "off" -> return CameraController.TonemapProfile.TONEMAPPROFILE_OFF
             "rec709" -> return CameraController.TonemapProfile.TONEMAPPROFILE_REC709
@@ -1071,7 +1069,10 @@ class MyApplicationInterface internal constructor(
             }
 
             val videoMaxFilesizeValue =
-                sharedPreferences.getString(PreferenceKeys.VIDEO_MAX_FILE_SIZE_PREFERENCE_KEY, "0")!!
+                sharedPreferences.getString(
+                    PreferenceKeys.VIDEO_MAX_FILE_SIZE_PREFERENCE_KEY,
+                    "0"
+                )!!
             var videoMaxFilesize: Long
             try {
                 videoMaxFilesize = videoMaxFilesizeValue.toLong()
@@ -1150,7 +1151,7 @@ class MyApplicationInterface internal constructor(
             if (MyDebug.LOG) Log.d(TAG, "try setting max filesize")
             var freeMemory: Long = storageUtils.freeMemory()
             if (freeMemory >= 0) {
-                freeMemory = freeMemory * 1024 * 1024
+                freeMemory *= 1024 * 1024
 
                 val minFreeMemory: Long = 50000000 // how much free space to leave after video
                 // minFreeFilesize is the minimum value to set for max file size:
@@ -1183,7 +1184,7 @@ class MyApplicationInterface internal constructor(
                     }
                 } else {
                     if (MyDebug.LOG) Log.e(TAG, "not enough free storage to record video")
-                    throw NoFreeStorageException
+                    throw NoFreeStorageException()
                 }
             } else {
                 if (MyDebug.LOG) Log.d(TAG, "can't determine remaining free space")
@@ -1232,7 +1233,7 @@ class MyApplicationInterface internal constructor(
         } else if (mainActivity.lastContinuousFastBurst()) {
             // Don't use pause preview mode when doing a continuous fast burst
             // Firstly due to not using background thread for pause preview mode, this will be
-            // sluggish anyway, but even when this is fixed, I'm not sure it makes sense to use
+            // sluggish anyway, but even when this is fixed, I'm not sure if it makes sense to use
             // pause preview in this mode.
             return false
         } else if (photoMode == PhotoMode.Panorama) {
@@ -1246,7 +1247,10 @@ class MyApplicationInterface internal constructor(
         sharedPreferences.getBoolean(PreferenceKeys.SHOW_TOASTS_PREFERENCE_KEY, true)
 
     val thumbnailAnimationPref: Boolean
-        get() = sharedPreferences.getBoolean(PreferenceKeys.THUMBNAIL_ANIMATION_PREFERENCE_KEY, true)
+        get() = sharedPreferences.getBoolean(
+            PreferenceKeys.THUMBNAIL_ANIMATION_PREFERENCE_KEY,
+            true
+        )
 
     override fun getShutterSoundPref(): Boolean {
         if (photoMode == PhotoMode.Panorama) return false
@@ -1441,7 +1445,7 @@ class MyApplicationInterface internal constructor(
                     TAG,
                     "font_size: $fontSize"
                 )
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.d(TAG, "font size invalid format, can't parse to int")
             }
             return fontSize
@@ -1587,7 +1591,7 @@ class MyApplicationInterface internal constructor(
      */
     override fun getDisplayRotation(preferLater: Boolean): Int {
         // important to use cached rotation to reduce issues of incorrect focus square location when
-        // rotating device, due to strange Android behaviour where rotation changes shortly before
+        // rotating device, due to strange Android behavior where rotation changes shortly before
         // the configuration actually changes
         var rotation = mainActivity.getDisplayRotation(preferLater)
 
@@ -1616,9 +1620,9 @@ class MyApplicationInterface internal constructor(
     )
 
     override fun setExposureTimePref(exposureTime: Long) {
-        val editor = sharedPreferences.edit()
-        editor.putLong(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY, exposureTime)
-        editor.apply()
+        sharedPreferences.edit {
+            putLong(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY, exposureTime)
+        }
     }
 
     override fun getFocusDistancePref(isTargetDistance: Boolean): Float {
@@ -1637,7 +1641,7 @@ class MyApplicationInterface internal constructor(
         )
     }
 
-    /** Sets whether in focus bracketing auto focusing mode for source focus distance.
+    /** Sets whether in focus bracketing autofocusing mode for source focus distance.
      * If enabled==false (i.e. returning to manual mode), the caller should call Preview.setFocusDistance()
      * to set the new manual focus distance.
      */
@@ -1669,7 +1673,10 @@ class MyApplicationInterface internal constructor(
         val photoMode = photoMode
         if (photoMode == PhotoMode.FastBurst) {
             val nImagesValue =
-                sharedPreferences.getString(PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY, "5")!!
+                sharedPreferences.getString(
+                    PreferenceKeys.FAST_BURST_N_IMAGES_PREFERENCE_KEY,
+                    "5"
+                )!!
             var nImages: Int
             try {
                 nImages = nImagesValue.toInt()
@@ -1702,24 +1709,35 @@ class MyApplicationInterface internal constructor(
 
     override fun isCameraExtensionPref(): Boolean {
         val photoMode = photoMode
-        return photoMode == PhotoMode.X_Auto || photoMode == PhotoMode.X_HDR || photoMode == PhotoMode.X_Night || photoMode == PhotoMode.X_Bokeh || photoMode == PhotoMode.X_Beauty
+        return photoMode == PhotoMode.XAuto || photoMode == PhotoMode.XHDR || photoMode == PhotoMode.XNight || photoMode == PhotoMode.XBokeh || photoMode == PhotoMode.XBeauty
     }
 
     @RequiresApi(api = Build.VERSION_CODES.S)
     override fun getCameraExtensionPref(): Int {
         val photoMode = photoMode
-        if (photoMode == PhotoMode.X_Auto) {
-            return CameraExtensionCharacteristics.EXTENSION_AUTOMATIC
-        } else if (photoMode == PhotoMode.X_HDR) {
-            return CameraExtensionCharacteristics.EXTENSION_HDR
-        } else if (photoMode == PhotoMode.X_Night) {
-            return CameraExtensionCharacteristics.EXTENSION_NIGHT
-        } else if (photoMode == PhotoMode.X_Bokeh) {
-            return CameraExtensionCharacteristics.EXTENSION_BOKEH
-        } else if (photoMode == PhotoMode.X_Beauty) {
-            return CameraExtensionCharacteristics.EXTENSION_BEAUTY
+        when (photoMode) {
+            PhotoMode.XAuto -> {
+                return CameraExtensionCharacteristics.EXTENSION_AUTOMATIC
+            }
+
+            PhotoMode.XHDR -> {
+                return CameraExtensionCharacteristics.EXTENSION_HDR
+            }
+
+            PhotoMode.XNight -> {
+                return CameraExtensionCharacteristics.EXTENSION_NIGHT
+            }
+
+            PhotoMode.XBokeh -> {
+                return CameraExtensionCharacteristics.EXTENSION_BOKEH
+            }
+
+            PhotoMode.XBeauty -> {
+                return CameraExtensionCharacteristics.EXTENSION_BEAUTY
+            }
+
+            else -> return 0
         }
-        return 0
     }
 
     fun setAperture(aperture: Float) {
@@ -1741,7 +1759,7 @@ class MyApplicationInterface internal constructor(
                 )!!
             try {
                 nImages = nImagesS.toInt()
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.e(
                     TAG,
                     "n_images_s invalid format: $nImagesS"
@@ -1771,7 +1789,7 @@ class MyApplicationInterface internal constructor(
                 )!!
             try {
                 nStops = nStopsS.toDouble()
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.e(
                     TAG,
                     "n_stops_s invalid format: $nStopsS"
@@ -1796,7 +1814,7 @@ class MyApplicationInterface internal constructor(
             )!!
         try {
             nImages = nImagesS.toInt()
-        } catch (exception: NumberFormatException) {
+        } catch (_: NumberFormatException) {
             if (MyDebug.LOG) Log.e(
                 TAG,
                 "n_images_s invalid format: $nImagesS"
@@ -1850,31 +1868,31 @@ class MyApplicationInterface internal constructor(
                     .isVideo && mainActivity.supportsCameraExtension(
                     CameraExtensionCharacteristics.EXTENSION_AUTOMATIC
                 )
-            ) return PhotoMode.X_Auto
+            ) return PhotoMode.XAuto
             val xHdr = photoModePref == "preference_photo_mode_x_hdr"
             if (xHdr && !mainActivity.preview
                     .isVideo && mainActivity.supportsCameraExtension(
                     CameraExtensionCharacteristics.EXTENSION_HDR
                 )
-            ) return PhotoMode.X_HDR
+            ) return PhotoMode.XHDR
             val xNight = photoModePref == "preference_photo_mode_x_night"
             if (xNight && !mainActivity.preview
                     .isVideo && mainActivity.supportsCameraExtension(
                     CameraExtensionCharacteristics.EXTENSION_NIGHT
                 )
-            ) return PhotoMode.X_Night
+            ) return PhotoMode.XNight
             val xBokeh = photoModePref == "preference_photo_mode_x_bokeh"
             if (xBokeh && !mainActivity.preview
                     .isVideo && mainActivity.supportsCameraExtension(
                     CameraExtensionCharacteristics.EXTENSION_BOKEH
                 )
-            ) return PhotoMode.X_Bokeh
+            ) return PhotoMode.XBokeh
             val xBeauty = photoModePref == "preference_photo_mode_x_beauty"
             if (xBeauty && !mainActivity.preview
                     .isVideo && mainActivity.supportsCameraExtension(
                     CameraExtensionCharacteristics.EXTENSION_BEAUTY
                 )
-            ) return PhotoMode.X_Beauty
+            ) return PhotoMode.XBeauty
             return PhotoMode.Standard
         }
 
@@ -1920,32 +1938,43 @@ class MyApplicationInterface internal constructor(
         if (mainActivity.preview.isVideo) return false // video snapshot mode
 
         //return photoMode == PhotoMode.Standard || photoMode == PhotoMode.DRO;
-        if (photoMode == PhotoMode.Standard || photoMode == PhotoMode.DRO) {
-            return true
-        } else if (photoMode == PhotoMode.ExpoBracketing) {
-            return sharedPreferences.getBoolean(
-                PreferenceKeys.ALLOW_RAW_FOR_EXPO_BRACKETING_PREFERENCE_KEY,
-                true
-            ) &&
-                    mainActivity.supportsBurstRaw()
-        } else if (photoMode == PhotoMode.HDR) {
-            // for HDR, RAW is only relevant if we're going to be saving the base expo images (otherwise there's nothing to save)
-            return sharedPreferences.getBoolean(PreferenceKeys.HDR_SAVE_EXPO_PREFERENCE_KEY, false) &&
-                    sharedPreferences.getBoolean(
-                        PreferenceKeys.ALLOW_RAW_FOR_EXPO_BRACKETING_PREFERENCE_KEY,
-                        true
-                    ) &&
-                    mainActivity.supportsBurstRaw()
-        } else if (photoMode == PhotoMode.FocusBracketing) {
-            return sharedPreferences.getBoolean(
-                PreferenceKeys.ALLOW_RAW_FOR_FOCUS_BRACKETING_PREFERENCE_KEY,
-                true
-            ) &&
-                    mainActivity.supportsBurstRaw()
+        when (photoMode) {
+            PhotoMode.Standard, PhotoMode.DRO -> {
+                return true
+            }
+
+            PhotoMode.ExpoBracketing -> {
+                return sharedPreferences.getBoolean(
+                    PreferenceKeys.ALLOW_RAW_FOR_EXPO_BRACKETING_PREFERENCE_KEY,
+                    true
+                ) &&
+                        mainActivity.supportsBurstRaw()
+            }
+
+            PhotoMode.HDR -> {
+                // for HDR, RAW is only relevant if we're going to be saving the base expo images (otherwise there's nothing to save)
+                return sharedPreferences.getBoolean(
+                    PreferenceKeys.HDR_SAVE_EXPO_PREFERENCE_KEY,
+                    false
+                ) &&
+                        sharedPreferences.getBoolean(
+                            PreferenceKeys.ALLOW_RAW_FOR_EXPO_BRACKETING_PREFERENCE_KEY,
+                            true
+                        ) &&
+                        mainActivity.supportsBurstRaw()
+            }
+
+            PhotoMode.FocusBracketing -> {
+                return sharedPreferences.getBoolean(
+                    PreferenceKeys.ALLOW_RAW_FOR_FOCUS_BRACKETING_PREFERENCE_KEY,
+                    true
+                ) &&
+                        mainActivity.supportsBurstRaw()
+            }
+            // not supported for panorama mode
+            // not supported for camera vendor extensions
+            else -> return false
         }
-        // not supported for panorama mode
-        // not supported for camera vendor extensions
-        return false
     }
 
     override fun getRawPref(): RawPref {
@@ -2115,7 +2144,7 @@ class MyApplicationInterface internal constructor(
     }
 
     /** Stop the panorama recording. Does nothing if panorama isn't currently recording.
-     * @param isCancelled Whether the panorama has been cancelled.
+     * @param isCancelled Whether the panorama has been canceled.
      */
     fun stopPanorama(isCancelled: Boolean) {
         if (MyDebug.LOG) Log.d(TAG, "stopPanorama")
@@ -2142,7 +2171,7 @@ class MyApplicationInterface internal constructor(
             TAG,
             "n_panorama_pics is now: $nPanoramaPics"
         )
-        if (nPanoramaPics == maxPanoramaPicsC) {
+        if (nPanoramaPics == MAX_PANORAMA_PICS_C) {
             if (MyDebug.LOG) Log.d(TAG, "reached max panorama limit")
             finishPanorama()
             return
@@ -2151,15 +2180,15 @@ class MyApplicationInterface internal constructor(
         if (nPanoramaPics > 1 && !panoramaDirLeftToRight) {
             angle = -angle // for right-to-left
         }
-        var x = sin((angle / panoramaPicsPerScreen).toDouble()).toFloat()
-        var z = -cos((angle / panoramaPicsPerScreen).toDouble()).toFloat()
+        var x = sin((angle / PANORAMA_PICS_PER_SCREEN).toDouble()).toFloat()
+        var z = -cos((angle / PANORAMA_PICS_PER_SCREEN).toDouble()).toFloat()
         setNextPanoramaPoint(x, 0.0f, z)
 
         if (nPanoramaPics == 1) {
             // also set target for right-to-left
             angle = -angle
-            x = sin((angle / panoramaPicsPerScreen).toDouble()).toFloat()
-            z = -cos((angle / panoramaPicsPerScreen).toDouble()).toFloat()
+            x = sin((angle / PANORAMA_PICS_PER_SCREEN).toDouble()).toFloat()
+            z = -cos((angle / PANORAMA_PICS_PER_SCREEN).toDouble()).toFloat()
             gyroSensor.addTarget(x, 0.0f, z)
             drawPreview.addGyroDirectionMarker(x, 0.0f, z)
         }
@@ -2202,7 +2231,7 @@ class MyApplicationInterface internal constructor(
                     // clearPanoramaPoint(), as we don't want to call drawPreview.clearGyroDirectionMarker()
                     // at this stage (looks better to keep showing the target market on-screen whilst photo
                     // is being taken, user more likely to keep the device still).
-                    // Also we still keep the target active (and don't call clearTarget() so we can monitor if
+                    // Also, we still keep the target active (and don't call clearTarget() so we can monitor if
                     // the target is still achieved or not (for panoramaPicAccepted).
                     //gyroSensor.clearTarget();
                     gyroSensor.disableTargetCallback()
@@ -2213,7 +2242,10 @@ class MyApplicationInterface internal constructor(
                             "set panorama_dir_left_to_right to $panoramaDirLeftToRight"
                         )
                     }
-                    mainActivity.takePicturePressed(false, false)
+                    mainActivity.takePicturePressed(
+                        photoSnapshot = false,
+                        continuousFastBurst = false
+                    )
                 }
 
                 override fun onTooFar() {
@@ -2347,17 +2379,17 @@ class MyApplicationInterface internal constructor(
                 }
 
                 var datetimeStamp = ""
-                if (dateStamp.length > 0) datetimeStamp += dateStamp
-                if (timeStamp.length > 0) {
-                    if (datetimeStamp.length > 0) datetimeStamp += " "
+                if (dateStamp.isNotEmpty()) datetimeStamp += dateStamp
+                if (timeStamp.isNotEmpty()) {
+                    if (datetimeStamp.isNotEmpty()) datetimeStamp += " "
                     datetimeStamp += timeStamp
                 }
 
                 // build subtitles
                 val subtitles = StringBuilder()
-                if (datetimeStamp.length > 0) subtitles.append(datetimeStamp).append("\n")
+                if (datetimeStamp.isNotEmpty()) subtitles.append(datetimeStamp).append("\n")
 
-                if (gpsStamp.length > 0) {
+                if (gpsStamp.isNotEmpty()) {
                     /*Address address = null;
                     if( storeLocation && !preference_stamp_geo_address.equals("preference_stamp_geo_address_no") ) {
                         // try to find an address
@@ -2417,7 +2449,7 @@ class MyApplicationInterface internal constructor(
                     }*/
                 }
 
-                if (subtitles.length == 0) {
+                if (subtitles.isEmpty()) {
                     return
                 }
                 var videoTimeFrom = videoTime - offsetMs
@@ -2664,10 +2696,10 @@ class MyApplicationInterface internal constructor(
                 if (done) {
                     // may need to pass back the Uri we saved to, if the calling application didn't specify a Uri
                     // set note above for VideoMethod.FILE
-                    // n.b., currently this code is not used, as we always switch to VideoMethod.FILE if the calling application didn't specify a Uri, but I've left this here for possible future behaviour
+                    // n.b., currently this code is not used, as we always switch to VideoMethod.FILE if the calling application didn't specify a Uri, but I've left this here for possible future behavior
                     if (videoMethod === VideoMethod.SAF || videoMethod === VideoMethod.MEDIASTORE) {
                         output = Intent()
-                        output.setData(uri)
+                        output.data = uri
                         if (MyDebug.LOG) Log.d(TAG, "pass back output uri [saf]: " + output.data)
                     }
                 }
@@ -2703,9 +2735,9 @@ class MyApplicationInterface internal constructor(
             } finally {
                 try {
                     retriever.release()
-                } catch (ex: RuntimeException) {
+                } catch (_: RuntimeException) {
                     // ignore
-                } catch (ex: IOException) {
+                } catch (_: IOException) {
                 }
                 try {
                     pfdSaf?.close()
@@ -2723,14 +2755,13 @@ class MyApplicationInterface internal constructor(
                 )
                 if (width > galleryButton.width) {
                     val scale = galleryButton.width.toFloat() / width
-                    val newWidth = Math.round(scale * width)
-                    val newHeight = Math.round(scale * height)
+                    val newWidth = (scale * width).roundToInt()
+                    val newHeight = (scale * height).roundToInt()
                     if (MyDebug.LOG) Log.d(
                         TAG,
                         "    scale video thumbnail to $newWidth x $newHeight"
                     )
-                    val scaledThumbnail =
-                        Bitmap.createScaledBitmap(thumbnail, newWidth, newHeight, true)
+                    val scaledThumbnail = thumbnail.scale(newWidth, newHeight)
                     // careful, as scaledThumbnail is sometimes not a copy!
                     if (scaledThumbnail != thumbnail) {
                         thumbnail.recycle()
@@ -2799,23 +2830,42 @@ class MyApplicationInterface internal constructor(
                 // in theory this is pointless, as announceUri no longer does anything on Android 7+,
                 // and mediastore method is only used on Android 10+, but keep this just in case
                 // announceUri does something in future
-                storageUtils.announceUri(uri, false, true)
+                storageUtils.announceUri(uri = uri, isNewPicture = false, isNewVideo = true)
 
                 // we also want to save the uri - we can use the media uri directly, rather than having to scan it
-                storageUtils.setLastMediaScanned(uri, false, false, null)
+                storageUtils.setLastMediaScanned(
+                    uri = uri,
+                    isRaw = false,
+                    hasnoexifdatetime = false,
+                    checkUri = null
+                )
 
                 done = true
             }
         } else if (videoMethod === VideoMethod.FILE) {
             if (filename != null) {
                 val file = File(filename)
-                storageUtils.broadcastFile(file, false, true, true, false, null)
+                storageUtils.broadcastFile(
+                    file = file,
+                    isNewPicture = false,
+                    isNewVideo = true,
+                    setLastScanned = true,
+                    hasnoexifdatetime = false,
+                    safUri = null
+                )
                 done = true
             }
         } else {
             if (uri != null) {
                 // see note in onPictureTaken() for where we call broadcastFile for SAF photos
-                storageUtils.broadcastUri(uri, false, true, true, false, false)
+                storageUtils.broadcastUri(
+                    uri = uri,
+                    isNewPicture = false,
+                    isNewVideo = true,
+                    setLastScanned = true,
+                    hasnoexifdatetime = false,
+                    imageCaptureIntent = false
+                )
                 done = true
             }
         }
@@ -2842,7 +2892,7 @@ class MyApplicationInterface internal constructor(
             "finishVideoIntent:$uri"
         )
         val output = Intent()
-        output.setData(uri)
+        output.data = uri
         mainActivity.setResult(Activity.RESULT_OK, output)
         mainActivity.finish()
     }
@@ -2878,14 +2928,14 @@ class MyApplicationInterface internal constructor(
         // in versions 1.24 and 1.24, there was a bug where we had "info_" for onVideoError and "error_" for onVideoInfo!
         // fixed in 1.25; also was correct for 1.23 and earlier
         val debugValue = "info_" + what + "_" + extra
-        val editor = sharedPreferences.edit()
-        editor.putString("last_video_error", debugValue)
-        editor.apply()
+        sharedPreferences.edit {
+            putString("last_video_error", debugValue)
+        }
     }
 
     override fun onFailedStartPreview() {
         mainActivity.preview.showToast(null, R.string.failed_to_start_camera_preview)
-        mainActivity.enablePausePreviewOnBackPressedCallback(false) // reenable standard back button behaviour (in case preview was paused due to option to pause preview after taking a photo)
+        mainActivity.enablePausePreviewOnBackPressedCallback(false) // reenable standard back button behavior (in case preview was paused due to option to pause preview after taking a photo)
     }
 
     override fun onCameraError() {
@@ -2966,7 +3016,7 @@ class MyApplicationInterface internal constructor(
             shareButton.visibility = View.GONE
             trashButton.visibility = View.GONE
             this.clearLastImages()
-            mainActivity.enablePausePreviewOnBackPressedCallback(false) // reenable standard back button behaviour
+            mainActivity.enablePausePreviewOnBackPressedCallback(false) // reenable standard back button behavior
         }
     }
 
@@ -2996,7 +3046,7 @@ class MyApplicationInterface internal constructor(
         nCaptureImagesRaw = 0
         drawPreview.onCaptureStarted()
 
-        if (photoMode == PhotoMode.X_Night) {
+        if (photoMode == PhotoMode.XNight) {
             mainActivity.preview
                 .showToast(null, R.string.preference_nr_mode_low_light_message, true)
         }
@@ -3036,13 +3086,13 @@ class MyApplicationInterface internal constructor(
         }
 
         // call this, so that if pause-preview-after-taking-photo option is set, we remove the "taking photo" border indicator straight away
-        // also even for normal (not pausing) behaviour, good to remove the border asap
+        // also even for normal (not pausing) behavior, good to remove the border asap
         drawPreview.cameraInOperation(false)
     }
 
     override fun onExtensionProgress(progress: Int) {
         var message = ""
-        if (photoMode == PhotoMode.X_Night) {
+        if (photoMode == PhotoMode.XNight) {
             message =
                 context.resources.getString(R.string.preference_nr_mode_low_light_message) + "\n"
         }
@@ -3105,12 +3155,10 @@ class MyApplicationInterface internal constructor(
             TAG,
             "switchToCamera: $frontFacing"
         )
-        val nCameras: Int =
-            mainActivity.preview.cameraControllerManager?.numberOfCameras ?: 0
-        val wantFacing: Facing =
-            if (frontFacing) Facing.FACING_FRONT else Facing.FACING_BACK
+        val nCameras: Int = mainActivity.preview.cameraControllerManager.numberOfCameras
+        val wantFacing: Facing = if (frontFacing) Facing.FACING_FRONT else Facing.FACING_BACK
         for (i in 0..<nCameras) {
-            if (mainActivity.preview.cameraControllerManager?.getFacing(i) === wantFacing) {
+            if (mainActivity.preview.cameraControllerManager.getFacing(i) === wantFacing) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "found desired camera: $i"
@@ -3121,57 +3169,57 @@ class MyApplicationInterface internal constructor(
         }
     }
 
-    /* Note that the cameraId is still valid if this returns false, it just means that a cameraId hasn't be explicitly set yet.
+    /* Note that the cameraId is still valid if this returns false, it just means that a cameraId hasn't been explicitly set yet.
      */
     fun hasSetCameraId(): Boolean {
-        return has_set_cameraId
+        return hasSetCameraId
     }
 
     override fun setCameraIdPref(cameraId: Int, cameraIdSPhysical: String?) {
-        this.has_set_cameraId = true
+        this.hasSetCameraId = true
         this._cameraIdPref = cameraId
         this._cameraIdSPhysicalPref = cameraIdSPhysical
     }
 
     override fun setFocusPref(focusValue: String?, isVideo: Boolean) {
-        val editor = sharedPreferences.edit()
-        editor.putString(
-            PreferenceKeys.getFocusPreferenceKey(getCameraIdPref(), isVideo),
-            focusValue
-        )
-        editor.apply()
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.getFocusPreferenceKey(getCameraIdPref(), isVideo),
+                focusValue
+            )
+        }
         // focus may be updated by preview (e.g., when switching to/from video mode)
         mainActivity.setManualFocusSeekBarVisibility(false)
     }
 
     override fun clearSceneModePref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.SCENE_MODE_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.SCENE_MODE_PREFERENCE_KEY)
+        }
     }
 
     override fun clearColorEffectPref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY)
+        }
     }
 
     override fun clearWhiteBalancePref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY)
+        }
     }
 
     override fun clearISOPref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.ISO_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.ISO_PREFERENCE_KEY)
+        }
     }
 
     override fun clearExposureCompensationPref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.EXPOSURE_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.EXPOSURE_PREFERENCE_KEY)
+        }
     }
 
     override fun setCameraResolutionPref(width: Int, height: Int) {
@@ -3186,14 +3234,14 @@ class MyApplicationInterface internal constructor(
                 "save new resolution_value: $resolutionValue"
             )
         }
-        val editor = sharedPreferences.edit()
-        editor.putString(
-            PreferenceKeys.getResolutionPreferenceKey(
-                getCameraIdPref(),
-                getCameraIdSPhysicalPref()
-            ), resolutionValue
-        )
-        editor.apply()
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.getResolutionPreferenceKey(
+                    getCameraIdPref(),
+                    getCameraIdSPhysicalPref()
+                ), resolutionValue
+            )
+        }
     }
 
     override fun requestCameraPermission() {
@@ -3219,25 +3267,27 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun clearExposureTimePref() {
-        val editor = sharedPreferences.edit()
-        editor.remove(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY)
-        editor.apply()
+        sharedPreferences.edit {
+            remove(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY)
+        }
     }
 
     override fun setFocusDistancePref(focusDistance: Float, isTargetDistance: Boolean) {
-        val editor = sharedPreferences.edit()
-        editor.putFloat(
-            if (isTargetDistance) PreferenceKeys.FOCUS_BRACKETING_TARGET_DISTANCE_PREFERENCE_KEY else PreferenceKeys.FOCUS_DISTANCE_PREFERENCE_KEY,
-            focusDistance
-        )
-        editor.apply()
+        sharedPreferences.edit {
+            putFloat(
+                if (isTargetDistance) PreferenceKeys.FOCUS_BRACKETING_TARGET_DISTANCE_PREFERENCE_KEY else PreferenceKeys.FOCUS_DISTANCE_PREFERENCE_KEY,
+                focusDistance
+            )
+        }
     }
 
     private val stampFontColor: Int
         get() {
-            val color =
-                sharedPreferences.getString(PreferenceKeys.STAMP_FONT_COLOR_PREFERENCE_KEY, "#ffffff")!!
-            return Color.parseColor(color)
+            val color = sharedPreferences.getString(
+                PreferenceKeys.STAMP_FONT_COLOR_PREFERENCE_KEY,
+                "#ffffff"
+            )!!
+            return color.toColorInt()
         }
 
     /** Should be called to reset parameters which aren't expected to be saved (e.g., resetting zoom when application is paused,
@@ -3247,7 +3297,7 @@ class MyApplicationInterface internal constructor(
         if (MyDebug.LOG) Log.d(TAG, "reset")
         if (switchedCamera) {
             // aperture is reset when switching camera, but not when application is paused or switching between photo/video etc
-            this._aperturePref = apertureDefault
+            this._aperturePref = APERTURE_DEFAULT
         }
         this.zoomFactor = -1
     }
@@ -3347,21 +3397,27 @@ class MyApplicationInterface internal constructor(
         textBounds.right += locationX + padding
         // unclear why we need the offset of -1, but need this to align properly on Galaxy Nexus at least
         val topYDiff = -textBounds.top + padding - 1
-        if (alignmentY == Alignment.ALIGNMENT_TOP) {
-            val height = textBounds.bottom - textBounds.top + 2 * padding
-            textBounds.top = locationY - 1
-            textBounds.bottom = textBounds.top + height
-            locationY += topYDiff
-        } else if (alignmentY == Alignment.ALIGNMENT_CENTRE) {
-            val height = textBounds.bottom - textBounds.top + 2 * padding
-            //int yDiff = - text_bounds.top + padding - 1;
-            textBounds.top =
-                (0.5 * ((locationY - 1) + (textBounds.top + locationY - padding))).toInt() // average of ALIGNMENT_TOP and ALIGNMENT_BOTTOM
-            textBounds.bottom = textBounds.top + height
-            locationY += (0.5 * topYDiff).toInt() // average of ALIGNMENT_TOP and ALIGNMENT_BOTTOM
-        } else {
-            textBounds.top += locationY - padding
-            textBounds.bottom += locationY + padding
+        when (alignmentY) {
+            Alignment.ALIGNMENT_TOP -> {
+                val height = textBounds.bottom - textBounds.top + 2 * padding
+                textBounds.top = locationY - 1
+                textBounds.bottom = textBounds.top + height
+                locationY += topYDiff
+            }
+
+            Alignment.ALIGNMENT_CENTRE -> {
+                val height = textBounds.bottom - textBounds.top + 2 * padding
+                //int yDiff = - text_bounds.top + padding - 1;
+                textBounds.top =
+                    (0.5 * ((locationY - 1) + (textBounds.top + locationY - padding))).toInt() // average of ALIGNMENT_TOP and ALIGNMENT_BOTTOM
+                textBounds.bottom = textBounds.top + height
+                locationY += (0.5 * topYDiff).toInt() // average of ALIGNMENT_TOP and ALIGNMENT_BOTTOM
+            }
+
+            else -> {
+                textBounds.top += locationY - padding
+                textBounds.bottom += locationY + padding
+            }
         }
         if (shadow == Shadow.SHADOW_BACKGROUND) {
             paint.color = background
@@ -3713,9 +3769,11 @@ class MyApplicationInterface internal constructor(
             success = true
         } else {
             val processType: ImageSaver.Request.ProcessType =
-                if (photoMode == PhotoMode.DRO || photoMode == PhotoMode.HDR) ImageSaver.Request.ProcessType.HDR
-                else if (photoMode == PhotoMode.X_Night) ImageSaver.Request.ProcessType.X_NIGHT
-                else ImageSaver.Request.ProcessType.NORMAL
+                when (photoMode) {
+                    PhotoMode.DRO, PhotoMode.HDR -> ImageSaver.Request.ProcessType.HDR
+                    PhotoMode.XNight -> ImageSaver.Request.ProcessType.X_NIGHT
+                    else -> ImageSaver.Request.ProcessType.NORMAL
+                }
             val forceSuffix = forceSuffix(photoMode)
 
             var preferenceHdrTonemappingAlgorithm: HDRProcessor.TonemappingAlgorithm =
@@ -3906,7 +3964,7 @@ class MyApplicationInterface internal constructor(
 
         val doInBackground = saveInBackground(false)
 
-        // currently we don't ever do post processing with RAW burst images, so just save them all
+        // currently we don't ever do post-processing with RAW burst images, so just save them all
         var success = true
         var i = 0
         while (i < rawImages.size && success) {
@@ -3983,7 +4041,7 @@ class MyApplicationInterface internal constructor(
                     done = false
                 } else {
                     val intent = Intent(Intent.ACTION_SEND)
-                    intent.setType("image/jpeg")
+                    intent.type = "image/jpeg"
                     intent.putExtra(Intent.EXTRA_STREAM, lastImageUri)
                     mainActivity.startActivity(Intent.createChooser(intent, "Photo"))
                 }
@@ -4026,7 +4084,14 @@ class MyApplicationInterface internal constructor(
                     if (fromUser) preview.showToast(null, R.string.photo_deleted, true)
                     if (file != null) {
                         // SAF doesn't broadcast when deleting them
-                        storageUtils.broadcastFile(file, false, false, false, false, null)
+                        storageUtils.broadcastFile(
+                            file = file,
+                            isNewPicture = false,
+                            isNewVideo = false,
+                            setLastScanned = false,
+                            hasnoexifdatetime = false,
+                            safUri = null
+                        )
                     }
                 }
             } catch (e: FileNotFoundException) {
@@ -4063,7 +4128,14 @@ class MyApplicationInterface internal constructor(
                     "successfully deleted $imageName"
                 )
                 if (fromUser) preview.showToast(photoDeleteToast, R.string.photo_deleted, true)
-                storageUtils.broadcastFile(file, false, false, false, false, null)
+                storageUtils.broadcastFile(
+                    file = file,
+                    isNewPicture = false,
+                    isNewVideo = false,
+                    setLastScanned = false,
+                    hasnoexifdatetime = false,
+                    safUri = null
+                )
             }
         }
     }
@@ -4154,14 +4226,14 @@ class MyApplicationInterface internal constructor(
         if (savedInstanceState != null) {
             // load the things we saved in onSaveInstanceState().
             if (MyDebug.LOG) Log.d(TAG, "read from savedInstanceState")
-            has_set_cameraId = true
-            _cameraIdPref = savedInstanceState.getInt("cameraId", cameraId_default)
+            hasSetCameraId = true
+            _cameraIdPref = savedInstanceState.getInt("cameraId", CAMERA_ID_DEFAULT)
             if (MyDebug.LOG) Log.d(TAG, "found cameraId: " + getCameraIdPref())
             _cameraIdSPhysicalPref = savedInstanceState.getString("cameraIdSPhysical", null)
             if (MyDebug.LOG) Log.d(TAG, "found cameraIdSPhysical: " + getCameraIdSPhysicalPref())
-            nRMode = savedInstanceState.getString("nr_mode", nrModeDefault)
-            if (MyDebug.LOG) Log.d(TAG, "found nr_mode: " + nRMode)
-            _aperturePref = savedInstanceState.getFloat("aperture", apertureDefault)
+            nRMode = savedInstanceState.getString("nr_mode", NR_MODE_DEFAULT)
+            if (MyDebug.LOG) Log.d(TAG, "found nr_mode: $nRMode")
+            _aperturePref = savedInstanceState.getFloat("aperture", APERTURE_DEFAULT)
             if (MyDebug.LOG) Log.d(TAG, "found aperture: " + getAperturePref())
         }
 
@@ -4174,14 +4246,15 @@ class MyApplicationInterface internal constructor(
     companion object {
         private const val TAG = "MyApplicationInterface"
 
-        const val panoramaPicsPerScreen: Float = 3.33333f
-        const val maxPanoramaPicsC: Int =
-            10 // if we increase this, review against memory requirements under MainActivity.supportsPanorama()
+        const val PANORAMA_PICS_PER_SCREEN: Float = 3.33333f
+
+        // if we increase this, review against memory requirements under MainActivity.supportsPanorama()
+        const val MAX_PANORAMA_PICS_C: Int = 10
 
         // camera properties which are saved in bundle, but not stored in preferences (so will be remembered if the app goes into background, but not after restart)
-        private const val cameraId_default = 0
-        private const val nrModeDefault = "preference_nr_mode_normal"
-        private const val apertureDefault = -1.0f
+        private const val CAMERA_ID_DEFAULT = 0
+        private const val NR_MODE_DEFAULT = "preference_nr_mode_normal"
+        private const val APERTURE_DEFAULT = -1.0f
         fun choosePanoramaResolution(sizes: List<CameraController.Size>): CameraController.Size {
             // if we allow panorama with higher resolutions, review against memory requirements under MainActivity.supportsPanorama()
             // also may need to update the downscaling in the testing code

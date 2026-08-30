@@ -37,6 +37,8 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.SeekBar
+import androidx.core.content.edit
+import androidx.core.view.isNotEmpty
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MainActivity.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
@@ -179,7 +181,7 @@ class MainUI(val mainActivity: MainActivity) {
         else*/
         run {
             view.animate().rotationBy(rotateBy)
-                .setDuration(viewRotateAnimationDuration.toLong())
+                .setDuration(VIEW_ROTATAE_ANIMATION_DURATION.toLong())
                 .setInterpolator(AccelerateDecelerateInterpolator()).start()
         }
     }
@@ -212,8 +214,8 @@ class MainUI(val mainActivity: MainActivity) {
     }
 
     // stores with width and height of the last time we laid out the UI
-    var layoutUI_display_w: Int = -1
-    var layoutUI_display_h: Int = -1
+    var layoutUIDisplayW: Int = -1
+    var layoutUIDisplayH: Int = -1
 
     private fun layoutUI(popupContainerOnly: Boolean) {
         var debugTime: Long = 0
@@ -238,12 +240,12 @@ class MainUI(val mainActivity: MainActivity) {
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         // we cache the preferenceUiPlacement to save having to check it in the draw() method
         this.uIPlacement = computeUIPlacement()
-        if (MyDebug.LOG) Log.d(TAG, "ui_placement: " + uIPlacement)
+        if (MyDebug.LOG) Log.d(TAG, "ui_placement: $uIPlacement")
         val relativeOrientation: Int
         if (MainActivity.LOCK_TO_LANDSCAPE) {
             // new code for orientation fixed to landscape
             // the display orientation should be locked to landscape, but how many degrees is that?
-            val rotation: Int = mainActivity.getWindowManager().getDefaultDisplay().getRotation()
+            val rotation: Int = mainActivity.windowManager.defaultDisplay.rotation
             var degrees = 0
             when (rotation) {
                 Surface.ROTATION_0 -> degrees = 0
@@ -373,15 +375,15 @@ class MainUI(val mainActivity: MainActivity) {
 
         val displaySize = Point()
         mainActivity.applicationInterface.getDisplaySize(displaySize, true)
-        this.layoutUI_display_w = displaySize.x
-        this.layoutUI_display_h = displaySize.y
+        this.layoutUIDisplayW = displaySize.x
+        this.layoutUIDisplayH = displaySize.y
         if (MyDebug.LOG) {
-            Log.d(TAG, "layoutUI_display_w: $layoutUI_display_w")
-            Log.d(TAG, "layoutUI_display_h: $layoutUI_display_h")
+            Log.d(TAG, "layoutUI_display_w: $layoutUIDisplayW")
+            Log.d(TAG, "layoutUI_display_h: $layoutUIDisplayH")
         }
         val displayHeight = min(displaySize.x.toDouble(), displaySize.y.toDouble()).toInt()
 
-        val scale: Float = mainActivity.getResources().getDisplayMetrics().density
+        val scale: Float = mainActivity.getResources().displayMetrics.density
         if (MyDebug.LOG) Log.d(TAG, "scale: $scale")
 
         /*int navigationGap = 0;
@@ -428,10 +430,10 @@ class MainUI(val mainActivity: MainActivity) {
                 // if we did want to do this for UIPLACEMENT_LEFT for consistency, it'd be the
                 // "bottom" margin we need to change.
                 galleryTopGap =
-                    (privacyIndicatorGapDp * scale + 0.5f).toInt() // convert dps to pixels
+                    (PRIVACY_INDICATOR_GAP_DP * scale + 0.5f).toInt() // convert dps to pixels
             }
             val privacyIndicatorGap =
-                (privacyIndicatorGapDp * scale + 0.5f).toInt() // convert dps to pixels
+                (PRIVACY_INDICATOR_GAP_DP * scale + 0.5f).toInt() // convert dps to pixels
             galleryNavigationGap += privacyIndicatorGap
         }
         testNavigationGap = navigationGap
@@ -1157,14 +1159,12 @@ class MainUI(val mainActivity: MainActivity) {
      */
     fun setSwitchCameraContentDescription() {
         if (MyDebug.LOG) Log.d(TAG, "setSwitchCameraContentDescription()")
-        if (mainActivity.preview != null && mainActivity.preview
-                ?.canSwitchCamera() == true
-        ) {
+        if (mainActivity.preview.canSwitchCamera()) {
             val view: ImageButton = mainActivity.findViewById(R.id.switch_camera)
             val contentDescription: Int
             val cameraId: Int = mainActivity.nextCameraId
             contentDescription =
-                when (mainActivity.preview?.cameraControllerManager?.getFacing(cameraId)) {
+                when (mainActivity.preview.cameraControllerManager?.getFacing(cameraId)) {
                     CameraController.Facing.FACING_FRONT -> R.string.switch_to_front_camera
                     CameraController.Facing.FACING_BACK -> R.string.switch_to_back_camera
                     CameraController.Facing.FACING_EXTERNAL -> R.string.switch_to_external_camera
@@ -1229,7 +1229,7 @@ class MainUI(val mainActivity: MainActivity) {
         // only change orientation when sufficiently changed
         if (diff > 60) {
             orientation = (orientation + 45) / 90 * 90
-            orientation = orientation % 360
+            orientation %= 360
             if (orientation != currentOrientation) {
                 this.currentOrientation = orientation
                 if (MyDebug.LOG) {
@@ -1258,7 +1258,7 @@ class MainUI(val mainActivity: MainActivity) {
                 handler.postDelayed({
                     if (MyDebug.LOG) Log.d(TAG, "onOrientationChanged->postDelayed()")
                     mainActivity.applicationInterface?.drawPreview?.updateSettings()
-                }, (viewRotateAnimationDuration + 20).toLong())
+                }, (VIEW_ROTATAE_ANIMATION_DURATION + 20).toLong())
             }
         }
     }
@@ -1280,7 +1280,10 @@ class MainUI(val mainActivity: MainActivity) {
             return false
         }
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_WHITE_BALANCE_LOCK_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_WHITE_BALANCE_LOCK_PREFERENCE_KEY,
+            false
+        )
     }
 
     fun showCycleRawIcon(): Boolean {
@@ -1294,7 +1297,10 @@ class MainUI(val mainActivity: MainActivity) {
 
     fun showStoreLocationIcon(): Boolean {
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_STORE_LOCATION_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_STORE_LOCATION_PREFERENCE_KEY,
+            false
+        )
     }
 
     fun showTextStampIcon(): Boolean {
@@ -1334,7 +1340,10 @@ class MainUI(val mainActivity: MainActivity) {
             return false
         }
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_FACE_DETECTION_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_FACE_DETECTION_PREFERENCE_KEY,
+            false
+        )
     }
 
     fun setImmersiveMode(immersiveMode: Boolean) {
@@ -1343,7 +1352,7 @@ class MainUI(val mainActivity: MainActivity) {
             "setImmersiveMode: $immersiveMode"
         )
         this.immersiveMode = immersiveMode
-        mainActivity.runOnUiThread(Runnable {
+        mainActivity.runOnUiThread {
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
             // if going into immersive mode, the we should set GONE the ones that are set GONE in showGUI(false)
             //final int visibilityGone = immersiveMode ? View.GONE : View.VISIBLE;
@@ -1364,7 +1373,7 @@ class MainUI(val mainActivity: MainActivity) {
             val focusSeekBar: View = mainActivity.findViewById(R.id.focus_seekbar)
             val focusBracketingTargetSeekBar: View =
                 mainActivity.findViewById(R.id.focus_bracketing_target_seekbar)
-            if ((mainActivity.preview.cameraControllerManager?.numberOfCameras ?: 0) > 1)
+            if (mainActivity.preview.cameraControllerManager.numberOfCameras > 1)
                 switchCameraButton.visibility = visibility
             if (mainActivity.showSwitchMultiCamIcon()) switchMultiCameraButton.visibility =
                 visibility
@@ -1393,7 +1402,11 @@ class MainUI(val mainActivity: MainActivity) {
                 "immersive_mode_off"
             )
             if (prefImmersiveMode == "immersive_mode_everything") {
-                if (sharedPreferences.getBoolean(PreferenceKeys.SHOW_TAKE_PHOTO_PREFERENCE_KEY, true)) {
+                if (sharedPreferences.getBoolean(
+                        PreferenceKeys.SHOW_TAKE_PHOTO_PREFERENCE_KEY,
+                        true
+                    )
+                ) {
                     val takePhotoButton: View = mainActivity.findViewById(R.id.take_photo)
                     takePhotoButton.visibility = visibility
                 }
@@ -1421,7 +1434,7 @@ class MainUI(val mainActivity: MainActivity) {
                 // make sure the GUI is set up as expected
                 showGUI()
             }
-        })
+        }
     }
 
     fun inImmersiveMode(): Boolean {
@@ -1449,7 +1462,7 @@ class MainUI(val mainActivity: MainActivity) {
             // call to reset the timer
             mainActivity.initImmersiveMode()
         }
-        mainActivity.runOnUiThread(Runnable {
+        mainActivity.runOnUiThread {
             val isPanoramaRecording: Boolean =
                 mainActivity.applicationInterface.gyroSensor.isRecording
             val visibility =
@@ -1463,7 +1476,7 @@ class MainUI(val mainActivity: MainActivity) {
             val exposureButton: View = mainActivity.findViewById(R.id.exposure)
             val popupButton: View = mainActivity.findViewById(R.id.popup)
             settingsButton.visibility = visibilityVideo
-            if ((mainActivity.preview.cameraControllerManager?.numberOfCameras ?: 0) > 1)
+            if (mainActivity.preview.cameraControllerManager.numberOfCameras > 1)
                 switchCameraButton.visibility = visibility
             if (mainActivity.showSwitchMultiCamIcon()) switchMultiCameraButton.visibility =
                 visibility
@@ -1489,7 +1502,7 @@ class MainUI(val mainActivity: MainActivity) {
             if (showGuiPhoto && showGuiVideo) {
                 layoutUI() // needed for "top" UIPlacement, to auto-arrange the buttons
             }
-        })
+        }
     }
 
     fun updateExposureLockIcon() {
@@ -1540,7 +1553,7 @@ class MainUI(val mainActivity: MainActivity) {
     fun updateStampIcon() {
         val view: ImageButton = mainActivity.findViewById(R.id.stamp)
         val enabled: Boolean =
-            mainActivity.applicationInterface.stampPref.equals("preference_stamp_yes")
+            mainActivity.applicationInterface.stampPref == "preference_stamp_yes"
         view.setImageResource(if (enabled) R.drawable.ic_text_format_red_48dp else R.drawable.ic_text_format_white_48dp)
         view.contentDescription = mainActivity.getResources()
             .getString(if (enabled) R.string.stamp_disable else R.string.stamp_enable)
@@ -1753,21 +1766,31 @@ class MainUI(val mainActivity: MainActivity) {
         )
         resetExposureUIHighlights()
 
-        if (mExposureLine == 0) {
-            isoButtonsContainer.setBackgroundColor(highlightColor)
-            //iso_buttons_container.setAlpha(0.5f);
-        } else if (mExposureLine == 1) {
-            isoSeekbar.setBackgroundColor(highlightColor)
-            //iso_seekbar.setAlpha(0.5f);
-        } else if (mExposureLine == 2) {
-            shutterSeekbar.setBackgroundColor(highlightColor)
-            //shutter_seekbar.setAlpha(0.5f);
-        } else if (mExposureLine == 3) { //
-            exposureSeekBar.setBackgroundColor(highlightColor)
-            //exposure_seek_bar.setAlpha(0.5f);
-        } else if (mExposureLine == 4) {
-            wbSeekbar.setBackgroundColor(highlightColor)
-            //wb_seekbar.setAlpha(0.5f);
+        when (mExposureLine) {
+            0 -> {
+                isoButtonsContainer.setBackgroundColor(highlightColor)
+                //iso_buttons_container.setAlpha(0.5f);
+            }
+
+            1 -> {
+                isoSeekbar.setBackgroundColor(highlightColor)
+                //iso_seekbar.setAlpha(0.5f);
+            }
+
+            2 -> {
+                shutterSeekbar.setBackgroundColor(highlightColor)
+                //shutter_seekbar.setAlpha(0.5f);
+            }
+
+            3 -> { //
+                exposureSeekBar.setBackgroundColor(highlightColor)
+                //exposure_seek_bar.setAlpha(0.5f);
+            }
+
+            4 -> {
+                wbSeekbar.setBackgroundColor(highlightColor)
+                //wb_seekbar.setAlpha(0.5f);
+            }
         }
     }
 
@@ -1830,13 +1853,13 @@ class MainUI(val mainActivity: MainActivity) {
         for (i in 0..<count) {
             val button = isoButtons!![i] as Button
             val buttonText = button.text.toString()
-            if (ISOTextEquals(buttonText, currentIso!!)) {
+            if (checkISOTextEquals(buttonText, currentIso!!)) {
                 found = true
                 // Select next one, unless it's "Manual", which we skip since
                 // it's not practical in remote mode.
                 var nextButton = isoButtons!![(i + count + step) % count] as Button
-                val nextButton_text = nextButton.text.toString()
-                if (nextButton_text.contains("m")) {
+                val nextButtonText = nextButton.text.toString()
+                if (nextButtonText.contains("m")) {
                     nextButton = isoButtons!![(i + count + 2 * step) % count] as Button
                 }
                 nextButton.callOnClick()
@@ -1864,65 +1887,75 @@ class MainUI(val mainActivity: MainActivity) {
             return
         }
 
-        if (mExposureLine == 0) { // ISO presets
-            val isoButtonsContainer: ViewGroup = mainActivity.findViewById(R.id.iso_buttons)
-            isoButtonsContainer.setBackgroundColor(highlightColorExposureUIElement)
-            //iso_buttons_container.setAlpha(1f);
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-            val currentIso = sharedPreferences.getString(
-                PreferenceKeys.ISO_PREFERENCE_KEY,
-                CameraController.ISO_DEFAULT
-            )
-            // if the manual ISO value isn't one of the "preset" values, then instead highlight the manual ISO icon
-            var found = false
-            var manualButton: Button? = null
-            for (view in isoButtons!!) {
-                val button = view as Button
-                val buttonText = button.text.toString()
-                if (ISOTextEquals(buttonText, currentIso!!)) {
-                    PopupView.setButtonSelected(button, true)
-                    //button.setBackgroundColor(highlightColorExposureUIElement);
-                    //button.setAlpha(0.3f);
-                    found = true
-                } else {
-                    if (buttonText.contains("m")) {
-                        manualButton = button
+        when (mExposureLine) {
+            0 -> { // ISO presets
+                val isoButtonsContainer: ViewGroup = mainActivity.findViewById(R.id.iso_buttons)
+                isoButtonsContainer.setBackgroundColor(highlightColorExposureUIElement)
+                //iso_buttons_container.setAlpha(1f);
+                val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
+                val currentIso = sharedPreferences.getString(
+                    PreferenceKeys.ISO_PREFERENCE_KEY,
+                    CameraController.ISO_DEFAULT
+                )
+                // if the manual ISO value isn't one of the "preset" values, then instead highlight the manual ISO icon
+                var found = false
+                var manualButton: Button? = null
+                for (view in isoButtons!!) {
+                    val button = view as Button
+                    val buttonText = button.text.toString()
+                    if (checkISOTextEquals(buttonText, currentIso!!)) {
+                        PopupView.setButtonSelected(button, true)
+                        //button.setBackgroundColor(highlightColorExposureUIElement);
+                        //button.setAlpha(0.3f);
+                        found = true
+                    } else {
+                        if (buttonText.contains("m")) {
+                            manualButton = button
+                        }
+                        PopupView.setButtonSelected(button, false)
+                        button.setBackgroundColor(Color.TRANSPARENT)
                     }
-                    PopupView.setButtonSelected(button, false)
-                    button.setBackgroundColor(Color.TRANSPARENT)
                 }
+                if (!found && manualButton != null) {
+                    // We are in manual ISO, highlight the "M" button
+                    PopupView.setButtonSelected(manualButton, true)
+                    manualButton.setBackgroundColor(highlightColorExposureUIElement)
+                    //manualButton.setAlpha(0.3f);
+                }
+                mSelectingExposureUIElement = true
             }
-            if (!found && manualButton != null) {
-                // We are in manual ISO, highlight the "M" button
-                PopupView.setButtonSelected(manualButton, true)
-                manualButton.setBackgroundColor(highlightColorExposureUIElement)
-                //manualButton.setAlpha(0.3f);
+
+            1 -> {
+                // ISO seek bar - change color
+                val seekBar: View = mainActivity.findViewById(R.id.iso_seekbar)
+                //seek_bar.setAlpha(0.1f);
+                seekBar.setBackgroundColor(highlightColorExposureUIElement)
+                mSelectingExposureUIElement = true
             }
-            mSelectingExposureUIElement = true
-        } else if (mExposureLine == 1) {
-            // ISO seek bar - change color
-            val seekBar: View = mainActivity.findViewById(R.id.iso_seekbar)
-            //seek_bar.setAlpha(0.1f);
-            seekBar.setBackgroundColor(highlightColorExposureUIElement)
-            mSelectingExposureUIElement = true
-        } else if (mExposureLine == 2) {
-            // ISO seek bar - change color
-            val seekBar: View = mainActivity.findViewById(R.id.exposure_time_seekbar)
-            //seek_bar.setAlpha(0.1f);
-            seekBar.setBackgroundColor(highlightColorExposureUIElement)
-            mSelectingExposureUIElement = true
-        } else if (mExposureLine == 3) {
-            // Exposure compensation
-            val container: View = mainActivity.findViewById(R.id.exposure_container)
-            //container.setAlpha(0.1f);
-            container.setBackgroundColor(highlightColorExposureUIElement)
-            mSelectingExposureUIElement = true
-        } else if (mExposureLine == 4) {
-            // Manual white balance
-            val container: View = mainActivity.findViewById(R.id.white_balance_seekbar)
-            //container.setAlpha(0.1f);
-            container.setBackgroundColor(highlightColorExposureUIElement)
-            mSelectingExposureUIElement = true
+
+            2 -> {
+                // ISO seek bar - change color
+                val seekBar: View = mainActivity.findViewById(R.id.exposure_time_seekbar)
+                //seek_bar.setAlpha(0.1f);
+                seekBar.setBackgroundColor(highlightColorExposureUIElement)
+                mSelectingExposureUIElement = true
+            }
+
+            3 -> {
+                // Exposure compensation
+                val container: View = mainActivity.findViewById(R.id.exposure_container)
+                //container.setAlpha(0.1f);
+                container.setBackgroundColor(highlightColorExposureUIElement)
+                mSelectingExposureUIElement = true
+            }
+
+            4 -> {
+                // Manual white balance
+                val container: View = mainActivity.findViewById(R.id.white_balance_seekbar)
+                //container.setAlpha(0.1f);
+                container.setBackgroundColor(highlightColorExposureUIElement)
+                mSelectingExposureUIElement = true
+            }
         }
     }
 
@@ -1938,7 +1971,7 @@ class MainUI(val mainActivity: MainActivity) {
         // normally we should always have heightPixels < widthPixels, but good not to assume we're running in landscape orientation
         val smallerDim = min(displaySize.x.toDouble(), displaySize.y.toDouble()).toInt()
         // the smaller dimension should limit the width, due to when held in portrait
-        val scale: Float = mainActivity.getResources().getDisplayMetrics().density
+        val scale: Float = mainActivity.getResources().displayMetrics.density
         var dpHeight = (smallerDim / scale).toInt()
         if (MyDebug.LOG) {
             Log.d(TAG, "display size: " + displaySize.x + " x " + displaySize.y)
@@ -2043,16 +2076,16 @@ class MainUI(val mainActivity: MainActivity) {
             val maxIso: Int = preview.maximumISO
             val values: MutableList<String> = ArrayList()
             values.add(CameraController.ISO_DEFAULT)
-            values.add(manualIsoValue)
+            values.add(MANUAL_ISO_VALUE)
             isoButtonManualIndex = 1 // must match where we place the manual button!
             val isoValues = intArrayOf(50, 100, 200, 400, 800, 1600, 3200, 6400)
-            values.add(ISOToButtonText(minIso))
+            values.add(convertISOToButtonText(minIso))
             for (isoValue in isoValues) {
-                if (isoValue > minIso && isoValue < maxIso) {
-                    values.add(ISOToButtonText(isoValue))
+                if (isoValue in (minIso + 1)..<maxIso) {
+                    values.add(convertISOToButtonText(isoValue))
                 }
             }
-            values.add(ISOToButtonText(maxIso))
+            values.add(convertISOToButtonText(maxIso))
             supportedIsos = values.toList()
         } else {
             supportedIsos = preview.supportedISOs
@@ -2064,9 +2097,9 @@ class MainUI(val mainActivity: MainActivity) {
         )
         // if the manual ISO value isn't one of the "preset" values, then instead highlight the manual ISO icon
         if ((currentIso != CameraController.ISO_DEFAULT) && supportedIsos != null && supportedIsos.contains(
-                manualIsoValue
+                MANUAL_ISO_VALUE
             ) && !supportedIsos.contains(currentIso)
-        ) currentIso = manualIsoValue
+        ) currentIso = MANUAL_ISO_VALUE
 
 
         var totalWidthDp = 280
@@ -2281,7 +2314,7 @@ class MainUI(val mainActivity: MainActivity) {
                 val button = view as Button
                 if (MyDebug.LOG) Log.d(TAG, "button: " + button.text)
                 val buttonText = button.text.toString()
-                if (ISOTextEquals(buttonText, currentIso!!)) {
+                if (checkISOTextEquals(buttonText, currentIso!!)) {
                     PopupView.setButtonSelected(button, true)
                     found = true
                 } else {
@@ -2383,7 +2416,7 @@ class MainUI(val mainActivity: MainActivity) {
              *     MainActivity.updateForSettings(), but doing so makes the popup close when checking photo or video resolutions!
              *     See test testSwitchResolution().
              */
-            if (cachePopup && !forceDestroyPopup) {
+            if (CACHE_POPUP && !forceDestroyPopup) {
                 popupView?.visibility = View.GONE
             } else {
                 destroyPopup()
@@ -2431,7 +2464,7 @@ class MainUI(val mainActivity: MainActivity) {
         val popupContainer: ViewGroup = mainActivity.findViewById(R.id.popup_container)
         val scrollBounds = Rect()
         popupContainer.getDrawingRect(scrollBounds)
-        val inside = popupContainer.getChildAt(0) as LinearLayout ?: return
+        val inside = popupContainer.getChildAt(0) as? LinearLayout ?: return
         // Safety check
 
         val count = inside.childCount
@@ -2442,19 +2475,19 @@ class MainUI(val mainActivity: MainActivity) {
             var v = inside.getChildAt(mPopupLine)
             if (MyDebug.LOG) Log.d(TAG, "line: $mPopupLine view: $v")
             // to test example with HorizontalScrollView, see popup menu on Nokia 8 with Camera2 API, the flash icons row uses a HorizontalScrollView
-            if (v is HorizontalScrollView && v.childCount > 0) v = v.getChildAt(0)
+            if (v is HorizontalScrollView && v.isNotEmpty()) v = v.getChildAt(0)
             if (v.isShown && v is LinearLayout) {
                 if (highlight) {
                     v.setBackgroundColor(highlightColor)
                     //v.setAlpha(0.3f);
-                    if (v.getBottom() > scrollBounds.bottom || v.getTop() < scrollBounds.top) popupContainer.scrollTo(
+                    if (v.bottom > scrollBounds.bottom || v.top < scrollBounds.top) popupContainer.scrollTo(
                         0,
-                        v.getTop()
+                        v.top
                     )
                     mHighlightedLine = v
                 } else {
                     v.setBackgroundColor(Color.TRANSPARENT)
-                    v.setAlpha(1f)
+                    v.alpha = 1f
                 }
                 foundLine = true
                 if (MyDebug.LOG) Log.d(
@@ -2483,7 +2516,7 @@ class MainUI(val mainActivity: MainActivity) {
             clearSelectionState()
             return
         }
-        highlightPopupLine(false, false)
+        highlightPopupLine(highlight = false, goUp = false)
         val count = mHighlightedLine!!.childCount
         var foundIcon = false
         while (!foundIcon) {
@@ -2517,27 +2550,27 @@ class MainUI(val mainActivity: MainActivity) {
      * when receiving a remote control command.
      */
     private fun nextPopupLine() {
-        highlightPopupLine(false, false)
+        highlightPopupLine(highlight = false, goUp = false)
         mPopupLine++
-        highlightPopupLine(true, false)
+        highlightPopupLine(highlight = true, goUp = false)
     }
 
     private fun previousPopupLine() {
-        highlightPopupLine(false, true)
+        highlightPopupLine(highlight = false, goUp = true)
         mPopupLine--
-        highlightPopupLine(true, true)
+        highlightPopupLine(highlight = true, goUp = true)
     }
 
     private fun nextPopupIcon() {
-        highlightPopupIcon(false, false)
+        highlightPopupIcon(highlight = false, goLeft = false)
         mPopupIcon++
-        highlightPopupIcon(true, false)
+        highlightPopupIcon(highlight = true, goLeft = false)
     }
 
     private fun previousPopupIcon() {
-        highlightPopupIcon(false, true)
+        highlightPopupIcon(highlight = false, goLeft = true)
         mPopupIcon--
-        highlightPopupIcon(true, true)
+        highlightPopupIcon(highlight = true, goLeft = true)
     }
 
     /**
@@ -2711,7 +2744,7 @@ class MainUI(val mainActivity: MainActivity) {
             clearSelectionState()
             remoteControlMode = true
             mSelectingLines = true
-            highlightPopupLine(true, false)
+            highlightPopupLine(highlight = true, goUp = false)
         }
     }
 
@@ -2731,7 +2764,7 @@ class MainUI(val mainActivity: MainActivity) {
             if (v.isShown && v is LinearLayout) {
                 if (MyDebug.LOG) Log.d(TAG, "reset " + mPopupLine + "th view: " + v)
                 v.setBackgroundColor(Color.TRANSPARENT)
-                v.setAlpha(1f)
+                v.alpha = 1f
             }
             if (mHighlightedLine != null) {
                 v = mHighlightedLine!!.getChildAt(mPopupIcon)
@@ -2848,12 +2881,12 @@ class MainUI(val mainActivity: MainActivity) {
                                 false
                             )
                             autoStabilise = !autoStabilise
-                            val editor = sharedPreferences.edit()
-                            editor.putBoolean(
-                                PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY,
-                                autoStabilise
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putBoolean(
+                                    PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY,
+                                    autoStabilise
+                                )
+                            }
                             val message: String = mainActivity.getResources()
                                 .getString(R.string.preference_auto_stabilise) + ": " + mainActivity.getResources()
                                 .getString(if (autoStabilise) R.string.on else R.string.off)
@@ -2996,7 +3029,7 @@ class MainUI(val mainActivity: MainActivity) {
             if (selectingIcons()) {
                 clickSelectedIcon()
             } else {
-                highlightPopupIcon(true, false)
+                highlightPopupIcon(highlight = true, goLeft = false)
             }
         }
     }
@@ -3021,9 +3054,9 @@ class MainUI(val mainActivity: MainActivity) {
                 if (MyDebug.LOG) Log.d(TAG, "user clicked dont_show_again for info dialog")
                 val sharedPreferences =
                     PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                val editor = sharedPreferences.edit()
-                editor.putBoolean(infoPreferenceKey, true)
-                editor.apply()
+                sharedPreferences.edit {
+                    putBoolean(infoPreferenceKey, true)
+                }
             })
 
         //main_activity.showPreview(false);
@@ -3201,17 +3234,19 @@ class MainUI(val mainActivity: MainActivity) {
     companion object {
         private const val TAG = "MainUI"
 
-        private const val cachePopup = true // if false, we recreate the popup each time
-        private const val viewRotateAnimationDuration =
-            100 // duration in ms of the icon rotation animation
-        const val privacyIndicatorGapDp: Int = 24
+        // if false, we recreate the popup each time
+        private const val CACHE_POPUP = true
 
-        private const val manualIsoValue = "m"
+        // duration in ms of the icon rotation animation
+        private const val VIEW_ROTATAE_ANIMATION_DURATION = 100
+        const val PRIVACY_INDICATOR_GAP_DP: Int = 24
+
+        private const val MANUAL_ISO_VALUE = "m"
 
         /** Returns whether the ISO button with the supplied text is a match for the supplied iso.
          * Should only be used for Preview.supportsISORange()==true (i.e., full manual ISO).
          */
-        fun ISOTextEquals(buttonText: String, iso: String): Boolean {
+        fun checkISOTextEquals(buttonText: String, iso: String): Boolean {
             // Can't use equals(), due to the \n that Popupview.getButtonOptionString() inserts, and
             // also good to make this general in case in future we support other text formats.
             // We really want to check that iso is the last word in buttonText.
@@ -3226,7 +3261,7 @@ class MainUI(val mainActivity: MainActivity) {
         /** Returns the ISO button text for the supplied iso.
          * Should only be used for Preview.supportsISORange()==true (i.e., full manual ISO).
          */
-        fun ISOToButtonText(iso: Int): String {
+        fun convertISOToButtonText(iso: Int): String {
             // n.b., if we change how the ISO is converted to a string for the button, will also need
             // to update updateSelectedISOButton()
             return iso.toString()

@@ -38,7 +38,7 @@ class VideoQualityHandler {
         _currentVideoQualityIndex = -1
     }
 
-    /** Initialises the class with the available video profiles and resolutions. The user should first
+    /** Initializes the class with the available video profiles and resolutions. The user should first
      * set the video sizes via setVideoSizes().
      * @param profiles   A list of qualities (see CamcorderProfile.QUALITY_*). Should be supplied in
      * order from highest to lowest quality.

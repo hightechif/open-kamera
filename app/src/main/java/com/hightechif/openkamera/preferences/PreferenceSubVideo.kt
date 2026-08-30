@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Bundle
 import android.preference.ListPreference
 import android.preference.Preference
-import android.preference.Preference.OnPreferenceChangeListener
 import android.preference.PreferenceGroup
 import android.preference.PreferenceManager
 import android.util.Log
@@ -20,22 +19,22 @@ import com.hightechif.openkamera.R
 import com.hightechif.openkamera.utils.MyDebug
 
 class PreferenceSubVideo : PreferenceSubScreen() {
-    public override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         if (MyDebug.LOG) Log.d(TAG, "onCreate")
         super.onCreate(savedInstanceState)
         addPreferencesFromResource(R.xml.preferences_sub_video)
 
-        val bundle: Bundle = getArguments()
+        val bundle: Bundle = arguments
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this.getActivity())
+        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this.activity)
 
         val cameraId = bundle.getInt("cameraId")
-        if (MyDebug.LOG) Log.d(TAG, "cameraId: " + cameraId)
+        if (MyDebug.LOG) Log.d(TAG, "cameraId: $cameraId")
         val cameraIdSPhysical = bundle.getString("cameraIdSPhysical")
-        if (MyDebug.LOG) Log.d(TAG, "cameraIdSPhysical: " + cameraIdSPhysical)
+        if (MyDebug.LOG) Log.d(TAG, "cameraIdSPhysical: $cameraIdSPhysical")
 
         val cameraOpen = bundle.getBoolean("camera_open")
-        if (MyDebug.LOG) Log.d(TAG, "camera_open: " + cameraOpen)
+        if (MyDebug.LOG) Log.d(TAG, "camera_open: $cameraOpen")
 
         val videoQuality = bundle.getStringArray("video_quality")
         val videoQualityString = bundle.getStringArray("video_quality_string")
@@ -45,18 +44,18 @@ class PreferenceSubVideo : PreferenceSubScreen() {
 
         val fpsPreferenceKey: String? =
             PreferenceKeys.getVideoFPSPreferenceKey(cameraId, cameraIdSPhysical)
-        if (MyDebug.LOG) Log.d(TAG, "fps_preference_key: " + fpsPreferenceKey)
+        if (MyDebug.LOG) Log.d(TAG, "fpsPreferenceKey: $fpsPreferenceKey")
         val fpsValue: String = sharedPreferences.getString(fpsPreferenceKey, "default")!!
-        if (MyDebug.LOG) Log.d(TAG, "fps_value: " + fpsValue)
+        if (MyDebug.LOG) Log.d(TAG, "fpsValue: $fpsValue")
 
         val supportsTonemapCurve = bundle.getBoolean("supports_tonemap_curve")
-        if (MyDebug.LOG) Log.d(TAG, "supports_tonemap_curve: " + supportsTonemapCurve)
+        if (MyDebug.LOG) Log.d(TAG, "supportsTonemapCurve: $supportsTonemapCurve")
 
         val supportsVideoStabilization = bundle.getBoolean("supports_video_stabilization")
-        if (MyDebug.LOG) Log.d(TAG, "supports_video_stabilization: " + supportsVideoStabilization)
+        if (MyDebug.LOG) Log.d(TAG, "supportsVideoStabilization: $supportsVideoStabilization")
 
         val supportsForceVideo4k = bundle.getBoolean("supports_force_video_4k")
-        if (MyDebug.LOG) Log.d(TAG, "supports_force_video_4k: " + supportsForceVideo4k)
+        if (MyDebug.LOG) Log.d(TAG, "supportsForceVideo4k: $supportsForceVideo4k")
 
         /* Set up video resolutions.
 		   Note that this will be the resolutions for either standard or high speed frame rate (where
@@ -77,30 +76,30 @@ class PreferenceSubVideo : PreferenceSubScreen() {
                 values[i] = videoQuality[i]
             }
             val lp = findPreference("preference_video_quality") as ListPreference
-            lp.setEntries(entries)
-            lp.setEntryValues(values)
+            lp.entries = entries
+            lp.entryValues = values
             val videoQualityPreferenceKey = bundle.getString("video_quality_preference_key")
             if (MyDebug.LOG) Log.d(
                 TAG,
-                "video_quality_preference_key: " + videoQualityPreferenceKey
+                "video_quality_preference_key: $videoQualityPreferenceKey"
             )
             val videoQualityValue: String =
                 sharedPreferences.getString(videoQualityPreferenceKey, "")!!
-            if (MyDebug.LOG) Log.d(TAG, "video_quality_value: " + videoQualityValue)
+            if (MyDebug.LOG) Log.d(TAG, "video_quality_value: $videoQualityValue")
             // set the key, so we save for the correct cameraId and high-speed setting
             // this must be done before setting the value (otherwise the video resolutions preference won't be
             // updated correctly when this is called from the callback when the user switches between
             // normal and high speed frame rates
-            lp.setKey(videoQualityPreferenceKey)
-            lp.setValue(videoQualityValue)
+            lp.key = videoQualityPreferenceKey
+            lp.value = videoQualityValue
 
             val isHighSpeed = bundle.getBoolean("video_is_high_speed")
             val title: String? =
-                if (isHighSpeed) getResources().getString(R.string.video_quality) + " [" + getResources().getString(
+                if (isHighSpeed) resources.getString(R.string.video_quality) + " [" + resources.getString(
                     R.string.high_speed
-                ) + "]" else getResources().getString(R.string.video_quality)
-            lp.setTitle(title)
-            lp.setDialogTitle(title)
+                ) + "]" else resources.getString(R.string.video_quality)
+            lp.title = title
+            lp.dialogTitle = title
         } else {
             val pref: Preference? = findPreference("preference_video_quality")
             //PreferenceGroup pg = (PreferenceGroup)this.findPreference("preference_screen_video_settings");
@@ -114,10 +113,10 @@ class PreferenceSubVideo : PreferenceSubScreen() {
             val values = arrayOfNulls<CharSequence>(videoFps.size + 1)
             var i = 0
             // default:
-            entries[i] = getResources().getString(R.string.preference_video_fps_default)
+            entries[i] = resources.getString(R.string.preference_video_fps_default)
             values[i] = "default"
             i++
-            val highSpeedAppend = " [" + getResources().getString(R.string.high_speed) + "]"
+            val highSpeedAppend = " [" + resources.getString(R.string.high_speed) + "]"
             for (k in videoFps.indices) {
                 val fps = videoFps[k]
                 if (videoFpsHighSpeed != null && videoFpsHighSpeed[k]) {
@@ -130,11 +129,11 @@ class PreferenceSubVideo : PreferenceSubScreen() {
             }
 
             val lp = findPreference("preference_video_fps") as ListPreference
-            lp.setEntries(entries)
-            lp.setEntryValues(values)
-            lp.setValue(fpsValue)
+            lp.entries = entries
+            lp.entryValues = values
+            lp.value = fpsValue
             // now set the key, so we save for the correct cameraId
-            lp.setKey(fpsPreferenceKey)
+            lp.key = fpsPreferenceKey
         }
 
         if (!supportsTonemapCurve && (cameraOpen || sharedPreferences.getString(
@@ -193,21 +192,19 @@ class PreferenceSubVideo : PreferenceSubScreen() {
     }
 
     /** Programmatically set up dependencies for preference types (e.g., ListPreference) that don't
-     * support this in xml (such as SwitchPreference and CheckBoxPreference), or where this depends
+     * support this in XML (such as SwitchPreference and CheckBoxPreference), or where this depends
      * on the device (e.g., Android version).
      */
     private fun setupDependencies() {
         // set up dependency for preferenceVideoProfileGamma on preferenceVideoLog
         var pref = findPreference("preference_video_log") as ListPreference?
         if (pref != null) { // may be null if preference not supported
-            pref.setOnPreferenceChangeListener(object : OnPreferenceChangeListener {
-                override fun onPreferenceChange(arg0: Preference?, newValue: Any): Boolean {
-                    val value: String? = newValue.toString()
-                    setVideoProfileGammaDependency(value)
-                    return true
-                }
-            })
-            setVideoProfileGammaDependency(pref.getValue()) // ensure dependency is enabled/disabled as required for initial value
+            pref.setOnPreferenceChangeListener { arg0, newValue ->
+                val value = newValue.toString()
+                setVideoProfileGammaDependency(value)
+                true
+            }
+            setVideoProfileGammaDependency(pref.value) // ensure dependency is enabled/disabled as required for initial value
         }
 
         if (!MyApplicationInterface.mediastoreSupportsVideoSubtitles()) {
@@ -221,18 +218,22 @@ class PreferenceSubVideo : PreferenceSubScreen() {
                 // is being recreated
                 run {
                     val sharedPreferences =
-                        PreferenceManager.getDefaultSharedPreferences(this.getActivity())
-                    if (sharedPreferences.getBoolean(PreferenceKeys.USING_SAF_PREFERENCE_KEY, false)) {
+                        PreferenceManager.getDefaultSharedPreferences(this.activity)
+                    if (sharedPreferences.getBoolean(
+                            PreferenceKeys.USING_SAF_PREFERENCE_KEY,
+                            false
+                        )
+                    ) {
                         usingSaf = true
                     }
                 }
-                if (MyDebug.LOG) Log.d(TAG, "using_saf: " + usingSaf)
+                if (MyDebug.LOG) Log.d(TAG, "using_saf: $usingSaf")
 
                 //pref.setDependency("preference_using_saf");
                 if (usingSaf) {
-                    pref.setEnabled(true)
+                    pref.isEnabled = true
                 } else {
-                    pref.setEnabled(false)
+                    pref.isEnabled = false
                 }
             }
         }
@@ -244,9 +245,9 @@ class PreferenceSubVideo : PreferenceSubScreen() {
             val enableDependent = "gamma" == newValue
             if (MyDebug.LOG) Log.d(
                 TAG,
-                "clicked video log: " + newValue + " enable_dependent: " + enableDependent
+                "clicked video log: $newValue enable_dependent: $enableDependent"
             )
-            dependent.setEnabled(enableDependent)
+            dependent.isEnabled = enableDependent
         }
     }
 

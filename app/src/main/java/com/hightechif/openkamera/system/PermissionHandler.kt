@@ -245,7 +245,7 @@ class PermissionHandler internal constructor(private val mainActivity: MainActiv
 
         when (requestCode) {
             MY_PERMISSIONS_REQUEST_CAMERA -> {
-                // If request is cancelled, the result arrays are empty.
+                // If request is canceled, the result arrays are empty.
                 if (grantResults.isNotEmpty()
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED
                 ) {
@@ -265,7 +265,7 @@ class PermissionHandler internal constructor(private val mainActivity: MainActiv
             }
 
             MY_PERMISSIONS_REQUEST_STORAGE -> {
-                // If request is cancelled, the result arrays are empty.
+                // If request is canceled, the result arrays are empty.
                 if (grantResults.isNotEmpty()
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED
                 ) {
@@ -285,7 +285,7 @@ class PermissionHandler internal constructor(private val mainActivity: MainActiv
             }
 
             MY_PERMISSIONS_REQUEST_RECORD_AUDIO -> {
-                // If request is cancelled, the result arrays are empty.
+                // If request is canceled, the result arrays are empty.
                 if (grantResults.isNotEmpty()
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED
                 ) {
@@ -300,13 +300,13 @@ class PermissionHandler internal constructor(private val mainActivity: MainActiv
                     // permission denied, boo! Disable the
                     // functionality that depends on this permission.
                     // no need to do anything
-                    // note that we don't turn off record audio option, as user may then record video not realising audio won't be recorded - best to be explicit each time
+                    // note that we don't turn off record audio option, as user may then record video not realizing audio won't be recorded - best to be explicit each time
                 }
                 return
             }
 
             MY_PERMISSIONS_REQUEST_LOCATION -> {
-                // If request is cancelled, the result arrays are empty.
+                // If request is canceled, the result arrays are empty.
                 if (grantResults.size == 2 && (grantResults[0] == PackageManager.PERMISSION_GRANTED || grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
                     // On Android 12 users can choose to only grant approximation location. This means
                     // one of the permissions will be denied, but as long as one location permission

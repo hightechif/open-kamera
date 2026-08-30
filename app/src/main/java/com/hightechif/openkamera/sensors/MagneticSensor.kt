@@ -138,7 +138,7 @@ class MagneticSensor(private val mainActivity: MainActivity) {
      * the dialog if so.
      */
     fun checkMagneticAccuracy() {
-        if (MyDebug.LOG) Log.d(TAG, "checkMagneticAccuracy(): " + magneticAccuracy)
+        if (MyDebug.LOG) Log.d(TAG, "checkMagneticAccuracy(): $magneticAccuracy")
         if (magneticAccuracy != SensorManager.SENSOR_STATUS_UNRELIABLE && magneticAccuracy != SensorManager.SENSOR_STATUS_ACCURACY_LOW) {
             if (MyDebug.LOG) Log.d(TAG, "accuracy is good enough (or accuracy not yet known)")
         } else if (shownMagneticAccuracyDialog) {
@@ -181,17 +181,13 @@ class MagneticSensor(private val mainActivity: MainActivity) {
     /* Whether the user preferences indicate that we need the magnetic sensor to be enabled.
      */
     private fun needsMagneticSensor(sharedPreferences: SharedPreferences): Boolean {
-        if (mainActivity.applicationInterface.geodirectionPref ||
-            sharedPreferences.getBoolean(PreferenceKeys.ADD_YPR_TO_COMMENTS, false) ||
-            sharedPreferences.getBoolean(
-                PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
-                false
-            ) ||
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
-        ) {
-            return true
-        }
-        return false
+        return mainActivity.applicationInterface.geodirectionPref ||
+                sharedPreferences.getBoolean(PreferenceKeys.ADD_YPR_TO_COMMENTS, false) ||
+                sharedPreferences.getBoolean(
+                    PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
+                    false
+                ) ||
+                sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY, false)
     }
 
     fun clearDialog() {

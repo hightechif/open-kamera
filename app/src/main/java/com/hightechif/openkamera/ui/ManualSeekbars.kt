@@ -94,14 +94,14 @@ class ManualSeekbars {
 
         // 1 to 99, per 1
         for (i in 1..99) {
-            if (i > minIso && i < maxIso) seekbarValues.add(i.toLong())
+            if (i in (minIso + 1)..<maxIso) seekbarValues.add(i.toLong())
         }
 
         // 100 to 500, per 5
         run {
             var i: Long = 100
             while (i < 500) {
-                if (i > minIso && i < maxIso) seekbarValues.add(i)
+                if (i in (minIso + 1)..<maxIso) seekbarValues.add(i)
                 i += 5
             }
         }
@@ -110,7 +110,7 @@ class ManualSeekbars {
         run {
             var i: Long = 500
             while (i < 1000) {
-                if (i > minIso && i < maxIso) seekbarValues.add(i)
+                if (i in (minIso + 1)..<maxIso) seekbarValues.add(i)
                 i += 10
             }
         }
@@ -119,7 +119,7 @@ class ManualSeekbars {
         run {
             var i: Long = 1000
             while (i < 5000) {
-                if (i > minIso && i < maxIso) seekbarValues.add(i)
+                if (i in (minIso + 1)..<maxIso) seekbarValues.add(i)
                 i += 50
             }
         }
@@ -127,7 +127,7 @@ class ManualSeekbars {
         // 5000 to 10000, per 100
         var i: Long = 5000
         while (i < 10000) {
-            if (i > minIso && i < maxIso) seekbarValues.add(i)
+            if (i in (minIso + 1)..<maxIso) seekbarValues.add(i)
             i += 100
         }
 
@@ -153,7 +153,7 @@ class ManualSeekbars {
         // 1/10,000 to 1/1,000
         for (i in 10 downTo 1) {
             val exposure = 1000000000L / (i * 1000L)
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
         }
@@ -161,7 +161,7 @@ class ManualSeekbars {
         // 1/900 to 1/100
         for (i in 9 downTo 1) {
             val exposure = 1000000000L / (i * 100L)
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
         }
@@ -169,7 +169,7 @@ class ManualSeekbars {
         // 1/90 to 1/60 (steps of 10)
         for (i in 9 downTo 6) {
             val exposure = 1000000000L / (i * 10L)
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
         }
@@ -179,7 +179,7 @@ class ManualSeekbars {
             var i = 50
             while (i >= 15) {
                 val exposure = 1000000000L / i
-                if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+                if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                     exposure
                 )
                 i -= 5
@@ -189,7 +189,7 @@ class ManualSeekbars {
         // 0.1 to 1.9, per 1.0s
         for (i in 1..19) {
             val exposure = (1000000000L / 10) * i
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
         }
@@ -197,7 +197,7 @@ class ManualSeekbars {
         // 2 to 19, per 1s
         for (i in 2..19) {
             val exposure = 1000000000L * i
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
         }
@@ -207,7 +207,7 @@ class ManualSeekbars {
             var i = 20
             while (i < 60) {
                 val exposure = 1000000000L * i
-                if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+                if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                     exposure
                 )
                 i += 5
@@ -221,7 +221,7 @@ class ManualSeekbars {
             var i = 60
             while (i < 180) {
                 val exposure = 1000000000L * i
-                if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+                if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                     exposure
                 )
                 i += 15
@@ -233,7 +233,7 @@ class ManualSeekbars {
             var i = 180
             while (i < 600) {
                 val exposure = 1000000000L * i
-                if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+                if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                     exposure
                 )
                 i += 60
@@ -244,7 +244,7 @@ class ManualSeekbars {
         var i = 600
         while (i <= 1200) {
             val exposure = 1000000000L * i
-            if (exposure > minExposureTime && exposure < maxExposureTime) seekbarValues.add(
+            if (exposure in (minExposureTime + 1)..<maxExposureTime) seekbarValues.add(
                 exposure
             )
             i += 120
@@ -260,8 +260,8 @@ class ManualSeekbars {
     companion object {
         private const val TAG = "ManualSeekbars"
 
-        private const val manualN =
-            1000 // the number of values on the seekbar used for manual focus distance
+        // the number of values on the seekbar used for manual focus distance
+        private const val MANUAL_N = 1000
 
         fun seekbarScaling(frac: Double): Double {
             // For various seekbars, we want to use a non-linear scaling, so user has more control over smaller values
@@ -278,12 +278,12 @@ class ManualSeekbars {
             maxValue: Double,
             value: Double
         ) {
-            seekBar.max = manualN
+            seekBar.max = MANUAL_N
             val scaling = (value - minValue) / (maxValue - minValue)
             val frac = seekbarScalingInverse(scaling)
-            var newValue = (frac * manualN + 0.5).toInt() // add 0.5 for rounding
+            var newValue = (frac * MANUAL_N + 0.5).toInt() // add 0.5 for rounding
             if (newValue < 0) newValue = 0
-            else if (newValue > manualN) newValue = manualN
+            else if (newValue > MANUAL_N) newValue = MANUAL_N
             seekBar.progress = newValue
         }
 

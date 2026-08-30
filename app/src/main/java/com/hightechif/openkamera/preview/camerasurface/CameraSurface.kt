@@ -17,7 +17,7 @@ import com.hightechif.openkamera.cameracontroller.CameraController
  */
 interface CameraSurface {
     val view: View
-    fun setPreviewDisplay(cameraController: CameraController?) // n.b., uses double-dispatch similar to Visitor pattern - behaviour depends on type of CameraSurface and CameraController
+    fun setPreviewDisplay(cameraController: CameraController?) // n.b., uses double-dispatch similar to Visitor pattern - behavior depends on type of CameraSurface and CameraController
     fun setVideoRecorder(videoRecorder: MediaRecorder?)
     fun setTransform(matrix: Matrix?)
     fun onPause()

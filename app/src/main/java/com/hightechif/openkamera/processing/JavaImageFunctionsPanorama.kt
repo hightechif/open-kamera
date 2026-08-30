@@ -8,24 +8,16 @@
 package com.hightechif.openkamera.processing
 
 import android.graphics.Bitmap
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_ACES
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_CLAMP
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_EXPONENTIAL
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_FU2
-import com.hightechif.openkamera.processing.HDRProcessor.TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD
 import com.hightechif.openkamera.processing.JavaImageProcessing.CachedBitmap
 import com.hightechif.openkamera.processing.JavaImageProcessing.FastAccessBitmap
-import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 
 //import android.util.Log;
 object JavaImageFunctionsPanorama {
     private const val TAG = "JavaImageFunctionsPanorama"
     private val pyramidBlendingWeights = floatArrayOf(0.05f, 0.25f, 0.4f, 0.25f, 0.05f)
+
     internal class ConvertToGreyscaleFunction : JavaImageProcessing.ApplyFunctionInterface {
         override fun init(nThreads: Int) {
         }
@@ -90,8 +82,8 @@ object JavaImageFunctionsPanorama {
     }
 
     internal class ComputeDerivativesFunction(// output for x derivatives
-        private val bitmap_Ix: Bitmap, // output for y derivatives
-        private val bitmap_Iy: Bitmap,
+        private val bitmapIx: Bitmap, // output for y derivatives
+        private val bitmapIy: Bitmap,
         private val bitmapIn: Bitmap
     ) :
         JavaImageProcessing.ApplyFunctionInterface {
@@ -100,7 +92,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -116,8 +108,8 @@ object JavaImageFunctionsPanorama {
             thisHeight: Int
         ) {
             // we could move these to class members for performance, remember we'd have to have a version per-thread
-            val cache_bitmap_Ix = IntArray(thisWidth * thisHeight)
-            val cache_bitmap_Iy = IntArray(thisWidth * thisHeight)
+            val cacheBitmapIx = IntArray(thisWidth * thisHeight)
+            val cacheBitmapIy = IntArray(thisWidth * thisHeight)
 
             var y = offY
             var c = 0
@@ -133,8 +125,8 @@ object JavaImageFunctionsPanorama {
 
                 var x = offX
                 while (x < offX + thisWidth) {
-                    var Ix = 0
-                    var Iy = 0
+                    var varIx = 0
+                    var varIy = 0
                     if (x >= 1 && x < width - 1 && y >= 1 && y < height - 1) {
                         // use Sobel operator
 
@@ -170,22 +162,22 @@ object JavaImageFunctionsPanorama {
                         iIy = min(iIy.toDouble(), 128.0).toInt()
                         iIy += 127 // iIy now runs from 0 to 255
 
-                        Ix = iIx
-                        Iy = iIy
+                        varIx = iIx
+                        varIy = iIy
                     }
 
                     //bitmap_Ix.setPixel(x, y, Ix << 24);
                     //bitmap_Iy.setPixel(x, y, Iy << 24);
-                    cache_bitmap_Ix[c] = Ix shl 24
-                    cache_bitmap_Iy[c] = Iy shl 24
+                    cacheBitmapIx[c] = varIx shl 24
+                    cacheBitmapIy[c] = varIy shl 24
                     x++
                     c++
                 }
                 y++
             }
 
-            bitmap_Ix.setPixels(
-                cache_bitmap_Ix,
+            bitmapIx.setPixels(
+                cacheBitmapIx,
                 0,
                 thisWidth,
                 offX,
@@ -193,8 +185,8 @@ object JavaImageFunctionsPanorama {
                 thisWidth,
                 thisHeight
             )
-            bitmap_Iy.setPixels(
-                cache_bitmap_Iy,
+            bitmapIy.setPixels(
+                cacheBitmapIy,
                 0,
                 thisWidth,
                 offX,
@@ -233,22 +225,22 @@ object JavaImageFunctionsPanorama {
 
     internal class CornerDetectorFunction(// output
         private val pixelsF: FloatArray,
-        private val bitmap_Ix: Bitmap,
-        private val bitmap_Iy: Bitmap
+        private val bitmapIx: Bitmap,
+        private val bitmapIy: Bitmap
     ) :
         JavaImageProcessing.ApplyFunctionInterface {
-        private val width = bitmap_Ix.width
-        private val height = bitmap_Ix.height
-        private lateinit var fast_bitmap_Ix: Array<FastAccessBitmap?>
-        private lateinit var fast_bitmap_Iy: Array<FastAccessBitmap?>
+        private val width = bitmapIx.width
+        private val height = bitmapIx.height
+        private lateinit var fastBitmapIx: Array<FastAccessBitmap?>
+        private lateinit var fastBitmapIy: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fast_bitmap_Ix = arrayOfNulls<FastAccessBitmap>(nThreads)
-            fast_bitmap_Iy = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIx = arrayOfNulls(nThreads)
+            fastBitmapIy = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
-                fast_bitmap_Ix[i] = FastAccessBitmap(bitmap_Ix)
-                fast_bitmap_Iy[i] = FastAccessBitmap(bitmap_Iy)
+                fastBitmapIx[i] = FastAccessBitmap(bitmapIx)
+                fastBitmapIy[i] = FastAccessBitmap(bitmapIy)
             }
         }
 
@@ -266,23 +258,23 @@ object JavaImageFunctionsPanorama {
             var y = offY
             var c = 0
             while (y < offY + thisHeight) {
-                fast_bitmap_Ix[threadIndex]?.ensureCache(
+                fastBitmapIx[threadIndex]?.ensureCache(
                     y - radius,
                     y + radius
                 ) // force cache to cover rows needed by this row
-                val bitmap_Ix_cache_y: Int = fast_bitmap_Ix[threadIndex]!!.cacheY
-                val y_rel_bitmap_Ix_cache = y - bitmap_Ix_cache_y
-                val bitmap_Ix_cache_pixels: IntArray =
-                    fast_bitmap_Ix[threadIndex]!!.cachedPixelsI
+                val bitmapIxCacheY: Int = fastBitmapIx[threadIndex]!!.cacheY
+                val yRelBitmapIxCache = y - bitmapIxCacheY
+                val bitmapIxCachePixels: IntArray =
+                    fastBitmapIx[threadIndex]!!.cachedPixelsI
 
-                fast_bitmap_Iy[threadIndex]?.ensureCache(
+                fastBitmapIy[threadIndex]?.ensureCache(
                     y - radius,
                     y + radius
                 ) // force cache to cover rows needed by this row
-                val bitmap_Iy_cache_y: Int = fast_bitmap_Iy[threadIndex]!!.cacheY
-                val y_rel_bitmap_Iy_cache = y - bitmap_Iy_cache_y
-                val bitmap_Iy_cache_pixels: IntArray =
-                    fast_bitmap_Iy[threadIndex]!!.cachedPixelsI
+                val bitmapIyCacheY: Int = fastBitmapIy[threadIndex]!!.cacheY
+                val yRelBitmapIyCache = y - bitmapIyCacheY
+                val bitmapIyCachePixels: IntArray =
+                    fastBitmapIy[threadIndex]!!.cachedPixelsI
 
                 var x = offX
                 while (x < offX + thisWidth) {
@@ -298,14 +290,14 @@ object JavaImageFunctionsPanorama {
                                 val dx = cx - x
                                 val dy = cy - y
 
-                                var Ix =
-                                    bitmap_Ix_cache_pixels[(y_rel_bitmap_Ix_cache + dy) * width + (cx)] ushr 24
-                                var Iy =
-                                    bitmap_Iy_cache_pixels[(y_rel_bitmap_Iy_cache + dy) * width + (cx)] ushr 24
+                                var varIx =
+                                    bitmapIxCachePixels[(yRelBitmapIxCache + dy) * width + (cx)] ushr 24
+                                var varIy =
+                                    bitmapIyCachePixels[(yRelBitmapIyCache + dy) * width + (cx)] ushr 24
 
                                 // convert from 0-255 to -127 - +128:
-                                Ix -= 127
-                                Iy -= 127
+                                varIx -= 127
+                                varIy -= 127
 
                                 /*float dist2 = dx*dx + dy*dy;
                                 const float sigma2 = 0.25f;
@@ -316,16 +308,16 @@ object JavaImageFunctionsPanorama {
                                 val weight = weights[2 + dx] * weights[2 + dy]
 
                                 //weight = 36;
-                                h00 += weight * Ix * Ix
-                                h01 += weight * Ix * Iy
-                                h11 += weight * Iy * Iy
+                                h00 += weight * varIx * varIx
+                                h01 += weight * varIx * varIy
+                                h11 += weight * varIy * varIy
                             }
                         }
 
-                        val det_H = h00 * h11 - h01 * h01
-                        val tr_H = h00 + h11
+                        val detH = h00 * h11 - h01 * h01
+                        val trH = h00 + h11
                         //out = det_H - 0.1f*tr_H*tr_H;
-                        out = det_H - 0.06f * tr_H * tr_H
+                        out = detH - 0.06f * trH * trH
                     }
 
                     pixelsF[y * width + x] = out
@@ -460,7 +452,7 @@ object JavaImageFunctionsPanorama {
 
         override fun init(nThreads: Int) {
             errors = IntArray(nThreads)
-            fastBitmap = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmap = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmap[i] = FastAccessBitmap(bitmap)
@@ -555,7 +547,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -677,7 +669,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -807,7 +799,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -1174,7 +1166,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -1269,7 +1261,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -1492,7 +1484,7 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmapIn: Array<FastAccessBitmap?>
 
         override fun init(nThreads: Int) {
-            fastBitmapIn = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmapIn = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmapIn[i] = FastAccessBitmap(bitmapIn)
@@ -2093,7 +2085,7 @@ object JavaImageFunctionsPanorama {
         private val width = bitmap1.width
 
         override fun init(nThreads: Int) {
-            fastBitmap1 = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmap1 = arrayOfNulls(nThreads)
 
             for (i in 0..<nThreads) {
                 fastBitmap1[i] = FastAccessBitmap(bitmap1)
@@ -2183,11 +2175,6 @@ object JavaImageFunctionsPanorama {
         JavaImageProcessing.ApplyFunctionInterface {
         private val mergeBlendWidth = blendWidth
 
-        //private final int startBlendX;
-        init {
-            //startBlendX = (fullWidth - mergeBlendWidth)/2;
-        }
-
         override fun init(nThreads: Int) {
         }
 
@@ -2263,11 +2250,6 @@ object JavaImageFunctionsPanorama {
         private lateinit var fastBitmap1: MutableList<FastAccessBitmap>
         private val mergeBlendWidth = blendWidth
 
-        //private final int startBlendX;
-        init {
-            //startBlendX = (fullWidth - mergeBlendWidth)/2;
-        }
-
         override fun init(nThreads: Int) {
             fastBitmap1 = mutableListOf()
 
@@ -2304,10 +2286,10 @@ object JavaImageFunctionsPanorama {
             while (y < offY + thisHeight) {
                 val midX = interpolatedBestPath[y]
 
-                fastBitmap1[threadIndex]?.getPixel(0, y) // force cache to cover row y
-                val bitmap1CacheY: Int = fastBitmap1[threadIndex]!!.cacheY
+                fastBitmap1[threadIndex].getPixel(0, y) // force cache to cover row y
+                val bitmap1CacheY: Int = fastBitmap1[threadIndex].cacheY
                 val yRelBitmap1Cache = y - bitmap1CacheY
-                val bitmap1CachePixels: IntArray = fastBitmap1[threadIndex]!!.cachedPixelsI
+                val bitmap1CachePixels: IntArray = fastBitmap1[threadIndex].cachedPixelsI
 
                 var x = offX
                 while (x < offX + thisWidth) {

@@ -24,6 +24,7 @@ import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.ui.MainUI
 import com.hightechif.openkamera.utils.MyDebug
+import kotlin.math.roundToInt
 
 /** Class for handling the Bluetooth LE remote control functionality.
  */
@@ -41,7 +42,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
             if (mainActivity.isAppPaused) {
                 if (MyDebug.LOG) Log.d(TAG, "but app is now paused")
                 // Unclear if this could happen - possibly if app pauses immediately after starting
-                // the service, but before we connect? In theory we should then unbind the service,
+                // the service, but before we connect? In theory, we should then unbind the service,
                 // but seems safer not to try to call initialize or connect.
                 // This will mean the BluetoothLeService still thinks it's unbound (isBound will
                 // be left false), but find, that just means we'll enforce not trying to connect at
@@ -99,32 +100,32 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
             val applicationInterface: MyApplicationInterface =
                 mainActivity.applicationInterface
             val mainUI: MainUI = mainActivity.mainUI
-            if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
+            if (BluetoothLeService.ACTION_GATT_CONNECTED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote connected")
                 // Tell the Bluetooth service what type of remote we want to use
                 bluetoothLeService!!.setRemoteDeviceType(remoteDeviceType!!)
                 mainActivity.setBrightnessForCamera(false)
-            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
+            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote disconnected")
                 isConnected = false
                 applicationInterface.drawPreview.onExtraOSDValuesChanged("-- \u00B0C", "-- m")
                 mainUI.updateRemoteConnectionIcon()
                 mainActivity.setBrightnessToMinimumIfWanted()
                 if (mainUI.isExposureUIOpen) mainUI.toggleExposureUI()
-            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote services discovered")
                 // We let the BluetoothLEService subscribe to what is relevant, so we
                 // do nothing here, but we wait until this is done to update the UI
                 // icon
                 isConnected = true
                 mainUI.updateRemoteConnectionIcon()
-            } else if (BluetoothLeService.ACTION_SENSOR_VALUE.equals(action)) {
+            } else if (BluetoothLeService.ACTION_SENSOR_VALUE == action) {
                 val temp = intent.getDoubleExtra(BluetoothLeService.SENSOR_TEMPERATURE, -1.0)
                 var depth: Double = intent.getDoubleExtra(
                     BluetoothLeService.SENSOR_DEPTH,
                     -1.0
                 ) / mainActivity.waterDensity
-                depth = (Math.round(depth * 10)) / 10.0 // Round to 1 decimal
+                depth = ((depth * 10).roundToInt()) / 10.0 // Round to 1 decimal
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "Sensor values: depth: $depth - temp: $temp"
@@ -133,7 +134,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
                 val line1 = "$temp \u00B0C"
                 val line2 = "$depth m"
                 applicationInterface.drawPreview.onExtraOSDValuesChanged(line1, line2)
-            } else if (BluetoothLeService.ACTION_REMOTE_COMMAND.equals(action)) {
+            } else if (BluetoothLeService.ACTION_REMOTE_COMMAND == action) {
                 val command = intent.getIntExtra(BluetoothLeService.EXTRA_DATA, -1)
                 // TODO: we could abstract this into a method provided by each remote control model
                 when (command) {
@@ -164,7 +165,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
                         }
 
                     BluetoothLeService.COMMAND_UP -> if (!mainUI.processRemoteUpButton()) {
-                        // Default up behaviour:
+                        // Default up behavior:
                         // - if we are on manual focus, then adjust focus.
                         // - if we are on autofocus, then adjust zoom.
                         if (mainActivity.preview
@@ -251,7 +252,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
                 mainActivity.unbindService(mServiceConnection)
                 isConnected = false // Unbinding closes the connection, of course
                 mainActivity.mainUI.updateRemoteConnectionIcon()
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote Service was not running, that's fine")
             }
         }

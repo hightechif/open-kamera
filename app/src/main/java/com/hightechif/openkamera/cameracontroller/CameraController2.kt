@@ -80,6 +80,7 @@ class CameraController2(
     previewErrorCb: ErrorCallback,
     cameraErrorCb: ErrorCallback
 ) : CameraController(cameraId) {
+
     private val context: Context
 
     // used to improve performance for subsequent CameraController2 objects; key is the cameraIdS string, value is a CameraFeaturesCache object
@@ -187,7 +188,7 @@ class CameraController2(
     // chooses number of burst images and other settings for Open Kamera's noise reduction (NR) photo mode
     private var burstForNoiseReduction = false
 
-    // if burstForNoiseReduction==true, whether to optimise for low light scenes
+    // if burstForNoiseReduction==true, whether to optimize for low light scenes
     private var noiseReductionLowLight = false
 
     // if burstForNoiseReduction==false, this gives the number of images for the burst
@@ -447,7 +448,7 @@ class CameraController2(
             if (MyDebug.LOG) Log.d(TAG, "new still image available")
             if (pictureCb == null || !jpegTodo) {
                 // in theory this shouldn't happen - but if this happens, still free the image to avoid risk of memory leak,
-                // or strange behaviour where an old image appears when the user next takes a photo
+                // or strange behavior where an old image appears when the user next takes a photo
                 Log.e(TAG, "no picture callback available")
                 val image = reader.acquireNextImage()
                 image?.close()
@@ -896,7 +897,7 @@ class CameraController2(
             if (MyDebug.LOG) Log.d(TAG, "new still raw image available")
             if (pictureCb == null || !rawTodo) {
                 // in theory this shouldn't happen - but if this happens, still free the image to avoid risk of memory leak,
-                // or strange behaviour where an old image appears when the user next takes a photo
+                // or strange behavior where an old image appears when the user next takes a photo
                 Log.e(TAG, "no picture callback available")
                 val thisImage = reader.acquireNextImage()
                 thisImage?.close()
@@ -952,7 +953,7 @@ class CameraController2(
             // need to communicate the problem to the application
             // n.b., as this is potentially serious error, we always log even if MyDebug.LOG is false
             Log.e(TAG, "error occurred after camera was opened")
-            // important to run on UI thread to avoid synchronisation issues in the Preview
+            // important to run on UI thread to avoid synchronization issues in the Preview
             val activity = context as Activity
             activity.runOnUiThread {
                 if (MyDebug.LOG) Log.d(
@@ -1016,8 +1017,8 @@ class CameraController2(
         }
     }
 
-    /** Enforce a minimum number of points in tonemap curves - needed due to Galaxy S10e having wrong behaviour if fewer
-     * than 16 or in some cases 32 points?! OnePlus 3T meanwhile has more gradual behaviour where it gets better at 64 points.
+    /** Enforce a minimum number of points in tonemap curves - needed due to Galaxy S10e having wrong behavior if fewer
+     * than 16 or in some cases 32 points?! OnePlus 3T meanwhile has more gradual behavior where it gets better at 64 points.
      */
     private fun enforceMinTonemapCurvePoints(inValues: FloatArray): FloatArray {
         if (MyDebug.LOG) {
@@ -1226,7 +1227,7 @@ class CameraController2(
             var minZoom = 0.0f
             var maxZoom = 0.0f
             if (cameraIdSPhysical != null) {
-                // don't support zoom for physical lenses - problem on Galaxy S24+ that zooming on physical lense gives random colours!
+                // don't support zoom for physical lenses - problem on Galaxy S24+ that zooming on physical lense gives random colors!
                 // but in general, the exposed zoom ranges don't seem correct for physical lenses
                 // both the above are true for CONTROL_ZOOM_RATIO_RANGE and SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -3112,16 +3113,16 @@ class CameraController2(
         this.maxRawImages = maxRawImages
     }
 
-    override fun setVideoHighSpeed(wantVideoHighSpeed: Boolean) {
+    override fun setVideoHighSpeed(setVideoHighSpeed: Boolean) {
         if (MyDebug.LOG) Log.d(
             TAG,
-            "setVideoHighSpeed: $wantVideoHighSpeed"
+            "setVideoHighSpeed: $setVideoHighSpeed"
         )
         if (camera == null) {
             if (MyDebug.LOG) Log.e(TAG, "no camera")
             return
         }
-        if (this.wantVideoHighSpeed == wantVideoHighSpeed) {
+        if (this.wantVideoHighSpeed == setVideoHighSpeed) {
             return
         }
         if (hasCaptureSession()) {
@@ -3129,7 +3130,7 @@ class CameraController2(
             if (MyDebug.LOG) Log.e(TAG, "can't set high speed when captureSession running!")
             throw RuntimeException() // throw as RuntimeException, as this is a programming error
         }
-        this.wantVideoHighSpeed = wantVideoHighSpeed
+        this.wantVideoHighSpeed = setVideoHighSpeed
         this.isVideoHighSpeed = false // reset just to be safe
     }
 
@@ -3162,8 +3163,8 @@ class CameraController2(
             // extensions too).
             // This saves us having to set capture request parameters back to their defaults, and is
             // also useful for modes like CONTROL_AE_ANTIBANDING_MODE where there isn't an obvious
-            // "default" to set (in theory extensions mode should just ignore such keys, but it'd be
-            // nicer to never set them).
+            // "default" to set. (In theory extensions mode should just ignore such keys, but it'd be
+            // nicer to never set them.)
             previewBuilder = null
             createPreviewRequest()
         }
@@ -4881,7 +4882,7 @@ class CameraController2(
                     isVideoHighSpeed = false
                 } catch (e: NullPointerException) {
                     // have had this from some devices on Google Play, from deep within createCaptureSession
-                    // note, we put the catch here rather than below, so as to not mask nullpointerexceptions
+                    // note, we put the catch here rather than below, to not mask nullpointerexceptions
                     // from my code
                     if (MyDebug.LOG) {
                         Log.e(TAG, "NullPointerException trying to create capture session")
@@ -4960,7 +4961,7 @@ class CameraController2(
             // we were in continuous picture mode and so waited in state STATE_WAITING_AUTOFOCUS, but the focus never occurred.
             // Ideally the caller to CameraController2 (Preview) should always explicitly set a focus mode if at least 1 focus mode is supported. At the
             // time of writing, Preview only sets a focus if at least 2 focus modes are supported. But even if we fix that in future, still good to have
-            // well defined behaviour at the CameraController level.
+            // well defined behavior at the CameraController level.
             focusValue = initialFocusMode
         }
 
@@ -5029,7 +5030,7 @@ class CameraController2(
                 }
                 e.printStackTrace()
             }
-            // simulate CameraController1 behaviour where face detection is stopped when we stop preview
+            // simulate CameraController1 behavior where face detection is stopped when we stop preview
             if (cameraSettings.hasFaceDetectMode && closeCaptureSession) {
                 if (MyDebug.LOG) Log.d(TAG, "cancel face detection")
                 cameraSettings.hasFaceDetectMode = false
@@ -5243,10 +5244,8 @@ class CameraController2(
             ) // ensure set back to idle
         }
 
-        if (pushAutofocusCb != null) {
-            // should call callbacks without a lock
-            pushAutofocusCb!!.onAutoFocus(false)
-        }
+        // should call callbacks without a lock
+        pushAutofocusCb?.onAutoFocus(false)
     }
 
     override fun setCaptureFollowAutofocusHint(captureFollowsAutofocusHint: Boolean) {
@@ -5333,8 +5332,8 @@ class CameraController2(
     }
 
     /** Whether the stillRequest has a manual exposure time different to the preview, and if so,
-     * whether we first need to set the preview exposure to match (needed for Samsung Galaxy devices,
-     * which don't honor a manual exposure that's different to the current preview exposure).
+     * whether we first need to set the preview exposure to match. (Needed for Samsung Galaxy devices,
+     * which don't honor a manual exposure that's different to the current preview exposure.)
      */
     private fun adjustPreview(stillRequest: CaptureRequest): Boolean {
         var adjustPreview = false
@@ -5708,7 +5707,7 @@ class CameraController2(
                         if (cameraSettings.hasIso) iso = cameraSettings.iso
                         else if (captureResultHasIso) iso = captureResultIso
                         // see https://sourceforge.net/p/OpenKamera/tickets/321/ - some devices may have auto ISO that's
-                        // outside of the allowed manual iso range!
+                        // outside the allowed manual iso range!
                         iso = max(iso.toDouble(), isoRange.lower.toDouble()).toInt()
                         iso = min(iso.toDouble(), isoRange.upper.toDouble()).toInt()
                         stillBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
@@ -5770,7 +5769,9 @@ class CameraController2(
                         var exposureTime = baseExposureTime
                         if (supportsExposureTime) {
                             var thisScale = scale
-                            for (j in i..<nHalfImages - 1) thisScale *= scale
+                            repeat((nHalfImages - 1) - i) {
+                                thisScale *= scale
+                            }
                             exposureTime = (exposureTime / thisScale).toLong()
                             if (exposureTime < minExposureTime) exposureTime = minExposureTime
                             if (MyDebug.LOG) {
@@ -5827,7 +5828,7 @@ class CameraController2(
                             if (i == nHalfImages - 1) {
                                 // RequestTagType.CAPTURE should only be set for the last request, otherwise we'll may do things like turning
                                 // off torch (for fake flash) before all images are received
-                                // More generally, doesn't seem a good idea to be doing the post-capture commands (resetting ae state etc)
+                                // More generally, doesn't seem a good idea to be doing the post-capture commands (resetting ae state etc.)
                                 // multiple times, and before all captures are complete!
                                 if (MyDebug.LOG) Log.d(
                                     TAG,
@@ -6201,14 +6202,14 @@ class CameraController2(
 
                 if (!isSamsung && burstType === BurstType.BURSTTYPE_NORMAL && burstForNoiseReduction) {
                     // Must be done after calling setupBuilder(), so we override the default EDGE_MODE and NOISE_REDUCTION_MODE.
-                    // We disable noise-reduction etc for photo mode NR because on many devices this smears out detail that we actually
+                    // We disable noise-reduction etc. for photo mode NR because on many devices this smears out detail that we actually
                     // aim to recover by averaging a stack of multiple images.
                     // Disabled for Samsung - firstly at least on Galaxy S24+ this has no effect except for unstable situations (e.g.,
                     // if UltraHDR/JPEG_R is enabled then switching from STD to NR mode means this works for some reason, even though we
                     // don't enable JPEG_R for NR mode...). We could fix it by also changing for the preview, although this makes the
                     // code more complicated (we'd need to save the old values, and also avoid interactions with setNoiseReductionMode() and
                     // setEdgeMode()). But Galaxy S24+ at least seems to have better noise reduction such that detail is less likely to be
-                    // smeared out, and overall quality of photos in NR mode seems better if run noise reduction etc as normal.
+                    // smeared out, and overall quality of photos in NR mode seems better if run noise reduction etc. as normal.
                     if (MyDebug.LOG) Log.d(TAG, "optimise settings for burst_for_noise_reduction")
                     stillBuilder.set(
                         CaptureRequest.NOISE_REDUCTION_MODE,
@@ -8109,7 +8110,7 @@ class CameraController2(
                     val cameraFaces = result.get(CaptureResult.STATISTICS_FACES)
                     if (cameraFaces != null) {
                         if (cameraFaces.size == 0 && lastFacesDetected == 0) {
-                            // no point continually calling the callback if 0 faces detected (same behaviour as CameraController1)
+                            // no point continually calling the callback if 0 faces detected (same behavior as CameraController1)
                         } else {
                             lastFacesDetected = cameraFaces.size
                             val faces = arrayOfNulls<Face>(cameraFaces.size)
@@ -8134,7 +8135,7 @@ class CameraController2(
                 // Also with JPEG only capture, there are problems with repeat mode and continuous focus if
                 // onImageAvailable() is called before this code is called, because it means here we cancel the
                 // focus and lose the focus callback that was going to trigger the next repeat photo! This shows
-                // up on testContinuousPictureFocusRepeat() on Nexus 7, but can be autotested on other devices
+                // up on testContinuousPictureFocusRepeat() on Nexus 7, but can be autotest on other devices
                 // with the flag, see testContinuousPictureFocusRepeatWaitCaptureResult().
                 try {
                     if (MyDebug.LOG) Log.d(TAG, "test_wait_capture_result: waiting...")

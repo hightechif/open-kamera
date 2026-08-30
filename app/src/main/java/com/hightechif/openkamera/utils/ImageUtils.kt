@@ -27,7 +27,7 @@ object ImageUtils {
     private fun setBitmapOptionsSampleSize(options: BitmapFactory.Options, inSampleSize: Int) {
         if (MyDebug.LOG) Log.d(TAG, "setBitmapOptionsSampleSize: $inSampleSize")
         if (inSampleSize > 1) {
-            // use inDensity for better quality, as inSampleSize uses nearest neighbour
+            // use inDensity for better quality, as inSampleSize uses nearest neighbor
             options.inDensity = inSampleSize
             options.inTargetDensity = 1
         }
@@ -36,7 +36,7 @@ object ImageUtils {
     /**
      * Loads a single jpeg as a Bitmaps.
      * @param mutable Whether the bitmap should be mutable. Note that when converting to bitmaps
-     * for the image post-processing (auto-stabilise etc), in general we need the
+     * for the image post-processing (auto-stabilize etc.), in general we need the
      * bitmap to be mutable (for photostamp to work).
      */
     fun loadBitmap(jpegImage: ByteArray, mutable: Boolean, inSampleSize: Int): Bitmap? {

@@ -74,7 +74,7 @@ class LocationSupplier internal constructor(private val context: Context) {
     class LocationInfo {
         var locationWasCached: Boolean = false
 
-        fun LocationWasCached(): Boolean {
+        fun locationWasCached(): Boolean {
             return locationWasCached
         }
     }
@@ -126,7 +126,7 @@ class LocationSupplier internal constructor(private val context: Context) {
             if (MyDebug.LOG) Log.d(TAG, "onLocationChanged")
             this.testHasReceivedLocation = true
             // Android camera source claims we need to check lat/long != 0.0d
-            // also check for not being null just in case - had a nullpointerexception on Google Play!
+            // also check for not being null just in case - had a NullPointerException on Google Play!
             if (location != null && (location.latitude != 0.0 || location.longitude != 0.0)) {
                 if (MyDebug.LOG) {
                     Log.d(TAG, "received location")
@@ -184,9 +184,9 @@ class LocationSupplier internal constructor(private val context: Context) {
         if (storeLocation && locationListeners == null) {
             // Note, ContextCompat.checkSelfPermission is meant to handle being called on any Android version, i.e., pre
             // Android Marshmallow it should return true as permissions are set an installation, and can't be switched off by
-            // the user. However on Galaxy Nexus Android 4.3 and Nexus 7 (2013) Android 5.1.1, ACCESS_COARSE_LOCATION returns
+            // the user. However, on Galaxy Nexus Android 4.3 and Nexus 7 (2013) Android 5.1.1, ACCESS_COARSE_LOCATION returns
             // PERMISSION_DENIED! So we keep the checks to Android Marshmallow or later (where we need them), and avoid
-            // checking behaviour for earlier devices.
+            // checking behavior for earlier devices.
             val hasCoarseLocationPermission: Boolean
             val hasFineLocationPermission: Boolean
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -339,8 +339,7 @@ class LocationSupplier internal constructor(private val context: Context) {
      * up that we did set some location listeners up).
      */
     fun noLocationListeners(): Boolean {
-        if (this.locationListeners == null) return true
-        return false
+        return this.locationListeners == null
     }
 
     companion object {
@@ -371,7 +370,7 @@ class LocationSupplier internal constructor(private val context: Context) {
                 sign = ""
             }
 
-            // use unicode rather than degrees symbol, due to Android Studio warning - see https://sourceforge.net/p/OpenKamera/tickets/107/
+            // use Unicode rather than degrees symbol, due to Android Studio warning - see https://sourceforge.net/p/OpenKamera/tickets/107/
             return "$sign$degrees\u00b0$minutes'$seconds\""
         }
     }

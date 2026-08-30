@@ -12,6 +12,7 @@ import android.net.Uri
 import android.preference.PreferenceManager
 import android.util.Log
 import android.util.Xml
+import androidx.core.content.edit
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.storage.StorageUtils
@@ -75,67 +76,67 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
             parser.setInput(inputStream, null)
             parser.nextTag()
 
-            parser.require(XmlPullParser.START_TAG, null, docTag)
+            parser.require(XmlPullParser.START_TAG, null, DOC_TAG)
 
             /*if( true )
             	throw new IOException(); // test*/
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-            val editor = sharedPreferences.edit()
-            editor.clear()
+            sharedPreferences.edit {
+                clear()
 
-            while (parser.next() != XmlPullParser.END_TAG) {
-                if (parser.eventType != XmlPullParser.START_TAG) {
-                    continue
+                while (parser.next() != XmlPullParser.END_TAG) {
+                    if (parser.eventType != XmlPullParser.START_TAG) {
+                        continue
+                    }
+                    val name = parser.name
+                    val key = parser.getAttributeValue(null, "key")
+                    if (MyDebug.LOG) {
+                        Log.d(TAG, "name: $name")
+                        Log.d(TAG, "    key: $key")
+                        Log.d(TAG, "    value: " + parser.getAttributeValue(null, "value"))
+                    }
+
+                    when (name) {
+                        BOOLEAN_TAG -> putBoolean(
+                            key,
+                            parser.getAttributeValue(null, "value").toBoolean()
+                        )
+
+                        FLOAT_TAG -> putFloat(
+                            key,
+                            parser.getAttributeValue(null, "value").toFloat()
+                        )
+
+                        INT_TAG -> putInt(key, parser.getAttributeValue(null, "value").toInt())
+                        LONG_TAG -> putLong(
+                            key,
+                            parser.getAttributeValue(null, "value").toLong()
+                        )
+
+                        STRING_TAG -> putString(key, parser.getAttributeValue(null, "value"))
+                        else -> {}
+                    }
+
+                    skipXml(parser)
                 }
-                val name = parser.name
-                val key = parser.getAttributeValue(null, "key")
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "name: $name")
-                    Log.d(TAG, "    key: $key")
-                    Log.d(TAG, "    value: " + parser.getAttributeValue(null, "value"))
+
+                // even though we're restoring from settings, we don't want the first time or what's new dialog showing up again!
+                // important to do this after reading from XML, so that the keys aren't overwritten
+                putBoolean(PreferenceKeys.FIRST_TIME_PREFERENCE_KEY, true)
+                try {
+                    val pInfo =
+                        mainActivity.packageManager.getPackageInfo(mainActivity.packageName, 0)
+                    val versionCode = pInfo.versionCode
+                    putInt(PreferenceKeys.LATEST_VERSION_PREFERENCE_KEY, versionCode)
+                } catch (e: PackageManager.NameNotFoundException) {
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "NameNotFoundException exception trying to get version number"
+                    )
+                    e.printStackTrace()
                 }
 
-                when (name) {
-                    booleanTag -> editor.putBoolean(
-                        key,
-                        parser.getAttributeValue(null, "value").toBoolean()
-                    )
-
-                    floatTag -> editor.putFloat(
-                        key,
-                        parser.getAttributeValue(null, "value").toFloat()
-                    )
-
-                    intTag -> editor.putInt(key, parser.getAttributeValue(null, "value").toInt())
-                    longTag -> editor.putLong(
-                        key,
-                        parser.getAttributeValue(null, "value").toLong()
-                    )
-
-                    stringTag -> editor.putString(key, parser.getAttributeValue(null, "value"))
-                    else -> {}
-                }
-
-                skipXml(parser)
             }
-
-            // even though we're restoring from settings, we don't want the first time or what's new dialog showing up again!
-            // important to do this after reading from xml, so that the keys aren't overwritten
-            editor.putBoolean(PreferenceKeys.FIRST_TIME_PREFERENCE_KEY, true)
-            try {
-                val pInfo =
-                    mainActivity.packageManager.getPackageInfo(mainActivity.packageName, 0)
-                val versionCode = pInfo.versionCode
-                editor.putInt(PreferenceKeys.LATEST_VERSION_PREFERENCE_KEY, versionCode)
-            } catch (e: PackageManager.NameNotFoundException) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "NameNotFoundException exception trying to get version number"
-                )
-                e.printStackTrace()
-            }
-
-            editor.apply()
             if (!mainActivity.isTest) {
                 // restarting seems to cause problems for test code (e.g., see testSettingsSaveLoad - even if that test is fine, it risks affecting subsequent tests)
                 mainActivity.restartOpenKamera()
@@ -186,7 +187,7 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
             val writer = StringWriter()
             xmlSerializer.setOutput(writer)
             xmlSerializer.startDocument("UTF-8", true)
-            xmlSerializer.startTag(null, docTag)
+            xmlSerializer.startTag(null, DOC_TAG)
 
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
             val map = sharedPreferences.all
@@ -194,21 +195,33 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
                 val value = value1!!
                 if (key != null) {
                     var tagType: String? = null
-                    if (value is Boolean) {
-                        tagType = booleanTag
-                    } else if (value is Float) {
-                        tagType = floatTag
-                    } else if (value is Int) {
-                        tagType = intTag
-                    } else if (value is Long) {
-                        tagType = longTag
-                    } else if (value is String) {
-                        tagType = stringTag
-                    } else {
-                        Log.e(
-                            TAG,
-                            "unknown value type: $value"
-                        )
+                    when (value) {
+                        is Boolean -> {
+                            tagType = BOOLEAN_TAG
+                        }
+
+                        is Float -> {
+                            tagType = FLOAT_TAG
+                        }
+
+                        is Int -> {
+                            tagType = INT_TAG
+                        }
+
+                        is Long -> {
+                            tagType = LONG_TAG
+                        }
+
+                        is String -> {
+                            tagType = STRING_TAG
+                        }
+
+                        else -> {
+                            Log.e(
+                                TAG,
+                                "unknown value type: $value"
+                            )
+                        }
                     }
 
                     if (tagType != null) {
@@ -219,7 +232,7 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
                     }
                 }
             }
-            xmlSerializer.endTag(null, docTag)
+            xmlSerializer.endTag(null, DOC_TAG)
             xmlSerializer.endDocument()
             xmlSerializer.flush()
             val dataWrite = writer.toString()
@@ -233,7 +246,14 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
             }
             else*/
             run {
-                storageUtils.broadcastFile(file, false, false, false, false, null)
+                storageUtils.broadcastFile(
+                    file = file,
+                    isNewPicture = false,
+                    isNewVideo = false,
+                    setLastScanned = false,
+                    hasnoexifdatetime = false,
+                    safUri = null
+                )
             }
         } catch (e: IOException) {
             e.printStackTrace()
@@ -252,12 +272,12 @@ class SettingsManager internal constructor(private val mainActivity: MainActivit
     companion object {
         private const val TAG = "SettingsManager"
 
-        private const val docTag = "open_camera_prefs"
-        private const val booleanTag = "boolean"
-        private const val floatTag = "float"
-        private const val intTag = "int"
-        private const val longTag = "long"
-        private const val stringTag = "string"
+        private const val DOC_TAG = "open_camera_prefs"
+        private const val BOOLEAN_TAG = "boolean"
+        private const val FLOAT_TAG = "float"
+        private const val INT_TAG = "int"
+        private const val LONG_TAG = "long"
+        private const val STRING_TAG = "string"
 
         @Throws(XmlPullParserException::class, IOException::class)
         private fun skipXml(parser: XmlPullParser) {

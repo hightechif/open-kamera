@@ -55,10 +55,10 @@ class ArraySeekBarPreference(context: Context?, attrs: AttributeSet) :
         check(!(entries == null || values == null)) { "ArraySeekBarPreference requires entries and entryValues array" }
         check(entries!!.size == values!!.size) { "ArraySeekBarPreference requires entries and entryValues arrays of same length" }
 
-        this.seekbar = view.findViewById<SeekBar>(R.id.arrayseekbarpreference_seekbar)
-        this.textView = view.findViewById<TextView>(R.id.arrayseekbarpreference_value)
+        this.seekbar = view.findViewById(R.id.arrayseekbarpreference_seekbar)
+        this.textView = view.findViewById(R.id.arrayseekbarpreference_value)
 
-        seekbar.setMax(entries!!.size - 1)
+        seekbar.max = entries!!.size - 1
         run {
             var index = valueIndex
             if (index == -1) {
@@ -81,7 +81,7 @@ class ArraySeekBarPreference(context: Context?, attrs: AttributeSet) :
 
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 val newEntry = entries!![progress].toString()
-                textView.setText(newEntry)
+                textView.text = newEntry
                 if (fromUser) {
                     lastHapticTime = MainActivity.performHapticFeedback(seekBar, lastHapticTime)
                 }
@@ -94,8 +94,8 @@ class ArraySeekBarPreference(context: Context?, attrs: AttributeSet) :
             }
         })
 
-        val newEntry = entries!![seekbar.getProgress()].toString()
-        textView.setText(newEntry)
+        val newEntry = entries!![seekbar.progress].toString()
+        textView.text = newEntry
     }
 
     override fun onDialogClosed(positiveResult: Boolean) {
@@ -150,7 +150,7 @@ class ArraySeekBarPreference(context: Context?, attrs: AttributeSet) :
         }
 
     private val entry: CharSequence?
-        /** Returns the human readable string of the current value.
+        /** Returns the human-readable string of the current value.
          */
         get() {
             val index = valueIndex

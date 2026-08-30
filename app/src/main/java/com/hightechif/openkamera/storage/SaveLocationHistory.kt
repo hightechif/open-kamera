@@ -11,6 +11,7 @@ import android.preference.PreferenceManager
 import android.util.Log
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.utils.MyDebug
+import androidx.core.content.edit
 
 
 /** Handles a history of save locations.
@@ -111,7 +112,7 @@ class SaveLocationHistory internal constructor(
         }
     }
 
-    /** Clears the folder history, and reinitialise it with the current folder.
+    /** Clears the folder history, and reinitialize it with the current folder.
      * @param folderName The current folder name.
      */
     fun clearFolderHistory(folderName: String) {
@@ -128,14 +129,14 @@ class SaveLocationHistory internal constructor(
     private fun writeSaveLocations() {
         if (MyDebug.LOG) Log.d(TAG, "writeSaveLocations")
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putInt(prefBase + "_size", saveLocationHistory.size)
-        if (MyDebug.LOG) Log.d(TAG, "save_location_history_size = " + saveLocationHistory.size)
-        for (i in saveLocationHistory.indices) {
-            val string = saveLocationHistory[i]
-            editor.putString(prefBase + "_" + i, string)
+        sharedPreferences.edit {
+            putInt(prefBase + "_size", saveLocationHistory.size)
+            if (MyDebug.LOG) Log.d(TAG, "save_location_history_size = " + saveLocationHistory.size)
+            for (i in saveLocationHistory.indices) {
+                val string = saveLocationHistory[i]
+                putString(prefBase + "_" + i, string)
+            }
         }
-        editor.apply()
     }
 
     /** Return the size of the history.

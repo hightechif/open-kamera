@@ -353,7 +353,7 @@ object Preshots {
                 encoder = MediaCodec.createByCodecName(encoderName)
 
                 // now set KEY_FRAME_RATE (must be after findEncoderForFormat(), see note above)
-                format.setInteger(MediaFormat.KEY_FRAME_RATE, 1000 / Preview.preshotIntervalMs)
+                format.setInteger(MediaFormat.KEY_FRAME_RATE, 1000 / Preview.PRESHOT_INTERVAL_MS)
 
                 encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 val inputSurface = encoder.createInputSurface()
@@ -379,7 +379,7 @@ object Preshots {
 
                     preshotBitmaps[i] = null // so we know this bitmap is recycled
                     bitmap.recycle()
-                    presentationTimeUs += (Preview.preshotIntervalMs * 1000).toLong()
+                    presentationTimeUs += (Preview.PRESHOT_INTERVAL_MS * 1000).toLong()
                 }
 
                 encodeVideoFrame(encoder, muxerInfo, presentationTimeUs, true)

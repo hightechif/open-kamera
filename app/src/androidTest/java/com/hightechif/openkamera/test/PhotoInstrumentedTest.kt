@@ -123,7 +123,7 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         Log.d(TAG, "n_files at start: $nFiles")
 
         val savedThumbnailCount =
-            getActivityValue { it.applicationInterface.drawPreview.test_thumbnail_anim_count }
+            getActivityValue { it.applicationInterface.drawPreview.testThumbnailAnimCount }
 
         if (touchToFocus) {
             subTestTouchToFocus(
@@ -154,7 +154,7 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
             val timeS = System.currentTimeMillis()
             while (true) {
                 val waiting =
-                    getActivityValue { activity -> activity.applicationInterface.drawPreview.test_thumbnail_anim_count <= savedThumbnailCount }
+                    getActivityValue { activity -> activity.applicationInterface.drawPreview.testThumbnailAnimCount <= savedThumbnailCount }
                 if (!waiting) break
                 Thread.sleep(10)
                 val allowedTimeMs =

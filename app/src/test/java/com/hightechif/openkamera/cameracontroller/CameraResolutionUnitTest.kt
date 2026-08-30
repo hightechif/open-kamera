@@ -5,6 +5,8 @@
  * Kotlin conversion & development: Copyright (C) 2026 Ridhan Fadhilah
  * Licensed under the GNU General Public License v3.0 (GPLv3).
  */
+@file:Suppress("DEPRECATION")
+
 package com.hightechif.openkamera.cameracontroller
 
 import com.hightechif.openkamera.MyApplicationInterface

@@ -7,7 +7,7 @@
  */
 package com.hightechif.openkamera.preferences
 
-/** Stores all of the string keys used for SharedPreferences.
+/** Stores all the string keys used for SharedPreferences.
  */
 object PreferenceKeys {
     // must be static, to safely call from other Activities
@@ -23,7 +23,7 @@ object PreferenceKeys {
      */
     const val SHOW_WHATS_NEW_PREFERENCE_KEY: String = "preference_show_whats_new"
 
-    /** If this preference is set, no longer show the auto-stabilise info dialog.
+    /** If this preference is set, no longer show the auto-stabilize info dialog.
      */
     const val AUTO_STABILISE_INFO_PREFERENCE_KEY: String = "done_auto_stabilise_info"
 
@@ -52,7 +52,7 @@ object PreferenceKeys {
     }
 
     // don't set to be specific for physical cameras, as too confusing to have lots of different flash preferences
-    // also in Preview, we don't save the flash back if not supported
+    // also in Preview, we don't save the flashback if not supported
     fun getFlashPreferenceKey(cameraId: Int): String {
         return "flash_value_$cameraId"
     }

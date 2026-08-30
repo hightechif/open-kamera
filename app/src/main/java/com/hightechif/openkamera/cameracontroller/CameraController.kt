@@ -26,7 +26,7 @@ import kotlin.math.abs
  * the original camera API, and Android 5's Camera2 API).
  * The class is fairly low level wrapper about the APIs - there is some
  * additional logical/workarounds where such things are API-specific, but
- * otherwise the calling application still controls the behaviour of the
+ * otherwise the calling application still controls the behavior of the
  * camera.
  */
 abstract class CameraController internal constructor(val cameraId: Int) {
@@ -313,7 +313,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
     }
 
     /** An area has values from [-1000,-1000] (for top-left) to [1000,1000] (for bottom-right) for whatever is
-     * the current field of view (i.e., taking zoom into account).
+     * the current field of view (i.e., taking Zoom into account).
      */
     data class Area(val rect: Rect, val weight: Int)
 
@@ -379,7 +379,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
 
     data class Face internal constructor(
         val score: Int, /* The rect has values from [-1000,-1000] (for top-left) to [1000,1000] (for bottom-right) for whatever is
-         * the current field of view (i.e., taking zoom into account).
+         * the current field of view (i.e., taking Zoom into account).
          */val rect: Rect
     ) {
         /** The temp rect is temporary storage that can be used by callers.
@@ -387,7 +387,10 @@ abstract class CameraController internal constructor(val cameraId: Int) {
         val temp: Rect = Rect()
     }
 
-    data class SupportedValues internal constructor(val values: List<String>, val selectedValue: String)
+    data class SupportedValues internal constructor(
+        val values: List<String>,
+        val selectedValue: String
+    )
 
     abstract fun release()
     abstract fun onError() // triggers error mechanism - should only be called externally for testing purposes
@@ -399,7 +402,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
 
     /** For CameraController2 only. Applications should cover the preview textureview if since last resuming, cameraController
      * has never been non-null or this method has never returned false.
-     * Otherwise there is a risk when opening the camera that the textureview still shows an image from when
+     * Otherwise, there is a risk when opening the camera that the textureview still shows an image from when
      * the camera was previously opened (e.g., from pausing and resuming the application). This returns false (for CameraController2)
      * when the camera has received its first frame.
      * Update: on more recent Android versions this didn't work very well, possibly due to a screenshot being used for "recent apps"
@@ -571,7 +574,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
      * Instead, we fake the precapture and flash simply by turning on the torch. After turning on torch, we wait for ae to stop
      * scanning (and af too, as it can start scanning in continuous mode) - this is effectively the equivalent of precapture -
      * before taking the photo.
-     * In auto-focus mode, we make the decision ourselves based on the current ISO.
+     * In autofocus mode, we make the decision ourselves based on the current ISO.
      * We also handle the flash firing for autofocus by turning the torch on and off too. Advantages are:
      * - The flash tends to be brighter, and the photo can end up overexposed as a result if capture follows the autofocus.
      * - Some devices also don't seem to fire flash for autofocus in Camera2 mode (e.g., Samsung S7)
@@ -746,12 +749,12 @@ abstract class CameraController internal constructor(val cameraId: Int) {
     abstract val facing: Facing?
     abstract fun unlock()
 
-    /** Call to initialise video recording, should call before MediaRecorder.prepare().
+    /** Call to initialize video recording, should call before MediaRecorder.prepare().
      * @param videoRecorder The media recorder object.
      */
     abstract fun initVideoRecorderPrePrepare(videoRecorder: MediaRecorder?)
 
-    /** Call to initialise video recording, should call after MediaRecorder.prepare(), but before MediaRecorder.start().
+    /** Call to initialize video recording, should call after MediaRecorder.prepare(), but before MediaRecorder.start().
      * @param videoRecorder The media recorder object.
      * @param wantPhotoVideoRecording Whether support for taking photos whilst video recording is required. If this feature isn't supported, the option has no effect.
      */
@@ -837,7 +840,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
     /*public float captureResultFocusDistanceMax() {
 		return 0.0f;
 	}*/
-    // gets the available values of a generic mode, e.g., scene, color etc, and makes sure the requested mode is available
+    // gets the available values of a generic mode, e.g., scene, color etc., and makes sure the requested mode is available
     fun checkModeIsSupported(
         values: MutableList<String>?,
         value: String,

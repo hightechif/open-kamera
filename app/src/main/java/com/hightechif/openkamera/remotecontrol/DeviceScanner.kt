@@ -14,7 +14,6 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothAdapter.LeScanCallback
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -34,13 +33,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.utils.MyDebug
 
 //public class DeviceScanner extends ListActivity {
 //public class DeviceScanner extends Activity {
-class DeviceScanner : AppCompatActivity() {
+open class DeviceScanner : AppCompatActivity() {
     private var leDeviceListAdapter: LeDeviceListAdapter? = null
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var isScanning = false
@@ -78,8 +78,8 @@ class DeviceScanner : AppCompatActivity() {
         )
 
         val currentRemote = findViewById<TextView>(R.id.currentRemote)
-        currentRemote.text =
-            resources.getString(R.string.bluetooth_current_remote) + " " + remoteName
+        val text = resources.getString(R.string.bluetooth_current_remote) + " " + remoteName
+        currentRemote.text = text
     }
 
     override fun onContentChanged() {
@@ -256,20 +256,19 @@ class DeviceScanner : AppCompatActivity() {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         val messageId: Int = R.string.permission_rationale_bluetooth_scan_connect
 
-        val permissionsF = permissions
         AlertDialog.Builder(this)
             .setTitle(R.string.permission_rationale_title)
             .setMessage(messageId)
             .setIcon(android.R.drawable.ic_dialog_alert)
             .setPositiveButton(android.R.string.ok, null)
-            .setOnDismissListener(DialogInterface.OnDismissListener {
+            .setOnDismissListener {
                 if (MyDebug.LOG) Log.d(TAG, "requesting permission...")
                 ActivityCompat.requestPermissions(
                     this@DeviceScanner,
-                    permissionsF,
+                    permissions,
                     REQUEST_BLUETOOTHSCANCONNECT_PERMISSIONS
                 )
-            }).show()
+            }.show()
     }
 
     private fun showRequestLocationPermissionRationale() {
@@ -285,20 +284,19 @@ class DeviceScanner : AppCompatActivity() {
         )
         val messageId: Int = R.string.permission_rationale_location
 
-        val permissionsF = permissions
         AlertDialog.Builder(this)
             .setTitle(R.string.permission_rationale_title)
             .setMessage(messageId)
             .setIcon(android.R.drawable.ic_dialog_alert)
             .setPositiveButton(android.R.string.ok, null)
-            .setOnDismissListener(DialogInterface.OnDismissListener {
+            .setOnDismissListener {
                 if (MyDebug.LOG) Log.d(TAG, "requesting permission...")
                 ActivityCompat.requestPermissions(
                     this@DeviceScanner,
-                    permissionsF,
+                    permissions,
                     REQUEST_LOCATION_PERMISSIONS
                 )
-            }).show()
+            }.show()
     }
 
     override fun onRequestPermissionsResult(
@@ -314,7 +312,7 @@ class DeviceScanner : AppCompatActivity() {
 
         when (requestCode) {
             REQUEST_LOCATION_PERMISSIONS -> {
-                if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (MyDebug.LOG) Log.d(TAG, "location permission granted")
                     checkBluetoothEnabled()
                     scanLeDevice(true)
@@ -324,7 +322,7 @@ class DeviceScanner : AppCompatActivity() {
             }
 
             REQUEST_BLUETOOTHSCANCONNECT_PERMISSIONS -> {
-                if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (MyDebug.LOG) Log.d(TAG, "bluetooth scan/connect permission granted")
                     checkBluetoothEnabled()
                     scanLeDevice(true)
@@ -379,15 +377,15 @@ class DeviceScanner : AppCompatActivity() {
 
     //@Override
     protected fun onListItemClick(l: ListView?, v: View?, position: Int, id: Long) {
-        val device = leDeviceListAdapter!!.getDevice(position) ?: return
+        val device = leDeviceListAdapter?.getDevice(position) ?: return
         if (MyDebug.LOG) {
             Log.d(TAG, "onListItemClick")
             Log.d(TAG, device.address)
         }
         val preferenceRemoteDeviceName: String = PreferenceKeys.REMOTE_NAME
-        val editor = mSharedPreferences!!.edit()
-        editor.putString(preferenceRemoteDeviceName, device.address)
-        editor.apply()
+        mSharedPreferences.edit {
+            putString(preferenceRemoteDeviceName, device.address)
+        }
         scanLeDevice(false)
         finish()
     }
@@ -469,7 +467,7 @@ class DeviceScanner : AppCompatActivity() {
                     view!!.findViewById(R.id.device_address),
                     view.findViewById(R.id.device_name)
                 )
-                view.setTag(viewHolder)
+                view.tag = viewHolder
             } else {
                 viewHolder = view.tag as ViewHolder
             }
@@ -496,19 +494,19 @@ class DeviceScanner : AppCompatActivity() {
                 viewHolder.deviceName.setText(R.string.unknown_device_no_permission)
             } else {
                 val deviceName = device.name
-                if (deviceName != null && deviceName.length > 0) viewHolder.deviceName!!.text =
+                if (deviceName != null && deviceName.isNotEmpty()) viewHolder.deviceName.text =
                     deviceName
                 else viewHolder.deviceName.setText(R.string.unknown_device)
             }
 
-            viewHolder.deviceAddress!!.text = device.address
+            viewHolder.deviceAddress.text = device.address
 
-            return view!!
+            return view
         }
     }
 
     private val mLeScanCallback =
-        LeScanCallback { device, rssi, scanRecord ->
+        LeScanCallback { device, _, _ -> // device, rssi, scanRecord
             runOnUiThread {
                 leDeviceListAdapter!!.addDevice(device)
                 leDeviceListAdapter!!.notifyDataSetChanged()

@@ -49,11 +49,11 @@ import java.io.StringWriter
 import java.io.Writer
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
-import java.util.Collections
 import java.util.Date
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
 import kotlin.concurrent.Volatile
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -450,33 +450,51 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
             Log.d(TAG, "do_in_background? $doInBackground")
         }
         return saveImage(
-            doInBackground,
-            true,
-            Request.ProcessType.NORMAL,
-            forceSuffix,
-            suffixOffset,
-            false,
-            mutableListOf(),
-            null,
-            rawImage,
-            false, null,
-            false, false,
-            Request.ImageFormat.STD, 0,
-            false, 0.0,
-            false,
-            false,
-            currentDate,
-            HDRProcessor.defaultTonemappingAlgorithmC,
-            null,
-            0,
-            0,
-            1.0f,
-            null, null, 0, 0, null, null, null, null,
-            null,
-            false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
-            0.0, false,
-            null, null,
-            1
+            doInBackground = doInBackground,
+            isRaw = true,
+            processType = Request.ProcessType.NORMAL,
+            forceSuffix = forceSuffix,
+            suffixOffset = suffixOffset,
+            saveExpo = false,
+            jpegImages = mutableListOf(),
+            preshotBitmaps = null,
+            rawImage = rawImage,
+            imageCaptureIntent = false,
+            imageCaptureIntentUri = null,
+            usingCamera2 = false,
+            usingCameraExtensions = false,
+            imageFormat = Request.ImageFormat.STD,
+            imageQuality = 0,
+            doAutoStabilise = false,
+            levelAngle = 0.0,
+            isFrontFacing = false,
+            mirror = false,
+            currentDate = currentDate,
+            preferenceHdrTonemappingAlgorithm = HDRProcessor.defaultTonemappingAlgorithmC,
+            preferenceHdrContrastEnhancement = null,
+            iso = 0,
+            exposureTime = 0,
+            zoomFactor = 1.0f,
+            preferenceStamp = null,
+            preferenceTextstamp = null,
+            fontSize = 0,
+            color = 0,
+            prefStyle = null,
+            preferenceStampDateformat = null,
+            preferenceStampTimeformat = null,
+            preferenceStampGpsformat = null,
+            preferenceUnitsDistance = null,
+            panoramaCrop = false,
+            removeDeviceExif = Request.RemoveDeviceExif.OFF,
+            storeLocation = false,
+            location = null,
+            storeGeoDirection = false,
+            geoDirection = 0.0,
+            pitchAngle = 0.0,
+            storeYpr = false,
+            customTagArtist = null,
+            customTagCopyright = null,
+            sampleFactor = 1
         )
     }
 
@@ -534,7 +552,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
             false,
             0,
             saveBase,
-            ArrayList<ByteArray>(),
+            ArrayList(),
             preshotBitmaps,
             null,
             imageCaptureIntent,
@@ -768,8 +786,8 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                 if (MyDebug.LOG) {
                     synchronized(this) {
                         Log.d(TAG, "ImageSaver thread added to queue, size is now: " + queue.size)
-                        Log.d(TAG, "images still to save is now: " + nImagesToSave)
-                        Log.d(TAG, "real images still to save is now: " + nRealImagesToSave)
+                        Log.d(TAG, "images still to save is now: $nImagesToSave")
+                        Log.d(TAG, "real images still to save is now: $nRealImagesToSave")
                     }
                 }
                 done = true
@@ -786,32 +804,51 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
     private fun addDummyRequest() {
         val dummyRequest = Request(
-            Request.Type.DUMMY,
-            Request.ProcessType.NORMAL,
-            false,
-            0,
-            Request.SaveBase.SAVEBASE_NONE,
-            mutableListOf(),
-            null,
-            null,
-            false, null,
-            false, false,
-            Request.ImageFormat.STD, 0,
-            false, 0.0, null,
-            false,
-            false,
-            null,
-            HDRProcessor.defaultTonemappingAlgorithmC,
-            null,
-            0,
-            0,
-            1.0f,
-            null, null, 0, 0, null, null, null, null,
-            null,
-            false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
-            0.0, false,
-            null, null,
-            1
+            type = Request.Type.DUMMY,
+            processType = Request.ProcessType.NORMAL,
+            forceSuffix = false,
+            suffixOffset = 0,
+            saveBase = Request.SaveBase.SAVEBASE_NONE,
+            jpegImages = mutableListOf(),
+            preshotBitmaps = null,
+            rawImage = null,
+            imageCaptureIntent = false,
+            imageCaptureIntentUri = null,
+            usingCamera2 = false,
+            usingCameraExtensions = false,
+            imageFormat = Request.ImageFormat.STD,
+            imageQuality = 0,
+            doAutoStabilise = false,
+            levelAngle = 0.0,
+            gyroRotationMatrix = null,
+            isFrontFacing = false,
+            mirror = false,
+            currentDate = null,
+            preferenceHdrTonemappingAlgorithm = HDRProcessor.defaultTonemappingAlgorithmC,
+            preferenceHdrContrastEnhancement = null,
+            iso = 0,
+            exposureTime = 0,
+            zoomFactor = 1.0f,
+            preferenceStamp = null,
+            preferenceTextstamp = null,
+            fontSize = 0,
+            color = 0,
+            prefStyle = null,
+            preferenceStampDateformat = null,
+            preferenceStampTimeformat = null,
+            preferenceStampGpsformat = null,
+            preferenceUnitsDistance = null,
+            panoramaCrop = false,
+            removeDeviceExif = Request.RemoveDeviceExif.OFF,
+            storeLocation = false,
+            location = null,
+            storeGeoDirection = false,
+            geoDirection = 0.0,
+            pitchAngle = 0.0,
+            storeYpr = false,
+            customTagArtist = null,
+            customTagCopyright = null,
+            sampleFactor = 1
         )
         if (MyDebug.LOG) Log.d(TAG, "add dummy request")
         addRequest(dummyRequest, 1)
@@ -822,7 +859,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         synchronized(this) {
             if (MyDebug.LOG) {
                 Log.d(TAG, "waitUntilDone: queue is size " + queue.size)
-                Log.d(TAG, "waitUntilDone: images still to save " + nImagesToSave)
+                Log.d(TAG, "waitUntilDone: images still to save $nImagesToSave")
             }
             while (nImagesToSave > 0) {
                 if (MyDebug.LOG) Log.d(TAG, "wait until done...")
@@ -837,7 +874,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                 }
                 if (MyDebug.LOG) {
                     Log.d(TAG, "waitUntilDone: queue is size " + queue.size)
-                    Log.d(TAG, "waitUntilDone: images still to save " + nImagesToSave)
+                    Log.d(TAG, "waitUntilDone: images still to save $nImagesToSave")
                 }
             }
         }
@@ -853,7 +890,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         xmlSerializer.attribute(
             null,
             GYRO_INFO_PANORAMA_PICS_PER_SCREEN_TAG,
-            MyApplicationInterface.panoramaPicsPerScreen.toString()
+            MyApplicationInterface.PANORAMA_PICS_PER_SCREEN.toString()
         )
         xmlSerializer.attribute(
             null,
@@ -958,7 +995,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                 4,
                 true,
                 request.preferenceHdrTonemappingAlgorithm,
-                HDRProcessor.DROTonemappingAlgorithm.DROALGORITHM_GAINGAMMA
+                HDRProcessor.DROTonemappingAlgorithm.DROALGORITHMGAINGAMMA
             )
         } catch (e: HDRProcessorException) {
             MyDebug.logStackTrace(TAG, "HDRProcessorException from processHDR", e)
@@ -1000,393 +1037,439 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         }
 
         val success: Boolean
-        if (request.processType == Request.ProcessType.AVERAGE) {
-            if (MyDebug.LOG) Log.d(TAG, "average")
+        when (request.processType) {
+            Request.ProcessType.AVERAGE -> {
+                if (MyDebug.LOG) Log.d(TAG, "average")
 
-            saveBaseImages(request, "_")
-            mainActivity.savingImage(true)
+                saveBaseImages(request, "_")
+                mainActivity.savingImage(true)
 
-            val nrBitmap: Bitmap
-            run {
-                try {
-                    val timeS = System.currentTimeMillis()
-                    val inSampleSize: Int =
-                        hdrProcessor.getAvgSampleSize(request.iso, request.exposureTime)
-                    val useSmp = true
-                    val nSmpImages = 4
-                    var thisTimeS = System.currentTimeMillis()
-                    var bitmaps: MutableList<Bitmap?>? = null
-                    val bitmap0: Bitmap?
-                    val bitmap1: Bitmap?
-                    if (useSmp) {
-                        val nRemaining = request.jpegImages.size
-                        val nLoad = min(nSmpImages.toDouble(), nRemaining.toDouble()).toInt()
-                        if (MyDebug.LOG) {
-                            Log.d(TAG, "n_remaining: $nRemaining")
-                            Log.d(TAG, "n_load: $nLoad")
-                        }
-                        val subJpegList: MutableList<ByteArray> = ArrayList()
-                        for (j in 0..<nLoad) {
-                            subJpegList.add(request.jpegImages[j])
-                        }
-                        bitmaps =
-                            ImageUtils.loadBitmaps(subJpegList, -1, inSampleSize)?.toMutableList()
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "length of bitmaps list is now: " + bitmaps?.size
-                        )
-                        bitmap0 = bitmaps?.get(0)
-                        bitmap1 = bitmaps?.get(1)
-                    } else {
-                        bitmap0 = ImageUtils.loadBitmap(request.jpegImages[0], false, inSampleSize)
-                        bitmap1 = ImageUtils.loadBitmap(request.jpegImages[1], false, inSampleSize)
-                    }
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "*** time for loading first bitmaps: " + (System.currentTimeMillis() - thisTimeS)
-                        )
-                    }
-                    val width = bitmap0!!.width
-                    val height = bitmap0.height
-                    var avgFactor = 1.0f
-                    thisTimeS = System.currentTimeMillis()
-                    val avgData: HDRProcessor.AvgData = hdrProcessor.processAvg(
-                        bitmap0,
-                        bitmap1,
-                        avgFactor,
-                        request.iso,
-                        request.exposureTime,
-                        request.zoomFactor
-                    )
-                    if (bitmaps != null) {
-                        bitmaps[0] = null
-                        bitmaps[1] = null
-                    }
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "*** time for processing first two bitmaps: " + (System.currentTimeMillis() - thisTimeS)
-                        )
-                    }
-
-                    for (i in 2..<request.jpegImages.size) {
-                        if (MyDebug.LOG) Log.d(TAG, "processAvg for image: $i")
-
-                        thisTimeS = System.currentTimeMillis()
-                        val newBitmap: Bitmap?
+                val nrBitmap: Bitmap
+                run {
+                    try {
+                        val timeS = System.currentTimeMillis()
+                        val inSampleSize: Int =
+                            hdrProcessor.getAvgSampleSize(request.iso, request.exposureTime)
+                        val useSmp = true
+                        val nSmpImages = 4
+                        var thisTimeS = System.currentTimeMillis()
+                        var bitmaps: MutableList<Bitmap?>? = null
+                        val bitmap0: Bitmap?
+                        val bitmap1: Bitmap?
                         if (useSmp) {
-                            if (MyDebug.LOG) Log.d(TAG, "length of bitmaps list: " + bitmaps!!.size)
-                            if (i < bitmaps!!.size) {
-                                if (MyDebug.LOG) Log.d(
-                                    TAG,
-                                    "already loaded bitmap from previous iteration with SMP"
-                                )
-                                newBitmap = bitmaps[i]
-                            } else {
-                                val nRemaining = request.jpegImages.size - i
-                                val nLoad =
-                                    min(nSmpImages.toDouble(), nRemaining.toDouble()).toInt()
-                                if (MyDebug.LOG) {
-                                    Log.d(TAG, "n_remaining: $nRemaining")
-                                    Log.d(TAG, "n_load: $nLoad")
-                                }
-                                val subJpegList: MutableList<ByteArray> = ArrayList()
-                                for (j in i..<i + nLoad) {
-                                    subJpegList.add(request.jpegImages[j])
-                                }
-                                val newBitmaps =
-                                    ImageUtils.loadBitmaps(subJpegList, -1, inSampleSize)
-                                if (newBitmaps != null) {
-                                    bitmaps.addAll(newBitmaps)
-                                }
-                                if (MyDebug.LOG) Log.d(
-                                    TAG,
-                                    "length of bitmaps list is now: " + bitmaps.size
-                                )
-                                newBitmap = bitmaps[i]
+                            val nRemaining = request.jpegImages.size
+                            val nLoad = min(nSmpImages.toDouble(), nRemaining.toDouble()).toInt()
+                            if (MyDebug.LOG) {
+                                Log.d(TAG, "n_remaining: $nRemaining")
+                                Log.d(TAG, "n_load: $nLoad")
                             }
+                            val subJpegList: MutableList<ByteArray> = ArrayList()
+                            for (j in 0..<nLoad) {
+                                subJpegList.add(request.jpegImages[j])
+                            }
+                            bitmaps =
+                                ImageUtils.loadBitmaps(subJpegList, -1, inSampleSize)
+                                    ?.toMutableList()
+                            if (MyDebug.LOG) Log.d(
+                                TAG,
+                                "length of bitmaps list is now: " + bitmaps?.size
+                            )
+                            bitmap0 = bitmaps?.get(0)
+                            bitmap1 = bitmaps?.get(1)
                         } else {
-                            newBitmap =
-                                ImageUtils.loadBitmap(request.jpegImages[i], false, inSampleSize)
+                            bitmap0 =
+                                ImageUtils.loadBitmap(request.jpegImages[0], false, inSampleSize)
+                            bitmap1 =
+                                ImageUtils.loadBitmap(request.jpegImages[1], false, inSampleSize)
                         }
                         if (MyDebug.LOG) {
                             Log.d(
                                 TAG,
-                                "*** time for loading extra bitmap: " + (System.currentTimeMillis() - thisTimeS)
+                                "*** time for loading first bitmaps: " + (System.currentTimeMillis() - thisTimeS)
                             )
                         }
-                        avgFactor = i.toFloat()
+                        val width = bitmap0!!.width
+                        val height = bitmap0.height
+                        var avgFactor = 1.0f
                         thisTimeS = System.currentTimeMillis()
-                        hdrProcessor.updateAvg(
-                            avgData,
-                            width,
-                            height,
-                            newBitmap,
+                        val avgData: HDRProcessor.AvgData = hdrProcessor.processAvg(
+                            bitmap0,
+                            bitmap1,
                             avgFactor,
                             request.iso,
                             request.exposureTime,
                             request.zoomFactor
                         )
-                        bitmaps?.set(i, null)
+                        if (bitmaps != null) {
+                            bitmaps[0] = null
+                            bitmaps[1] = null
+                        }
                         if (MyDebug.LOG) {
                             Log.d(
                                 TAG,
-                                "*** time for updating extra bitmap: " + (System.currentTimeMillis() - thisTimeS)
+                                "*** time for processing first two bitmaps: " + (System.currentTimeMillis() - thisTimeS)
                             )
                         }
-                    }
 
-                    thisTimeS = System.currentTimeMillis()
-                    nrBitmap = hdrProcessor.avgBrighten(
-                        avgData,
-                        width,
-                        height,
-                        request.iso,
-                        request.exposureTime
-                    )
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "*** time for brighten: " + (System.currentTimeMillis() - thisTimeS)
+                        for (i in 2..<request.jpegImages.size) {
+                            if (MyDebug.LOG) Log.d(TAG, "processAvg for image: $i")
+
+                            thisTimeS = System.currentTimeMillis()
+                            val newBitmap: Bitmap?
+                            if (useSmp) {
+                                if (MyDebug.LOG) Log.d(
+                                    TAG,
+                                    "length of bitmaps list: " + bitmaps!!.size
+                                )
+                                if (i < bitmaps!!.size) {
+                                    if (MyDebug.LOG) Log.d(
+                                        TAG,
+                                        "already loaded bitmap from previous iteration with SMP"
+                                    )
+                                    newBitmap = bitmaps[i]
+                                } else {
+                                    val nRemaining = request.jpegImages.size - i
+                                    val nLoad =
+                                        min(nSmpImages.toDouble(), nRemaining.toDouble()).toInt()
+                                    if (MyDebug.LOG) {
+                                        Log.d(TAG, "n_remaining: $nRemaining")
+                                        Log.d(TAG, "n_load: $nLoad")
+                                    }
+                                    val subJpegList: MutableList<ByteArray> = ArrayList()
+                                    for (j in i..<i + nLoad) {
+                                        subJpegList.add(request.jpegImages[j])
+                                    }
+                                    val newBitmaps =
+                                        ImageUtils.loadBitmaps(subJpegList, -1, inSampleSize)
+                                    if (newBitmaps != null) {
+                                        bitmaps.addAll(newBitmaps)
+                                    }
+                                    if (MyDebug.LOG) Log.d(
+                                        TAG,
+                                        "length of bitmaps list is now: " + bitmaps.size
+                                    )
+                                    newBitmap = bitmaps[i]
+                                }
+                            } else {
+                                newBitmap =
+                                    ImageUtils.loadBitmap(
+                                        request.jpegImages[i],
+                                        false,
+                                        inSampleSize
+                                    )
+                            }
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "*** time for loading extra bitmap: " + (System.currentTimeMillis() - thisTimeS)
+                                )
+                            }
+                            avgFactor = i.toFloat()
+                            thisTimeS = System.currentTimeMillis()
+                            hdrProcessor.updateAvg(
+                                avgData,
+                                width,
+                                height,
+                                newBitmap,
+                                avgFactor,
+                                request.iso,
+                                request.exposureTime,
+                                request.zoomFactor
+                            )
+                            bitmaps?.set(i, null)
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "*** time for updating extra bitmap: " + (System.currentTimeMillis() - thisTimeS)
+                                )
+                            }
+                        }
+
+                        thisTimeS = System.currentTimeMillis()
+                        nrBitmap = hdrProcessor.avgBrighten(
+                            avgData,
+                            width,
+                            height,
+                            request.iso,
+                            request.exposureTime
                         )
+                        if (MyDebug.LOG) {
+                            Log.d(
+                                TAG,
+                                "*** time for brighten: " + (System.currentTimeMillis() - thisTimeS)
+                            )
+                        }
+                        avgData.destroy()
+                        if (MyDebug.LOG) {
+                            Log.d(
+                                TAG,
+                                "*** total time for saving NR image: " + (System.currentTimeMillis() - timeS)
+                            )
+                        }
+                    } catch (e: HDRProcessorException) {
+                        MyDebug.logStackTrace(TAG, "HDRProcessorException", e)
+                        throw RuntimeException()
                     }
-                    avgData.destroy()
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "*** total time for saving NR image: " + (System.currentTimeMillis() - timeS)
-                        )
-                    }
-                } catch (e: HDRProcessorException) {
-                    MyDebug.logStackTrace(TAG, "HDRProcessorException", e)
-                    throw RuntimeException()
                 }
-            }
 
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "nr_bitmap: " + nrBitmap + " is mutable? " + nrBitmap.isMutable
-            )
-            System.gc()
-            mainActivity.savingImage(false)
-
-            if (MyDebug.LOG) Log.d(TAG, "save NR image")
-            success = saveSingleImageNow(
-                request,
-                request.jpegImages[0], nrBitmap, NR_SUFFIX, true, true, true, false
-            )
-            if (MyDebug.LOG && !success) Log.e(TAG, "saveSingleImageNow failed for nr image")
-            nrBitmap.recycle()
-            System.gc()
-        } else if (request.processType == Request.ProcessType.HDR) {
-            if (MyDebug.LOG) Log.d(TAG, "hdr")
-            if (request.jpegImages.size != 1 && request.jpegImages.size != 3) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
-                    "saveImageNow expected either 1 or 3 images for hdr, not " + request.jpegImages.size
+                    "nr_bitmap: " + nrBitmap + " is mutable? " + nrBitmap.isMutable
                 )
-                throw RuntimeException()
+                System.gc()
+                mainActivity.savingImage(false)
+
+                if (MyDebug.LOG) Log.d(TAG, "save NR image")
+                success = saveSingleImageNow(
+                    request = request,
+                    data = request.jpegImages[0],
+                    bitmap = nrBitmap,
+                    filenameSuffix = NR_SUFFIX,
+                    updateThumbnail = true,
+                    shareImage = true,
+                    ignoreRawOnly = true,
+                    ignoreExifOrientation = false
+                )
+                if (MyDebug.LOG && !success) Log.e(TAG, "saveSingleImageNow failed for nr image")
+                nrBitmap.recycle()
+                System.gc()
             }
 
-            val timeS = System.currentTimeMillis()
-            if (request.jpegImages.size > 1) {
-                saveBaseImages(request, "_")
+            Request.ProcessType.HDR -> {
+                if (MyDebug.LOG) Log.d(TAG, "hdr")
+                if (request.jpegImages.size != 1 && request.jpegImages.size != 3) {
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "saveImageNow expected either 1 or 3 images for hdr, not " + request.jpegImages.size
+                    )
+                    throw RuntimeException()
+                }
+
+                val timeS = System.currentTimeMillis()
+                if (request.jpegImages.size > 1) {
+                    saveBaseImages(request, "_")
+                    if (MyDebug.LOG) {
+                        Log.d(
+                            TAG,
+                            "HDR performance: time after saving base exposures: " + (System.currentTimeMillis() - timeS)
+                        )
+                    }
+                }
+
+                if (MyDebug.LOG) Log.d(TAG, "create HDR image")
+                mainActivity.savingImage(true)
+
+                val baseBitmap = (request.jpegImages.size - 1) / 2
+                if (MyDebug.LOG) Log.d(TAG, "base_bitmap: $baseBitmap")
+                val bitmaps =
+                    ImageUtils.loadBitmaps(request.jpegImages, baseBitmap, 1)?.toMutableList()
+                if (bitmaps == null) {
+                    if (MyDebug.LOG) Log.e(TAG, "failed to load bitmaps")
+                    mainActivity.savingImage(false)
+                    return false
+                }
                 if (MyDebug.LOG) {
                     Log.d(
                         TAG,
-                        "HDR performance: time after saving base exposures: " + (System.currentTimeMillis() - timeS)
+                        "HDR performance: time after decompressing base exposures: " + (System.currentTimeMillis() - timeS)
                     )
                 }
-            }
 
-            if (MyDebug.LOG) Log.d(TAG, "create HDR image")
-            mainActivity.savingImage(true)
-
-            val baseBitmap = (request.jpegImages.size - 1) / 2
-            if (MyDebug.LOG) Log.d(TAG, "base_bitmap: $baseBitmap")
-            val bitmaps = ImageUtils.loadBitmaps(request.jpegImages, baseBitmap, 1)?.toMutableList()
-            if (bitmaps == null) {
-                if (MyDebug.LOG) Log.e(TAG, "failed to load bitmaps")
-                mainActivity.savingImage(false)
-                return false
-            }
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "HDR performance: time after decompressing base exposures: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            if (!processHDR(bitmaps, request, timeS)) {
-                mainActivity.preview.showToast(null, R.string.failed_to_process_hdr)
-                mainActivity.savingImage(false)
-                return false
-            }
-
-            val hdrBitmap = bitmaps[0]
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "hdr_bitmap: " + hdrBitmap + " is mutable? " + hdrBitmap?.isMutable
-            )
-            bitmaps.clear()
-            System.gc()
-            mainActivity.savingImage(false)
-
-            if (MyDebug.LOG) Log.d(TAG, "save HDR image")
-            val baseImageId = (request.jpegImages.size - 1) / 2
-            if (MyDebug.LOG) Log.d(TAG, "base_image_id: $baseImageId")
-            val suffix = if (request.jpegImages.size == 1) "_DRO" else HDR_SUFFIX
-            success = saveSingleImageNow(
-                request,
-                request.jpegImages[baseImageId],
-                hdrBitmap,
-                suffix,
-                true,
-                true,
-                true,
-                false
-            )
-            if (MyDebug.LOG && !success) Log.e(TAG, "saveSingleImageNow failed for hdr image")
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "HDR performance: time after saving HDR image: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-            hdrBitmap?.recycle()
-            System.gc()
-        } else if (request.processType == Request.ProcessType.PANORAMA) {
-            if (MyDebug.LOG) Log.d(TAG, "panorama")
-
-            if (!request.imageCaptureIntent && request.saveBase == Request.SaveBase.SAVEBASE_ALL_PLUS_DEBUG) {
-                try {
-                    val writer = StringWriter()
-                    writeGyroDebugXml(writer, request)
-                    val storageUtils = mainActivity.storageUtils
-                    val saveFile = mainActivity.getExternalFilesDir(null)?.let { file ->
-                        storageUtils.createOutputMediaFile(
-                            file,
-                            StorageUtils.MEDIA_TYPE_GYRO_INFO,
-                            "",
-                            "xml",
-                            request.currentDate
-                        )
-                    }
-                    if (MyDebug.LOG) Log.d(TAG, "save to: " + saveFile?.absolutePath)
-                    val saveUri: Uri? = null
-                    val outputStream: OutputStream? =
-                        if (saveFile != null) FileOutputStream(saveFile)
-                        else mainActivity.contentResolver.openOutputStream(saveUri!!)
-                    try {
-                        outputStream?.write(writer.toString().toByteArray(Charset.forName("UTF-8")))
-                    } catch (_: Exception) {
-                        // do nothing
-                    } finally {
-                        outputStream?.close()
-                    }
-
-                    if (saveFile != null) {
-                        storageUtils.broadcastFile(saveFile, false, false, false, false, null)
-                    } else if (saveUri != null) {
-                        broadcastSAFFile(saveUri, false, false, false)
-                    }
-                } catch (e: IOException) {
-                    MyDebug.logStackTrace(TAG, "failed to write gyro text file", e)
-                }
-            }
-
-            saveBaseImages(request, "_")
-            mainActivity.savingImage(true)
-            val timeS = System.currentTimeMillis()
-
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "panorama_dir_left_to_right: " + request.panoramaDirLeftToRight
-            )
-            if (!request.panoramaDirLeftToRight) {
-                Collections.reverse(request.jpegImages)
-                if (request.gyroRotationMatrix != null) {
-                    Collections.reverse(request.gyroRotationMatrix)
-                }
-            }
-
-            val bitmaps = ImageUtils.loadBitmaps(request.jpegImages, -2, 1)?.toMutableList()
-            if (bitmaps == null) {
-                if (MyDebug.LOG) Log.e(TAG, "failed to load bitmaps")
-                mainActivity.savingImage(false)
-                return false
-            }
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "panorama performance: time after decompressing base exposures: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            for (i in bitmaps.indices) {
-                var bitmap = bitmaps[i]
-                bitmap = ImageUtils.rotateForExif(bitmap, request.jpegImages[0])
-                bitmaps[i] = bitmap
-            }
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "panorama performance: time after rotating for exif: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            val panorama: Bitmap
-            try {
-                @Suppress("UNCHECKED_CAST")
-                panorama = panoramaProcessor.panorama(
-                    bitmaps as MutableList<Bitmap>,
-                    MyApplicationInterface.panoramaPicsPerScreen,
-                    request.cameraViewAngleY,
-                    request.panoramaCrop
-                )
-            } catch (e: PanoramaProcessorException) {
-                MyDebug.logStackTrace(TAG, "PanoramaProcessorException from panorama", e)
-                if (e.code == PanoramaProcessorException.UNEQUAL_SIZES || e.code == PanoramaProcessorException.FAILED_TO_CROP) {
-                    mainActivity.preview.showToast(null, R.string.failed_to_process_panorama)
-                    Log.e(TAG, "panorama failed: " + e.code)
-                    bitmaps.clear()
-                    System.gc()
+                if (!processHDR(bitmaps, request, timeS)) {
+                    mainActivity.preview.showToast(null, R.string.failed_to_process_hdr)
                     mainActivity.savingImage(false)
                     return false
-                } else {
-                    throw RuntimeException()
                 }
-            }
-            if (MyDebug.LOG) {
-                Log.d(
+
+                val hdrBitmap = bitmaps[0]
+                if (MyDebug.LOG) Log.d(
                     TAG,
-                    "panorama performance: time after creating panorama image: " + (System.currentTimeMillis() - timeS)
+                    "hdr_bitmap: " + hdrBitmap + " is mutable? " + hdrBitmap?.isMutable
+                )
+                bitmaps.clear()
+                System.gc()
+                mainActivity.savingImage(false)
+
+                if (MyDebug.LOG) Log.d(TAG, "save HDR image")
+                val baseImageId = (request.jpegImages.size - 1) / 2
+                if (MyDebug.LOG) Log.d(TAG, "base_image_id: $baseImageId")
+                val suffix = if (request.jpegImages.size == 1) "_DRO" else HDR_SUFFIX
+                success = saveSingleImageNow(
+                    request = request,
+                    data = request.jpegImages[baseImageId],
+                    bitmap = hdrBitmap,
+                    filenameSuffix = suffix,
+                    updateThumbnail = true,
+                    shareImage = true,
+                    ignoreRawOnly = true,
+                    ignoreExifOrientation = false
+                )
+                if (MyDebug.LOG && !success) Log.e(TAG, "saveSingleImageNow failed for hdr image")
+                if (MyDebug.LOG) {
+                    Log.d(
+                        TAG,
+                        "HDR performance: time after saving HDR image: " + (System.currentTimeMillis() - timeS)
+                    )
+                }
+                hdrBitmap?.recycle()
+                System.gc()
+            }
+
+            Request.ProcessType.PANORAMA -> {
+                if (MyDebug.LOG) Log.d(TAG, "panorama")
+
+                if (!request.imageCaptureIntent && request.saveBase == Request.SaveBase.SAVEBASE_ALL_PLUS_DEBUG) {
+                    try {
+                        val writer = StringWriter()
+                        writeGyroDebugXml(writer, request)
+                        val storageUtils = mainActivity.storageUtils
+                        val saveFile = mainActivity.getExternalFilesDir(null)?.let { file ->
+                            storageUtils.createOutputMediaFile(
+                                file,
+                                StorageUtils.MEDIA_TYPE_GYRO_INFO,
+                                "",
+                                "xml",
+                                request.currentDate
+                            )
+                        }
+                        if (MyDebug.LOG) Log.d(TAG, "save to: " + saveFile?.absolutePath)
+                        val saveUri: Uri? = null
+                        val outputStream: OutputStream? =
+                            if (saveFile != null) FileOutputStream(saveFile)
+                            else mainActivity.contentResolver.openOutputStream(saveUri!!)
+                        try {
+                            outputStream?.write(
+                                writer.toString().toByteArray(Charset.forName("UTF-8"))
+                            )
+                        } catch (_: Exception) {
+                            // do nothing
+                        } finally {
+                            outputStream?.close()
+                        }
+
+                        if (saveFile != null) {
+                            storageUtils.broadcastFile(
+                                file = saveFile,
+                                isNewPicture = false,
+                                isNewVideo = false,
+                                setLastScanned = false,
+                                hasnoexifdatetime = false,
+                                safUri = null
+                            )
+                        } else if (saveUri != null) {
+                            broadcastSAFFile(
+                                saveUri = saveUri,
+                                updateThumbnail = false,
+                                hasNoExifDateTime = false,
+                                isImageCaptureIntent = false
+                            )
+                        }
+                    } catch (e: IOException) {
+                        MyDebug.logStackTrace(TAG, "failed to write gyro text file", e)
+                    }
+                }
+
+                saveBaseImages(request, "_")
+                mainActivity.savingImage(true)
+                val timeS = System.currentTimeMillis()
+
+                if (MyDebug.LOG) Log.d(
+                    TAG,
+                    "panorama_dir_left_to_right: " + request.panoramaDirLeftToRight
+                )
+                if (!request.panoramaDirLeftToRight) {
+                    request.jpegImages.reverse()
+                    request.gyroRotationMatrix?.reverse()
+                }
+
+                val bitmaps = ImageUtils.loadBitmaps(request.jpegImages, -2, 1)?.toMutableList()
+                if (bitmaps == null) {
+                    if (MyDebug.LOG) Log.e(TAG, "failed to load bitmaps")
+                    mainActivity.savingImage(false)
+                    return false
+                }
+                if (MyDebug.LOG) {
+                    Log.d(
+                        TAG,
+                        "panorama performance: time after decompressing base exposures: " + (System.currentTimeMillis() - timeS)
+                    )
+                }
+
+                for (i in bitmaps.indices) {
+                    var bitmap = bitmaps[i]
+                    bitmap = ImageUtils.rotateForExif(bitmap, request.jpegImages[0])
+                    bitmaps[i] = bitmap
+                }
+                if (MyDebug.LOG) {
+                    Log.d(
+                        TAG,
+                        "panorama performance: time after rotating for exif: " + (System.currentTimeMillis() - timeS)
+                    )
+                }
+
+                val panorama: Bitmap
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    panorama = panoramaProcessor.panorama(
+                        bitmaps as MutableList<Bitmap>,
+                        MyApplicationInterface.PANORAMA_PICS_PER_SCREEN,
+                        request.cameraViewAngleY,
+                        request.panoramaCrop
+                    )
+                } catch (e: PanoramaProcessorException) {
+                    MyDebug.logStackTrace(TAG, "PanoramaProcessorException from panorama", e)
+                    if (e.code == PanoramaProcessorException.UNEQUAL_SIZES || e.code == PanoramaProcessorException.FAILED_TO_CROP) {
+                        mainActivity.preview.showToast(null, R.string.failed_to_process_panorama)
+                        Log.e(TAG, "panorama failed: " + e.code)
+                        bitmaps.clear()
+                        System.gc()
+                        mainActivity.savingImage(false)
+                        return false
+                    } else {
+                        throw RuntimeException()
+                    }
+                }
+                if (MyDebug.LOG) {
+                    Log.d(
+                        TAG,
+                        "panorama performance: time after creating panorama image: " + (System.currentTimeMillis() - timeS)
+                    )
+                }
+                if (MyDebug.LOG) Log.d(TAG, "panorama: $panorama")
+                bitmaps.clear()
+                System.gc()
+
+                mainActivity.savingImage(false)
+
+                if (MyDebug.LOG) Log.d(TAG, "save panorama image")
+                success = saveSingleImageNow(
+                    request = request,
+                    data = request.jpegImages[0],
+                    bitmap = panorama,
+                    filenameSuffix = PANO_SUFFIX,
+                    updateThumbnail = true,
+                    shareImage = true,
+                    ignoreRawOnly = true,
+                    ignoreExifOrientation = true
+                )
+                if (MyDebug.LOG && !success) Log.e(
+                    TAG,
+                    "saveSingleImageNow failed for panorama image"
+                )
+                panorama.recycle()
+                System.gc()
+            }
+
+            else -> {
+                val suffix = "_"
+                success = saveImages(
+                    request = request,
+                    suffix = suffix,
+                    firstOnly = false,
+                    updateThumbnail = true,
+                    share = true
                 )
             }
-            if (MyDebug.LOG) Log.d(TAG, "panorama: $panorama")
-            bitmaps.clear()
-            System.gc()
-
-            mainActivity.savingImage(false)
-
-            if (MyDebug.LOG) Log.d(TAG, "save panorama image")
-            success = saveSingleImageNow(
-                request,
-                request.jpegImages[0],
-                panorama,
-                PANO_SUFFIX,
-                true,
-                true,
-                true,
-                true
-            )
-            if (MyDebug.LOG && !success) Log.e(TAG, "saveSingleImageNow failed for panorama image")
-            panorama.recycle()
-            System.gc()
-        } else {
-            val suffix = "_"
-            success = saveImages(request, suffix, false, true, true)
         }
 
         return success
@@ -1413,14 +1496,14 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
             }
             val shareImage = share && (i == midImage)
             if (!saveSingleImageNow(
-                    request,
-                    image,
-                    null,
-                    filenameSuffix,
-                    updateThumbnail,
-                    shareImage,
-                    false,
-                    false
+                    request = request,
+                    data = image,
+                    bitmap = null,
+                    filenameSuffix = filenameSuffix,
+                    updateThumbnail = updateThumbnail,
+                    shareImage = shareImage,
+                    ignoreRawOnly = false,
+                    ignoreExifOrientation = false
                 )
             ) {
                 if (MyDebug.LOG) Log.e(TAG, "saveSingleImageNow failed for image: $i")
@@ -1451,11 +1534,11 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                 baseRequest.imageQuality = 100
             }
             saveImages(
-                baseRequest,
-                suffix,
-                baseRequest.saveBase == Request.SaveBase.SAVEBASE_FIRST,
-                false,
-                false
+                request = baseRequest,
+                suffix = suffix,
+                firstOnly = baseRequest.saveBase == Request.SaveBase.SAVEBASE_FIRST,
+                updateThumbnail = false,
+                share = false
             )
         }
     }
@@ -1706,12 +1789,12 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
                 if (picFile != null && saveUri == null) {
                     storageUtils.broadcastFile(
-                        picFile,
-                        true,
-                        false,
-                        updateThumbnail,
-                        hasnoexifdatetime,
-                        null
+                        file = picFile,
+                        isNewPicture = true,
+                        isNewVideo = false,
+                        setLastScanned = updateThumbnail,
+                        hasnoexifdatetime = hasnoexifdatetime,
+                        safUri = null
                     )
                     mainActivity.testLastSavedImage = picFile.absolutePath
                 }
@@ -1734,7 +1817,11 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
                         if (!request.imageCaptureIntent) {
                             if (MyDebug.LOG) Log.d(TAG, "announce mediastore uri")
-                            storageUtils.announceUri(saveUri, true, false)
+                            storageUtils.announceUri(
+                                uri = saveUri,
+                                isNewPicture = true,
+                                isNewVideo = false
+                            )
                             if (updateThumbnail) {
                                 storageUtils.setLastMediaScanned(
                                     saveUri,
@@ -1771,7 +1858,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
             mainActivity.preview.cameraController?.let { controller ->
                 val size = controller.pictureSize
                 val ratio =
-                    Math.ceil(size.width.toDouble() / mainActivity.preview.view.width).toInt()
+                    ceil(size.width.toDouble() / mainActivity.preview.view.width).toInt()
                 var sampleSize = Integer.highestOneBit(ratio)
                 sampleSize *= request.sampleFactor
                 if (sampleSize < 1) sampleSize = 1
@@ -1850,17 +1937,17 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         if (MyDebug.LOG) Log.d(TAG, "file for SAF is: $file")
         if (file != null) {
             storageUtils.broadcastFile(
-                file,
-                true,
-                false,
-                updateThumbnail,
-                hasNoExifDateTime,
-                saveUri
+                file = file,
+                isNewPicture = true,
+                isNewVideo = false,
+                setLastScanned = updateThumbnail,
+                hasnoexifdatetime = hasNoExifDateTime,
+                safUri = saveUri
             )
             mainActivity.testLastSavedImage = file.absolutePath
         } else {
             if (!isImageCaptureIntent) {
-                storageUtils.announceUri(saveUri, true, false)
+                storageUtils.announceUri(uri = saveUri, isNewPicture = true, isNewVideo = false)
                 if (updateThumbnail) {
                     storageUtils.setLastMediaScanned(saveUri, true, hasNoExifDateTime, saveUri)
                 }
@@ -1969,12 +2056,12 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
                 if (picFile != null && saveUri == null) {
                     storageUtils.broadcastFile(
-                        picFile,
-                        true,
-                        true,
-                        updateThumbnail,
-                        hasnoexifdatetime,
-                        null
+                        file = picFile,
+                        isNewPicture = true,
+                        isNewVideo = true,
+                        setLastScanned = updateThumbnail,
+                        hasnoexifdatetime = hasnoexifdatetime,
+                        safUri = null
                     )
                     if (rawOnly) {
                         mainActivity.testLastSavedImage = picFile.absolutePath
@@ -1992,7 +2079,11 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                         }
 
                         if (MyDebug.LOG) Log.d(TAG, "announce mediastore uri")
-                        storageUtils.announceUri(saveUri, true, true)
+                        storageUtils.announceUri(
+                            uri = saveUri,
+                            isNewPicture = true,
+                            isNewVideo = true
+                        )
                         if (updateThumbnail) {
                             storageUtils.setLastMediaScanned(
                                 saveUri,
@@ -2003,12 +2094,12 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                         }
                     } else {
                         storageUtils.broadcastUri(
-                            saveUri,
-                            true,
-                            false,
-                            rawOnly,
-                            hasnoexifdatetime,
-                            false
+                            uri = saveUri,
+                            isNewPicture = true,
+                            isNewVideo = false,
+                            setLastScanned = rawOnly,
+                            hasnoexifdatetime = hasnoexifdatetime,
+                            imageCaptureIntent = false
                         )
                     }
                 }
@@ -2088,20 +2179,19 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         fun computeQueueSize(largeHeapMemoryInput: Int): Int {
             var largeHeapMemory = largeHeapMemoryInput
             if (MyDebug.LOG) Log.d(TAG, "large max memory = ${largeHeapMemory}MB")
-            val maxQueueSize: Int
             if (MyDebug.LOG) Log.d(TAG, "test_small_queue_size?: $testSmallQueueSize")
             if (testSmallQueueSize) {
                 largeHeapMemory = 0
             }
 
-            if (largeHeapMemory >= 512) {
-                maxQueueSize = 34
+            val maxQueueSize: Int = if (largeHeapMemory >= 512) {
+                34
             } else if (largeHeapMemory >= 256) {
-                maxQueueSize = 12
+                12
             } else if (largeHeapMemory >= 128) {
-                maxQueueSize = 8
+                8
             } else {
-                maxQueueSize = 6
+                6
             }
             if (MyDebug.LOG) Log.d(TAG, "max_queue_size = $maxQueueSize")
             return maxQueueSize
@@ -2266,7 +2356,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         val height = bitmap.height
 
         val cameraAngleY = mainActivity.preview.getViewAngleY(false)
-        val anglePerPic = cameraAngleY / MyApplicationInterface.panoramaPicsPerScreen
+        val anglePerPic = cameraAngleY / MyApplicationInterface.PANORAMA_PICS_PER_SCREEN
         val totalAngle = cameraAngleY + anglePerPic * (nPics - 1)
         val nPicsFor360 = 360.0f / totalAngle
         val fullWidth = (width * nPicsFor360 + 0.5f).toInt()
