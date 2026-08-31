@@ -60,6 +60,7 @@ import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculato
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
+import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
 import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManager
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
@@ -193,6 +194,7 @@ class CameraController2(
     // lock to synchronize between UI thread and the background "CameraBackground" thread/handler
     private val backgroundCameraLock = Any()
 
+    val callbackDispatcher = Camera2StateCallbackDispatcher()
     val sessionManager = Camera2SessionManager()
     val imageReaderPipeline = Camera2ImageReaderPipeline()
     private val imageReader: ImageReader?
@@ -7266,6 +7268,7 @@ class CameraController2(
                 "onCaptureBufferLost: $frameNumber"
             )
             super.onCaptureBufferLost(session, request, target, frameNumber)
+            callbackDispatcher.onCaptureBufferLost(session, request, target, frameNumber)
         }
 
         override fun onCaptureFailed(
@@ -7284,6 +7287,7 @@ class CameraController2(
                 request,
                 failure
             ) // API docs say this does nothing, but call it just to be safe
+            callbackDispatcher.onCaptureFailed(session, request, failure)
         }
 
         override fun onCaptureSequenceAborted(session: CameraCaptureSession, sequenceId: Int) {
@@ -7295,6 +7299,7 @@ class CameraController2(
                 session,
                 sequenceId
             ) // API docs say this does nothing, but call it just to be safe
+            callbackDispatcher.onCaptureSequenceAborted(session, sequenceId)
         }
 
         override fun onCaptureSequenceCompleted(
@@ -7312,6 +7317,7 @@ class CameraController2(
                 sequenceId,
                 frameNumber
             ) // API docs say this does nothing, but call it just to be safe
+            callbackDispatcher.onCaptureSequenceCompleted(session, sequenceId, frameNumber)
         }
 
         override fun onCaptureStarted(
@@ -7334,6 +7340,7 @@ class CameraController2(
             // n.b., we don't play the shutter sound here for RequestTagType.CAPTURE, as it typically sounds "too late"
             // (if ever we changed this, would also need to fix for burst, where we only set the RequestTagType.CAPTURE for the last image)
             super.onCaptureStarted(session, request, timestamp, frameNumber)
+            callbackDispatcher.onCaptureStarted(session, request, timestamp, frameNumber)
         }
 
         override fun onCaptureCompleted(
@@ -7371,6 +7378,7 @@ class CameraController2(
                 request,
                 result
             ) // API docs say this does nothing, but call it just to be safe (as with Google Camera)
+            callbackDispatcher.onCaptureCompleted(session, request, result)
         }
 
         /** Updates cached information regarding the capture result status related to auto-exposure.
