@@ -65,6 +65,7 @@ import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManage
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
 import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
+import com.hightechif.openkamera.cameracontroller.threading.Camera2ThreadManager
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
 import java.util.Collections
@@ -319,9 +320,9 @@ class CameraController2(
     private lateinit var _surfaceTexture: Surface
     private val _previewSurface: Surface
         get() = _surfaceTexture
-    private var thread: HandlerThread?
-    private var handler: Handler?
-    private var executor: Executor?
+    var threadManager: Camera2ThreadManager? = null
+    var handler: Handler? = null
+    var executor: Executor? = null
     private var videoRecorderSurface: Surface? = null
 
     private var previewWidth = 0
@@ -1056,19 +1057,10 @@ class CameraController2(
             previewImageReader.close();
             previewImageReader = null;
         }*/
-        if (thread != null) {
-            // should only close thread after closing the camera, otherwise we get messages "sending message to a Handler on a dead thread"
-            // see https://sourceforge.net/p/OpenKamera/discussion/general/thread/32c2b01b/?limit=25
-            thread!!.quitSafely()
-            try {
-                thread!!.join()
-                thread = null
-                handler = null
-                executor = null
-            } catch (e: InterruptedException) {
-                e.printStackTrace()
-            }
-        }
+        threadManager?.shutdownSafely()
+        threadManager = null
+        handler = null
+        executor = null
     }
 
     /** Enforce a minimum number of points in tonemap curves - needed due to Galaxy S10e having wrong behavior if fewer
@@ -6949,10 +6941,10 @@ class CameraController2(
             )
         }
 
-        thread = HandlerThread("CameraBackground")
-        thread!!.start()
-        handler = Handler(thread!!.looper)
-        executor = Executor { command -> handler?.post(command) }
+        val tm = Camera2ThreadManager("CameraBackground")
+        this.threadManager = tm
+        this.handler = tm.handler
+        this.executor = tm.executor
 
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
