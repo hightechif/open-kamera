@@ -55,6 +55,8 @@ import android.view.SurfaceHolder
 import android.view.TextureView
 import androidx.annotation.IntRange
 import androidx.annotation.RequiresApi
+import com.hightechif.openkamera.cameracontroller.burst.Camera2CaptureCoordinator
+import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculator
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.processing.HDRProcessor
@@ -190,41 +192,67 @@ class CameraController2(
 
     private var imageReader: ImageReader? = null
 
-    private var _burstType = BurstType.BURSTTYPE_NONE
-    private var expoBracketingNImages = 3
-    private var expoBracketingStops = 2.0
-    private var useExpoFastBurst = true
+    val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
+
+    private val expoBracketingNImages: Int
+        get() = captureCoordinator.expoBracketingNImages
+
+    private val expoBracketingStops: Double
+        get() = captureCoordinator.expoBracketingStops
+
+    private val useExpoFastBurst: Boolean
+        get() = captureCoordinator.useExpoFastBurst
 
     // for BURSTTYPE_FOCUS:
     // whether focus bracketing in progress; set back to 'false' to cancel
-    private var focusBracketingInProgress = false
-    private var focusBracketingNImages = 3
-    private var _focusBracketingSourceDistance = 0.0f
-    private var _focusBracketingTargetDistance = 0.0f
-    private var focusBracketingAddInfinity = false
+    private var focusBracketingInProgress: Boolean
+        get() = captureCoordinator.focusBracketingInProgress
+        set(value) {
+            captureCoordinator.focusBracketingInProgress = value
+        }
+
+    private val focusBracketingNImages: Int
+        get() = captureCoordinator.focusBracketingNImages
+
+    private val focusBracketingAddInfinity: Boolean
+        get() = captureCoordinator.focusBracketingAddInfinity
 
     // for BURSTTYPE_NORMAL:
     // chooses number of burst images and other settings for Open Kamera's noise reduction (NR) photo mode
-    private var burstForNoiseReduction = false
+    private val burstForNoiseReduction: Boolean
+        get() = captureCoordinator.burstForNoiseReduction
 
     // if burstForNoiseReduction==true, whether to optimize for low light scenes
-    private var noiseReductionLowLight = false
+    private val noiseReductionLowLight: Boolean
+        get() = captureCoordinator.noiseReductionLowLight
 
     // if burstForNoiseReduction==false, this gives the number of images for the burst
-    private var burstRequestedNImages = 0
+    private var burstRequestedNImages: Int
+        get() = captureCoordinator.burstRequestedNImages
+        set(value) {
+            captureCoordinator.burstRequestedNImages = value
+        }
 
     //for BURSTTYPE_CONTINUOUS:
     // whether we're currently taking a continuous burst
-    override var isContinuousBurstInProgress: Boolean = false
-        private set
+    override var isContinuousBurstInProgress: Boolean
+        get() = captureCoordinator.isContinuousBurstInProgress
+        private set(value) {
+            captureCoordinator.isContinuousBurstInProgress = value
+        }
 
     // whether we've requested the last capture
-    private var continuousBurstRequestedLastCapture = false
+    private var continuousBurstRequestedLastCapture: Boolean
+        get() = captureCoordinator.continuousBurstRequestedLastCapture
+        set(value) {
+            captureCoordinator.continuousBurstRequestedLastCapture = value
+        }
 
     // Whether to enable a workaround hack for some Galaxy devices - take an additional dummy photo
     // when taking an expo/HDR burst, to avoid problem where manual exposure is ignored for the
     // first image.
-    private var dummyCaptureHack = false
+    private val dummyCaptureHack: Boolean
+        get() = captureCoordinator.dummyCaptureHack
 
     //private boolean dummyCaptureHack = true; // test
     private var wantJpegR = false
@@ -3209,7 +3237,7 @@ class CameraController2(
     }
 
     override var burstType: BurstType
-        get() = _burstType
+        get() = captureCoordinator.burstType
         set(burstType) {
             if (MyDebug.LOG) Log.d(
                 TAG,
@@ -3219,16 +3247,10 @@ class CameraController2(
                 if (MyDebug.LOG) Log.e(TAG, "no camera")
                 return
             }
-            if (this._burstType === burstType) {
+            if (captureCoordinator.burstType === burstType) {
                 return
             }
-            /*if( hasCaptureSession() ) {
-                 // can only call this when captureSession not created - as it affects how we create the imageReader
-                 if( MyDebug.LOG )
-                     Log.e(TAG, "can't set burst type when captureSession running!");
-                 throw new RuntimeException(); // throw as RuntimeException, as this is a programming error
-             }*/
-            this._burstType = burstType
+            captureCoordinator.burstType = burstType
             updateUseFakePrecaptureMode(cameraSettings.flashValue)
             cameraSettings.setAEMode(
                 previewBuilder,
@@ -3237,23 +3259,16 @@ class CameraController2(
         }
 
     override fun setExpoBracketingNImages(nImages: Int) {
-        var newNImages = nImages
         if (MyDebug.LOG) Log.d(
             TAG,
-            "setExpoBracketingNImages: $newNImages"
+            "setExpoBracketingNImages: $nImages"
         )
-        if (newNImages <= 1 || (newNImages % 2) == 0) {
-            if (MyDebug.LOG) Log.e(TAG, "n_images should be an odd number greater than 1")
-            throw RuntimeException("n_images should be an odd number greater than 1") // throw as RuntimeException, as this is a programming error
+        try {
+            captureCoordinator.setExpoBracketingNImages(nImages)
+        } catch (e: IllegalArgumentException) {
+            if (MyDebug.LOG) Log.e(TAG, e.message ?: "Invalid nImages")
+            throw RuntimeException(e.message) // throw as RuntimeException, as this is a programming error
         }
-        if (newNImages > MAX_EXPO_BRACKETING_N_IMAGES) {
-            newNImages = MAX_EXPO_BRACKETING_N_IMAGES
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "limiting n_images to max of $newNImages"
-            )
-        }
-        this.expoBracketingNImages = newNImages
     }
 
     override fun setExpoBracketingStops(stops: Double) {
@@ -3261,11 +3276,12 @@ class CameraController2(
             TAG,
             "setExpoBracketingStops: $stops"
         )
-        if (stops <= 0.0) {
+        try {
+            captureCoordinator.setExpoBracketingStops(stops)
+        } catch (e: IllegalArgumentException) {
             if (MyDebug.LOG) Log.e(TAG, "stops should be positive")
-            throw RuntimeException() // throw as RuntimeException, as this is a programming error
+            throw RuntimeException(e) // throw as RuntimeException, as this is a programming error
         }
-        this.expoBracketingStops = stops
     }
 
     override fun setDummyCaptureHack(dummyCaptureHack: Boolean) {
@@ -3273,7 +3289,7 @@ class CameraController2(
             TAG,
             "setDummyCaptureHack: $dummyCaptureHack"
         )
-        this.dummyCaptureHack = dummyCaptureHack
+        captureCoordinator.dummyCaptureHack = dummyCaptureHack
     }
 
     override fun setUseExpoFastBurst(useExpoFastBurst: Boolean) {
@@ -3281,34 +3297,24 @@ class CameraController2(
             TAG,
             "setUseExpoFastBurst: $useExpoFastBurst"
         )
-        this.useExpoFastBurst = useExpoFastBurst
+        captureCoordinator.useExpoFastBurst = useExpoFastBurst
     }
 
     override val isCaptureFastBurst: Boolean
-        get() =// BURSTTYPE_FOCUS photos are captured at a slow rate, so fine to return false for that (means
-            // devices can still use highest resolutions)
-            this.burstType !== BurstType.BURSTTYPE_NONE && this.burstType !== BurstType.BURSTTYPE_FOCUS
+        get() = captureCoordinator.isCaptureFastBurst
 
     override val isCapturingBurst: Boolean
-        get() {
-            if (this.burstType === BurstType.BURSTTYPE_NONE) return false
-            if (burstType === BurstType.BURSTTYPE_CONTINUOUS) return isContinuousBurstInProgress || nBurst > 0 || nBurstRaw > 0
-            return burstTotal > 1 && nBurstTaken < burstTotal
-        }
+        get() = captureCoordinator.isCapturingBurst(nBurstTaken, nBurstTotal, nBurst, nBurstRaw)
 
     override val burstTotal: Int
-        get() {
-            if (burstType === BurstType.BURSTTYPE_CONTINUOUS) return 0 // total burst size is unknown
-
-            return nBurstTotal
-        }
+        get() = captureCoordinator.calculateBurstTotal(nBurstTotal)
 
     override fun setBurstNImages(burstRequestedNImages: Int) {
         if (MyDebug.LOG) Log.d(
             TAG,
             "setBurstNImages: $burstRequestedNImages"
         )
-        this.burstRequestedNImages = burstRequestedNImages
+        captureCoordinator.burstRequestedNImages = burstRequestedNImages
     }
 
     override fun setBurstForNoiseReduction(
@@ -3325,19 +3331,18 @@ class CameraController2(
                 "noise_reduction_low_light: $noiseReductionLowLight"
             )
         }
-        this.burstForNoiseReduction = burstForNoiseReduction
-        this.noiseReductionLowLight = noiseReductionLowLight
+        captureCoordinator.setBurstForNoiseReduction(burstForNoiseReduction, noiseReductionLowLight)
     }
 
     override fun stopContinuousBurst() {
         if (MyDebug.LOG) Log.d(TAG, "stopContinuousBurst")
-        isContinuousBurstInProgress = false
+        captureCoordinator.stopContinuousBurst()
     }
 
     override fun stopFocusBracketingBurst() {
         if (MyDebug.LOG) Log.d(TAG, "stopFocusBracketingBurst")
         if (burstType === BurstType.BURSTTYPE_FOCUS) {
-            focusBracketingInProgress = false
+            captureCoordinator.stopFocusBracketing()
         } else {
             Log.e(
                 TAG,
@@ -3967,7 +3972,7 @@ class CameraController2(
             TAG,
             "setFocusBracketingNImages: $nImages"
         )
-        this.focusBracketingNImages = nImages
+        captureCoordinator.focusBracketingNImages = nImages
     }
 
     override fun setFocusBracketingAddInfinity(focusBracketingAddInfinity: Boolean) {
@@ -3975,33 +3980,33 @@ class CameraController2(
             TAG,
             "setFocusBracketingAddInfinity: $focusBracketingAddInfinity"
         )
-        this.focusBracketingAddInfinity = focusBracketingAddInfinity
+        captureCoordinator.focusBracketingAddInfinity = focusBracketingAddInfinity
     }
 
     override var focusBracketingSourceDistance: Float
-        get() = this._focusBracketingSourceDistance
+        get() = captureCoordinator.focusBracketingSourceDistance
         set(focusBracketingSourceDistance) {
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "setFocusBracketingSourceDistance: $focusBracketingSourceDistance"
             )
-            this._focusBracketingSourceDistance = focusBracketingSourceDistance
+            captureCoordinator.focusBracketingSourceDistance = focusBracketingSourceDistance
         }
 
     override fun setFocusBracketingSourceDistanceFromCurrent() {
         if (captureResultHasFocusDistance) {
-            this._focusBracketingSourceDistance = captureResultFocusDistance
+            captureCoordinator.focusBracketingSourceDistance = captureResultFocusDistance
         }
     }
 
     override var focusBracketingTargetDistance: Float
-        get() = this._focusBracketingTargetDistance
+        get() = captureCoordinator.focusBracketingTargetDistance
         set(focusBracketingTargetDistance) {
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "setFocusBracketingTargetDistance: $focusBracketingTargetDistance"
             )
-            this._focusBracketingTargetDistance = focusBracketingTargetDistance
+            captureCoordinator.focusBracketingTargetDistance = focusBracketingTargetDistance
         }
 
     /** Decides whether we should be using fake precapture mode.
@@ -8775,89 +8780,7 @@ class CameraController2(
             target: Float,
             count: Int
         ): MutableList<Float> {
-            val focusDistances: MutableList<Float> = ArrayList()
-            var focusDistanceS = source
-            var focusDistanceE = target
-            val maxFocusBracketDistanceC = 0.1f // 10m
-            focusDistanceS = max(
-                focusDistanceS.toDouble(),
-                maxFocusBracketDistanceC.toDouble()
-            ).toFloat() // since we'll deal with 1/distance, use Math.max
-            focusDistanceE = max(
-                focusDistanceE.toDouble(),
-                maxFocusBracketDistanceC.toDouble()
-            ).toFloat() // since we'll deal with 1/distance, use Math.max
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "focus_distance_s: $focusDistanceS"
-                )
-                Log.d(
-                    TAG,
-                    "focus_distance_e: $focusDistanceE"
-                )
-            }
-            // we want to interpolate linearly in distance, not 1/distance
-            val realFocusDistanceS = 1.0f / focusDistanceS
-            val realFocusDistanceE = 1.0f / focusDistanceE
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "real_focus_distance_s: $realFocusDistanceS"
-                )
-                Log.d(
-                    TAG,
-                    "real_focus_distance_e: $realFocusDistanceE"
-                )
-            }
-            for (i in 0..<count) {
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "i: $i")
-                }
-                // for first and last, we still use the real focus distances; for intermediate values, we interpolate
-                // with first/last clamped to max of 10m (to avoid taking reciprocal of 0)
-                val distance: Float
-                when (i) {
-                    0 -> {
-                        distance = source
-                    }
-
-                    count - 1 -> {
-                        distance = target
-                    }
-
-                    else -> {
-                        //float alpha = ((float)i)/(count-1.0f);
-                        // rather than linear interpolation, we use log, see https://stackoverflow.com/questions/5215459/android-mediaplayer-setvolume-function
-                        // this gives more shots are closer focus distances
-                        var value = i
-                        if (realFocusDistanceS > realFocusDistanceE) {
-                            // if source is further than target, we still want the interpolation distances to be the same, but in reversed order
-                            value = count - 1 - i
-                        }
-                        var alpha =
-                            (1.0 - ln((count - value).toDouble()) / ln(count.toDouble())).toFloat()
-                        if (realFocusDistanceS > realFocusDistanceE) {
-                            alpha = 1.0f - alpha
-                        }
-                        val realDistance =
-                            (1.0f - alpha) * realFocusDistanceS + alpha * realFocusDistanceE
-                        if (MyDebug.LOG) {
-                            Log.d(TAG, "    alpha: $alpha")
-                            Log.d(
-                                TAG,
-                                "    real_distance: $realDistance"
-                            )
-                        }
-                        distance = 1.0f / realDistance
-                    }
-                }
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "    distance: $distance")
-                }
-                focusDistances.add(distance)
-            }
-            return focusDistances
+            return FocusBracketingCalculator.setupFocusBracketingDistances(source, target, count)
         }
     }
 }
