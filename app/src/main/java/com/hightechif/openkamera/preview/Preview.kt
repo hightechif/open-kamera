@@ -37,11 +37,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
-import android.renderscript.Allocation
-import android.renderscript.Element
 import android.renderscript.RSInvalidStateException
 import android.renderscript.RenderScript
-import android.renderscript.Type
 import android.util.Log
 import android.util.Pair
 import android.view.LayoutInflater
@@ -64,16 +61,6 @@ import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.ScriptC_histogram_compute
 import com.hightechif.openkamera.TakePhoto
-import com.hightechif.openkamera.preview.analysis.FrameAnalysisConfig
-import com.hightechif.openkamera.preview.analysis.FrameAnalysisResult
-import com.hightechif.openkamera.preview.analysis.HistogramType
-import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
-import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
@@ -89,6 +76,10 @@ import com.hightechif.openkamera.cameracontroller.CameraControllerManager2
 import com.hightechif.openkamera.cameracontroller.RawImage
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
 import com.hightechif.openkamera.preview.ApplicationInterface.NoFreeStorageException
+import com.hightechif.openkamera.preview.analysis.FrameAnalysisConfig
+import com.hightechif.openkamera.preview.analysis.HistogramType
+import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
+import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
 import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
@@ -97,15 +88,17 @@ import com.hightechif.openkamera.preview.geometry.ViewportDimensions
 import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
 import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
-import com.hightechif.openkamera.processing.HDRProcessor
-import com.hightechif.openkamera.processing.JavaImageFunctionsHDR
-import com.hightechif.openkamera.processing.JavaImageFunctionsPreview
-import com.hightechif.openkamera.processing.JavaImageProcessing
+import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
+import com.hightechif.openkamera.preview.timer.CaptureTimerCoordinator
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.ToastBoxer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
-import java.lang.ref.WeakReference
 import java.text.DecimalFormat
 import java.util.Date
 import java.util.Hashtable
@@ -300,10 +293,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     @Volatile
     private var phase = PHASE_NORMAL // must be volatile for test project reading the state
-    private val takePictureTimer = Timer()
-    private var takePictureTimerTask: TimerTask? = null
-    private val beepTimer = Timer()
-    private var beepTimerTask: TimerTask? = null
+    val captureTimerCoordinator by lazy { CaptureTimerCoordinator() }
     private val flashVideoTimer = Timer()
     private var flashVideoTimerTask: TimerTask? = null
     private val batteryIfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -311,7 +301,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var batteryCheckVideoTimerTask: TimerTask? = null
     var timerEndTime: Long = 0
         private set
-    private var remainingRepeatPhotos = 0
+    val remainingRepeatPhotos: Int
+        get() = captureTimerCoordinator.remainingRepeatPhotos
     private var remainingRestartVideo = 0
 
     private var previewStartedState = PREVIEW_NOT_STARTED
@@ -1464,12 +1455,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     fun cancelTimer() {
         if (MyDebug.LOG) Log.d(TAG, "cancelTimer()")
         if (this.isOnTimer) {
-            takePictureTimerTask!!.cancel()
-            takePictureTimerTask = null
-            if (beepTimerTask != null) {
-                beepTimerTask!!.cancel()
-                beepTimerTask = null
-            }
+            captureTimerCoordinator.cancelCountdown()
             this.phase = PHASE_NORMAL
             if (MyDebug.LOG) Log.d(TAG, "cancelled camera timer")
         }
@@ -1477,7 +1463,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     fun cancelRepeat() {
         if (MyDebug.LOG) Log.d(TAG, "cancelRepeat()")
-        remainingRepeatPhotos = 0
+        captureTimerCoordinator.cancelBurst()
     }
 
     /**
@@ -5435,7 +5421,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         val repeatModeValue: String = applicationInterface.getRepeatPref()
         if (repeatModeValue == "unlimited") {
             if (MyDebug.LOG) Log.d(TAG, "unlimited repeat")
-            remainingRepeatPhotos = -1
+            captureTimerCoordinator.setupBurst(BurstScheduleConfig(isBurstInfinite = true))
         } else {
             var nRepeat: Int
             try {
@@ -5449,7 +5435,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 e.printStackTrace()
                 nRepeat = 1
             }
-            remainingRepeatPhotos = nRepeat - 1
+            captureTimerCoordinator.setupBurst(BurstScheduleConfig(totalPhotos = nRepeat))
         }
 
         if (timerDelay == 0L) {
@@ -5466,49 +5452,33 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             Log.d(TAG, "timer_delay: $timerDelay")
         }
         this.phase = PHASE_TIMER
-        class TakePictureTimerTask : TimerTask() {
-            override fun run() {
-                if (beepTimerTask != null) {
-                    beepTimerTask!!.cancel()
-                    beepTimerTask = null
+        timerEndTime = System.currentTimeMillis() + timerDelay
+        if (MyDebug.LOG) Log.d(TAG, "take photo at: $timerEndTime")
+        captureTimerCoordinator.startCountdown(
+            timerDelayMs = timerDelay,
+            onBeep = { remainingTime ->
+                if (remainingTime > 0) {
+                    applicationInterface.timerBeep(remainingTime)
                 }
+            },
+            onFinish = {
                 val activity = context as Activity
-                activity.runOnUiThread { // we run on main thread to avoid problem of camera closing at the same time
-                    // but still need to check that the camera hasn't closed or the task halted, since TimerTask.run() started
-                    if (cameraController != null && takePictureTimerTask != null) takePicture(
-                        maxFilesizeRestart = false,
-                        photoSnapshot = false,
-                        continuousFastBurst = false
-                    )
-                    else {
+                activity.runOnUiThread {
+                    if (cameraController != null && isOnTimer) {
+                        takePicture(
+                            maxFilesizeRestart = false,
+                            photoSnapshot = false,
+                            continuousFastBurst = false
+                        )
+                    } else {
                         if (MyDebug.LOG) Log.d(
                             TAG,
-                            "takePictureTimerTask: don't take picture, as already cancelled"
+                            "takePictureTimer: don't take picture, as already cancelled or camera closed"
                         )
                     }
                 }
             }
-        }
-        timerEndTime = System.currentTimeMillis() + timerDelay
-        if (MyDebug.LOG) Log.d(TAG, "take photo at: $timerEndTime")
-        /*if( !repeated ) {
-			showToast(takePhotoToast, R.string.started_timer);
-		}*/
-        takePictureTimer.schedule(
-            TakePictureTimerTask().also { takePictureTimerTask = it },
-            timerDelay
         )
-
-        class BeepTimerTask : TimerTask() {
-            private var remainingTime = timerDelay
-            override fun run() {
-                if (remainingTime > 0) { // check in case this isn't canceled by time we take the photo
-                    applicationInterface.timerBeep(remainingTime)
-                }
-                remainingTime -= 1000
-            }
-        }
-        beepTimer.schedule(BeepTimerTask().also { beepTimerTask = it }, 0, 1000)
     }
 
     private fun flashVideo() {
@@ -6687,7 +6657,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     return
                 }
 
-                if (remainingRepeatPhotos > 0) remainingRepeatPhotos--
+                captureTimerCoordinator.consumeNextBurst()
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "takeRemainingRepeatPhotos: remaining_repeat_photos is now: $remainingRepeatPhotos"
@@ -7745,6 +7715,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
         cancelRefreshPreviewBitmap()
         frameAnalyzer.destroy()
+        captureTimerCoordinator.destroy()
         freePreviewBitmap() // in case onDestroy() called directly without onPause()
 
         if (rs != null) {
@@ -8482,7 +8453,10 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         preShotsRingBuffer.add(fullCopy)
                     }
                 } catch (e: Exception) {
-                    if (MyDebug.LOG) Log.e(TAG, "failed to create preview full bitmap: ${e.message}")
+                    if (MyDebug.LOG) Log.e(
+                        TAG,
+                        "failed to create preview full bitmap: ${e.message}"
+                    )
                 }
             }
 
@@ -8685,7 +8659,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         return this.successfullyFocused && System.currentTimeMillis() < this.successfullyFocusedTime + 5000
     }
 
-    val facesDetected: Array<CameraController.Face>?
+    val facesDetected: Array<CameraController.Face>
         /** If non-null, this returned array will store the currently detected faces (if face recognition
          * is enabled). The face.temp rect will store the face rectangle in screen coordinates.
          */
