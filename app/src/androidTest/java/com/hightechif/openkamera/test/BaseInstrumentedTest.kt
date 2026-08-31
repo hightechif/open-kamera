@@ -83,7 +83,7 @@ abstract class BaseInstrumentedTest {
         var done = false
         while (!done) {
             assertTrue(System.currentTimeMillis() - timeS < 20000)
-            done = getActivityValue { activity -> activity.preview.OpenKameraAttempted() }
+            done = getActivityValue { activity -> activity.preview.openCameraAttempted() }
         }
 
         Log.d(TAG, "camera is open!")

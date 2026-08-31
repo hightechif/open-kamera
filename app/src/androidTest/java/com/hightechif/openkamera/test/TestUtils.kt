@@ -745,7 +745,7 @@ object TestUtils {
     ) {
         val preview = activity.preview
         assertEquals(
-            if (manualCanAutoFocus) savedCount + 1 else savedCount, preview.count_cameraAutoFocus
+            if (manualCanAutoFocus) savedCount + 1 else savedCount, preview.countCameraAutoFocus
         )
         if (singleTapPhoto) {
             assertFalse(preview.hasFocusArea())

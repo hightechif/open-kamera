@@ -21,7 +21,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Point
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.SurfaceTexture
 import android.hardware.SensorEvent
@@ -45,13 +44,9 @@ import android.renderscript.RenderScript
 import android.renderscript.Type
 import android.util.Log
 import android.util.Pair
-import android.view.GestureDetector
-import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.OrientationEventListener
-import android.view.ScaleGestureDetector
-import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.TextureView
@@ -87,6 +82,11 @@ import com.hightechif.openkamera.preview.ApplicationInterface.NoFreeStorageExcep
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
 import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
+import com.hightechif.openkamera.preview.geometry.PreviewMatrixCalculator
+import com.hightechif.openkamera.preview.geometry.ViewportDimensions
+import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
+import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
+import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.JavaImageFunctionsHDR
 import com.hightechif.openkamera.processing.JavaImageFunctionsPreview
@@ -112,7 +112,6 @@ import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sign
 import kotlin.math.sqrt
 import kotlin.math.tan
 
@@ -157,9 +156,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var setPreviewSize = false
     private var previewW = 0
     private var previewH = 0
-    private var setTextureviewSize = false
-    private var textureviewW = 0
-    private var textureviewH = 0
+    private var setTextureViewSize = false
+    private var textureViewW = 0
+    private var textureViewH = 0
 
     private var rs: RenderScript? =
         null // lazily created, so we don't take up resources if application isn't using renderscript
@@ -238,10 +237,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     private var cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+
     // background task used for opening camera
     private var openCameraTask: AsyncTask<Void?, Void?, CameraController?>? = null
+
     // background task used for closing camera
     private var closeCameraTask: CloseCameraTask? = null
+
     // whether we have permissions necessary to operate the camera (camera, storage); assume true until we've been denied one of them
     private var hasPermissions = true
 
@@ -288,6 +290,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     private var videoFileInfo = VideoFileInfo()
+
     // used for Android 8+ to handle seamless restart (see MediaRecorder.setNextOutputFile())
     private var nextVideoFileInfo: VideoFileInfo? = null
 
@@ -382,14 +385,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     var maxZoom: Int = 0
         private set
-    private val gestureDetector: GestureDetector
-    private val scaleGestureDetector: ScaleGestureDetector
     private var zoomRatios: List<Int>? = null
     var minimumFocusDistance: Float = 0f
         private set
-    private var touchWasMultitouch = false
-    private var touchOrigX = 0f
-    private var touchOrigY = 0f
 
     var supportedFlashValues: List<String>? = null // our "values" format
         private set
@@ -563,16 +561,16 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var isTestJunit4 = false
 
     @Volatile
-    var count_cameraStartPreview: Int = 0
+    var countCameraStartPreview: Int = 0
 
     @Volatile
-    var count_cameraAutoFocus: Int = 0
+    var countCameraAutoFocus: Int = 0
 
     @Volatile
-    var count_cameraTakePicture: Int = 0
+    var countCameraTakePicture: Int = 0
 
     @Volatile
-    var count_cameraContinuousFocusMoving: Int = 0
+    var countCameraContinuousFocusMoving: Int = 0
 
     @Volatile
     var testFailOpenCamera: Boolean = false
@@ -584,10 +582,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     var testVideoIoexception: Boolean = false
 
     @Volatile
-    var testVideoCameracontrollerexception: Boolean = false
+    var testVideoCameraControllerException: Boolean = false
 
+    // set from MySurfaceView or CanvasView
     @Volatile
-    var testTickerCalled: Boolean = false // set from MySurfaceView or CanvasView
+    var testTickerCalled: Boolean = false
 
     @Volatile
     var testCalledNextOutputFile: Boolean = false
@@ -602,13 +601,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     @Volatile
     var testBurstResolution: Boolean = false
 
+    /*private fun previewToCamera(coords: MutableList<Float>) {
+        val alpha = coords[0] / cameraSurface.view.width.toFloat()
+        val beta = coords[1] / cameraSurface.view.height.toFloat()
+        coords[0] = 2000.0f * alpha - 1000.0f
+        coords[1] = 2000.0f * beta - 1000.0f
+    }*/
+
     private val resources: Resources
-        /*private fun previewToCamera(coords: MutableList<Float>) {
-            val alpha = coords[0] / cameraSurface.view.width.toFloat()
-            val beta = coords[1] / cameraSurface.view.height.toFloat()
-            coords[0] = 2000.0f * alpha - 1000.0f
-            coords[1] = 2000.0f * beta - 1000.0f
-        }*/
         get() = cameraSurface.view.resources
 
     val view: View
@@ -620,58 +620,35 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private fun calculateCameraToPreviewMatrix() {
         if (MyDebug.LOG) Log.d(TAG, "calculateCameraToPreviewMatrix")
         if (cameraController == null) return
-        _cameraToPreviewMatrix.reset()
-        if (!usingAndroidL) {
-            // see http://developer.android.com/reference/android/hardware/Camera.Face.html#rect
-            // Need mirror for front camera
-            val mirror = (cameraController!!.facing === Facing.FACING_FRONT)
-            _cameraToPreviewMatrix.setScale((if (mirror) -1 else 1).toFloat(), 1f)
-            val displayOrientation: Int = cameraController!!.displayOrientation
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "orientation of display relative to camera orientation: $displayOrientation"
-                )
-            }
-            _cameraToPreviewMatrix.postRotate(displayOrientation.toFloat())
-        } else {
-            // Unfortunately the transformation for Android L API isn't documented, but this seems to work for Nexus 6.
-            // This is the equivalent code for android.hardware.Camera.setDisplayOrientation, but we don't actually use setDisplayOrientation()
-            // for CameraController2, except testing on Nexus 6 shows that we shouldn't change "result" for front facing camera.
-            val mirror = (cameraController!!.facing === Facing.FACING_FRONT)
-            _cameraToPreviewMatrix.setScale(1f, (if (mirror) -1 else 1).toFloat())
-            val degrees = getDisplayRotationDegrees(false)
-            val result: Int = (cameraController!!.cameraOrientation - degrees + 360) % 360
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "orientation of display relative to natural orientation: $degrees"
-                )
-                Log.d(
-                    TAG,
-                    "orientation of display relative to camera orientation: $result"
-                )
-            }
-            _cameraToPreviewMatrix.postRotate(result.toFloat())
-        }
-        // Camera driver coordinates range from (-1000, -1000) to (1000, 1000).
-        // UI coordinates range from (0, 0) to (width, height).
-        _cameraToPreviewMatrix.postScale(
-            cameraSurface.view.width / 2000f,
-            cameraSurface.view.height / 2000f
+        val dimensions = ViewportDimensions(
+            surfaceWidth = cameraSurface.view.width,
+            surfaceHeight = cameraSurface.view.height,
+            previewWidth = previewW,
+            previewHeight = previewH,
+            displayRotationDegrees = getDisplayRotationDegrees(false),
+            cameraOrientation = cameraController!!.cameraOrientation,
+            displayOrientation = cameraController!!.displayOrientation,
+            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
+            isUsingCamera2 = usingAndroidL
         )
-        _cameraToPreviewMatrix.postTranslate(
-            cameraSurface.view.width / 2f,
-            cameraSurface.view.height / 2f
-        )
+        _cameraToPreviewMatrix.set(PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dimensions))
     }
 
     private fun calculatePreviewToCameraMatrix() {
         if (cameraController == null) return
+        val dimensions = ViewportDimensions(
+            surfaceWidth = cameraSurface.view.width,
+            surfaceHeight = cameraSurface.view.height,
+            previewWidth = previewW,
+            previewHeight = previewH,
+            displayRotationDegrees = getDisplayRotationDegrees(false),
+            cameraOrientation = cameraController!!.cameraOrientation,
+            displayOrientation = cameraController!!.displayOrientation,
+            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
+            isUsingCamera2 = usingAndroidL
+        )
+        _previewToCameraMatrix.set(PreviewMatrixCalculator.calculatePreviewToCameraMatrix(dimensions))
         calculateCameraToPreviewMatrix()
-        if (!_cameraToPreviewMatrix.invert(_previewToCameraMatrix)) {
-            if (MyDebug.LOG) Log.d(TAG, "calculatePreviewToCameraMatrix failed to invert matrix!?")
-        }
     }
 
     private fun getCameraToPreviewMatrix(): Matrix {
@@ -679,41 +656,87 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         return _cameraToPreviewMatrix
     }
 
-    /*Matrix getPreviewToCameraMatrix() {
-       calculatePreviewToCameraMatrix();
-       return previewToCameraMatrix;
-   }*/
-    /** Return a focus area from supplied point. Supplied coordinates should be in camera
-     * coordinates.
-     */
+    /** Return a focus area from supplied point. Supplied coordinates should be in camera coordinates. */
     private fun getAreas(focusX: Float, focusY: Float): ArrayList<CameraController.Area> {
-        val focusSize = 50
-        if (MyDebug.LOG) {
-            Log.d(TAG, "focus x, y: $focusX, $focusY")
-        }
-        val rect = Rect()
-        rect.left = focusX.toInt() - focusSize
-        rect.right = focusX.toInt() + focusSize
-        rect.top = focusY.toInt() - focusSize
-        rect.bottom = focusY.toInt() + focusSize
-        if (rect.left < -1000) {
-            rect.left = -1000
-            rect.right = rect.left + 2 * focusSize
-        } else if (rect.right > 1000) {
-            rect.right = 1000
-            rect.left = rect.right - 2 * focusSize
-        }
-        if (rect.top < -1000) {
-            rect.top = -1000
-            rect.bottom = rect.top + 2 * focusSize
-        } else if (rect.bottom > 1000) {
-            rect.bottom = 1000
-            rect.top = rect.bottom - 2 * focusSize
-        }
+        return PreviewMatrixCalculator.calculateFocusAreas(
+            focusX,
+            focusY,
+            focusSize = 50,
+            weight = 1000
+        )
+    }
 
-        val areas: ArrayList<CameraController.Area> = ArrayList()
-        areas.add(CameraController.Area(rect, 1000))
-        return areas
+    private var hasMultitouchStartZoomFactor = false
+    private var multitouchStartZoomFactor = 0
+
+    private val touchGestureCoordinator: PreviewTouchGestureCoordinator by lazy {
+        PreviewTouchGestureCoordinator(context, object : PreviewTouchCallback {
+            override fun onSingleTouch(event: MotionEvent, wasPaused: Boolean): Boolean {
+                return handleSingleTouch(event, wasPaused)
+            }
+
+            override fun onScaleZoom(scaleFactor: Float) {
+                if (cameraController != null && hasZoom) {
+                    (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.setZoom(
+                        scaleFactor
+                    )
+                    scaleZoom(scaleFactor)
+                }
+            }
+
+            override fun onScaleBegin() {
+                if (hasZoom && cameraController != null) {
+                    hasMultitouchStartZoomFactor = true
+                    multitouchStartZoomFactor = cameraController!!.zoom
+                    hasSmoothZoom = true
+                    smoothZoom = zoomRatios!![multitouchStartZoomFactor] / 100.0f
+                } else {
+                    hasMultitouchStartZoomFactor = false
+                    multitouchStartZoomFactor = 0
+                    hasSmoothZoom = false
+                    smoothZoom = 1.0f
+                }
+            }
+
+            override fun onScaleEnd() {
+                if (hasMultitouchStartZoomFactor && hasZoom && cameraController != null && zoomRatios != null && zoomRatios!!.isNotEmpty() && zoomRatios!![0] < 100) {
+                    val startZoom = zoomRatios!![multitouchStartZoomFactor]
+                    val endZoomFactor: Int = cameraController!!.zoom
+                    val endZoom = zoomRatios!![endZoomFactor]
+                    if (endZoom in 90..110 && startZoom != 100 && endZoom != 100) {
+                        val startDiff = startZoom - 100
+                        val endDiff = endZoom - 100
+                        if (!(kotlin.math.sign(startDiff.toDouble()) == kotlin.math.sign(endDiff.toDouble()) && abs(
+                                endDiff.toDouble()
+                            ) >= abs(startDiff.toDouble()))
+                        ) {
+                            val snappedZoom = find1xZoom()
+                            zoomTo(snappedZoom, false)
+                        }
+                    }
+                }
+                hasMultitouchStartZoomFactor = false
+                multitouchStartZoomFactor = 0
+                hasSmoothZoom = false
+                smoothZoom = 1.0f
+            }
+
+            override fun onDoubleTap(): Boolean {
+                return this@Preview.onDoubleTap()
+            }
+
+            override fun shouldTakePhotoOnDoubleTap(): Boolean {
+                return takePhotoOnDoubleTap()
+            }
+
+            override fun isTouchCaptureEnabled(): Boolean {
+                return applicationInterface.getTouchCapturePref()
+            }
+
+            override fun onClearFakeToast() {
+                clearActiveFakeToast()
+            }
+        })
     }
 
     fun touchEvent(event: MotionEvent): Boolean {
@@ -721,81 +744,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             TAG,
             "touch event at : " + event.x + " , " + event.y + " at time " + event.eventTime
         )
-
-        // doesn't seem a bad idea to clear fake toasts (touching screen gets rid of standard toasts on Android 10+ at least)
-        this.clearActiveFakeToast()
-
         val wasPaused = this.previewStartedState != PREVIEW_STARTED
         if (MyDebug.LOG) Log.d(TAG, "was_paused: $wasPaused")
-
-        if (gestureDetector.onTouchEvent(event)) {
-            if (MyDebug.LOG) Log.d(TAG, "touch event handled by gestureDetector")
-            return true
-        }
-        scaleGestureDetector.onTouchEvent(event)
-        if (cameraController == null) {
-            if (MyDebug.LOG) Log.d(TAG, "received touch event, but camera not available")
-            return true
-        }
         applicationInterface.touchEvent(event)
-        /*if( MyDebug.LOG ) {
-			Log.d(TAG, "touch event: " + event.getAction());
-		}*/
-        if (event.pointerCount != 1) {
-            //multitouchTime = System.currentTimeMillis();
-            touchWasMultitouch = true
-            return true
-        }
-        if (event.action != MotionEvent.ACTION_UP) {
-            if (event.action == MotionEvent.ACTION_DOWN && event.pointerCount == 1) {
-                touchWasMultitouch = false
-                if (event.action == MotionEvent.ACTION_DOWN) {
-                    touchOrigX = event.x
-                    touchOrigY = event.y
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "touch down at $touchOrigX , $touchOrigY"
-                    )
-                }
-            }
-            return true
-        }
-
-        // now only have to handle MotionEvent.ACTION_UP from this point onwards
-        if (touchWasMultitouch) {
-            return true
-        }
-
-        // ignore swipes
-        run {
-            val x = event.x
-            val y = event.y
-            val diffX = x - touchOrigX
-            val diffY = y - touchOrigY
-            val dist2 = diffX * diffX + diffY * diffY
-            val scale = resources.displayMetrics.density
-            val tol = 31 * scale + 0.5f // convert dps to pixels (about 0.5cm)
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "touched from $touchOrigX , $touchOrigY to $x , $y"
-                )
-                Log.d(TAG, "dist: " + sqrt(dist2.toDouble()))
-                Log.d(TAG, "tol: $tol")
-            }
-            if (dist2 > tol * tol) {
-                if (MyDebug.LOG) Log.d(TAG, "touch was a swipe")
-                return true
-            }
-        }
-
-        if (takePhotoOnDoubleTap()) {
-            // need to wait until onSingleTapConfirmed() before calling handleSingleTouch(), e.g., don't
-            // want to do touch-to-focus if this is part of a double tap
-            return true
-        }
-
-        return handleSingleTouch(event, wasPaused)
+        return touchGestureCoordinator.onTouchEvent(
+            event,
+            wasPaused,
+            isCameraAvailable = (cameraController != null)
+        )
     }
 
     private fun handleSingleTouch(event: MotionEvent, wasPaused: Boolean): Boolean {
@@ -906,77 +862,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         return this.hasSmoothZoom
     }
 
-    /** Handle multitouch zoom.
-     */
-    private inner class ScaleListener : SimpleOnScaleGestureListener() {
-        private var hasMultitouchStartZoomFactor = false
-        private var multitouchStartZoomFactor = 0
-
-        override fun onScale(detector: ScaleGestureDetector): Boolean {
-            if (this@Preview.cameraController != null && this@Preview.hasZoom) {
-                var scaleFactor = detector.scaleFactor
-                if (MyDebug.LOG) Log.d(TAG, "onScale: $scaleFactor")
-                // make pinch zoom more sensitive:
-                if (touchWasMultitouch) scaleFactor = 1.0f + 2.0f * (scaleFactor - 1.0f)
-                (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.setZoom(
-                    scaleFactor
-                )
-                this@Preview.scaleZoom(scaleFactor)
-            }
-            return true
-        }
-
-        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-            if (hasZoom && cameraController != null) {
-                hasMultitouchStartZoomFactor = true
-                multitouchStartZoomFactor = cameraController!!.zoom
-                hasSmoothZoom = true
-                smoothZoom = zoomRatios!![multitouchStartZoomFactor] / 100.0f
-            } else {
-                hasMultitouchStartZoomFactor = false
-                multitouchStartZoomFactor = 0
-                hasSmoothZoom = false
-                smoothZoom = 1.0f
-            }
-            return true
-        }
-
-        override fun onScaleEnd(detector: ScaleGestureDetector) {
-            if (MyDebug.LOG) Log.d(TAG, "onScaleEnd")
-            if (hasMultitouchStartZoomFactor && hasZoom && cameraController != null && zoomRatios!![0] < 100) {
-                // when the minimum zoom is less than 1x, we should support snapping to 1x, so it's easy for the user to
-                // switch back to 1x zoom when using pinch zoom
-                val startZoom = zoomRatios!![multitouchStartZoomFactor]
-                val endZoomFactor: Int = cameraController!!.zoom
-                val endZoom = zoomRatios!![endZoomFactor]
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "start_zoom: $startZoom")
-                    Log.d(TAG, "end_zoom  : $endZoom")
-                }
-                if (endZoom >= 90 && endZoom <= 110 && startZoom != 100 && endZoom != 100) {
-                    val startDiff = startZoom - 100
-                    val endDiff = endZoom - 100
-                    if (sign(startDiff.toDouble()) == sign(endDiff.toDouble()) && abs(endDiff.toDouble()) >= abs(
-                            startDiff.toDouble()
-                        )
-                    ) {
-                        // we only want to snap when moving towards 1x, or have crossed over 1x
-                    } else {
-                        if (MyDebug.LOG) Log.d(TAG, "snapped pinch zoom to 1x zoom")
-                        val snappedZoom = find1xZoom()
-                        zoomTo(snappedZoom, false)
-                    }
-                }
-            }
-            hasMultitouchStartZoomFactor = false
-            multitouchStartZoomFactor = 0
-            hasSmoothZoom = false
-            smoothZoom = 1.0f
-        }
-    }
-
-    /** Returns whether we will take a photo on a double tap.
-     */
+    /** Returns whether we will take a photo on a double tap. */
     private fun takePhotoOnDoubleTap(): Boolean {
         return applicationInterface.getDoubleTapCapturePref()
     }
@@ -985,45 +871,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (MyDebug.LOG) Log.d(TAG, "onDoubleTap()")
         if (takePhotoOnDoubleTap()) {
             if (MyDebug.LOG) Log.d(TAG, "double-tap to capture")
-            // Interpret as if user had clicked take photo/video button.
-            // We go via ApplicationInterface instead of going direct to Preview.takePicturePressed(), so that
-            // the application can handle same as if user had pressed shutter button (needed so that this works
-            // correctly in Panorama mode).
             applicationInterface.requestTakePhoto()
             return true
         }
         if (applicationInterface.getTouchCapturePref()) {
-            // return true to disable double-tap-drag zoom gesture, as we don't want this when using single tap to capture either
             return true
         }
-        return false // important, so that double-tap-drag zoom gesture works
-    }
-
-    private inner class DoubleTapListener : SimpleOnGestureListener() {
-        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            if (MyDebug.LOG) Log.d(TAG, "onSingleTapConfirmed")
-            // If we're taking a photo on double tap, then for single taps we need to wait until these are confirmed
-            // otherwise we handle via Preview.touchEvent().
-            // Arguably we could handle everything via onSingleTapConfirmed(), but want to avoid
-            // unexpected changes of behavior - plus it would mean a slight delay for touch to
-            // focus (since onSingleTapConfirmed obviously has to wait to be sure this isn't a
-            // double tap).
-            if (takePhotoOnDoubleTap()) {
-                // now safe to handle the single touch
-                val wasPaused = this@Preview.previewStartedState != PREVIEW_STARTED
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "was_paused: $wasPaused"
-                )
-                return handleSingleTouch(e, wasPaused)
-            }
-            return false
-        }
-
-        override fun onDoubleTap(e: MotionEvent): Boolean {
-            if (MyDebug.LOG) Log.d(TAG, "onDoubleTap")
-            return this@Preview.onDoubleTap()
-        }
+        return false
     }
 
     fun clearFocusAreas() {
@@ -1051,81 +905,28 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             spec[1] = heightSpec
             return
         }
-        var aspectRatio = this.aspectRatio
-
-        var previewWidth = MeasureSpec.getSize(widthSpec)
-        var previewHeight = MeasureSpec.getSize(heightSpec)
-        if (MyDebug.LOG) {
-            Log.d(TAG, "previewWidth: $previewWidth")
-            Log.d(TAG, "previewHeight: $previewHeight")
-        }
-
-        // Get the padding of the border background.
         val hPadding: Int = cameraSurface.view.paddingLeft + cameraSurface.view.paddingRight
         val vPadding: Int = cameraSurface.view.paddingTop + cameraSurface.view.paddingBottom
+        val previewWidth = MeasureSpec.getSize(widthSpec) - hPadding
+        val previewHeight = MeasureSpec.getSize(heightSpec) - vPadding
 
-        // Resize the preview frame with correct aspect ratio.
-        previewWidth -= hPadding
-        previewHeight -= vPadding
-
-        val result: Int
-        if (cameraController != null) {
-            // We shouldn't assume that previewWidth > previewHeight means the device is in landscape
-            // orientation - this isn't necessarily true for split-screen or multi-window mode.
-            // Important to use preferLater==true, as in split-screen or multi-window mode, we don't always get a call
-            // to MainActivity.onConfigurationChanged() when device orientation changes, so have no way to know to
-            // reset the cached rotation. But we want the latest rotation value here anyway.
+        val result: Int = if (cameraController != null) {
             val degrees = getDisplayRotationDegrees(true)
-            result = (cameraController!!.cameraOrientation - degrees + 360) % 360
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "orientation of display relative to natural orientation: $degrees"
-                )
-                Log.d(
-                    TAG,
-                    "orientation of display relative to camera orientation: $result"
-                )
-            }
+            (cameraController!!.cameraOrientation - degrees + 360) % 360
         } else {
-            // fall back to guessing via the window dimensions
-            result = if (previewWidth > previewHeight) 0 else 90
-        }
-        if (MyDebug.LOG) Log.d(TAG, "aspect_ratio: $aspectRatio")
-        if (result % 180 != 0) {
-            // Usually this means the device is in portrait mode, and hence e.g. an aspect ratio of
-            // 4:3 should give an on-screen preview of 3:4 (since the device is rotated 90 degrees
-            // compared to the natural camera orientation).
-            // It's important to use this code instead of checking if the display is in portrait
-            // (or that previewWidth < previewHeight), for split-screen or multi-window displays.
-            // E.g., if the device orientation is in portrait, it might still be that Open Kamera
-            // is running in landscape with previewWidth > previewHeight, because of running in
-            // split-screen mode, or more generally in multi-window mode where the window is resized
-            // to landscape orientation.
-            // See https://developer.android.com/training/camera2/camera-preview#relative_rotation .
-            aspectRatio = 1.0f / aspectRatio
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "aspect_ratio rotated to: $aspectRatio"
-            )
+            if (previewWidth > previewHeight) 0 else 90
         }
 
-        if (previewWidth > previewHeight * aspectRatio) {
-            previewWidth = (previewHeight.toDouble() * aspectRatio).toInt()
-        } else {
-            previewHeight = (previewWidth.toDouble() / aspectRatio).toInt()
-        }
-        if (MyDebug.LOG) {
-            Log.d(TAG, "previewWidth is now: $previewWidth")
-            Log.d(TAG, "previewHeight is now: $previewHeight")
-        }
-
-        // Add the padding of the border.
-        previewWidth += hPadding
-        previewHeight += vPadding
-
-        spec[0] = MeasureSpec.makeMeasureSpec(previewWidth, MeasureSpec.EXACTLY)
-        spec[1] = MeasureSpec.makeMeasureSpec(previewHeight, MeasureSpec.EXACTLY)
+        val pair = ViewportTransformHelper.calculateMeasureSpec(
+            widthSpec = widthSpec,
+            heightSpec = heightSpec,
+            aspectRatio = this.aspectRatio,
+            hPadding = hPadding,
+            vPadding = vPadding,
+            relativeRotation = result
+        )
+        spec[0] = pair.first
+        spec[1] = pair.second
         if (MyDebug.LOG) Log.d(TAG, "return: " + spec[0] + " x " + spec[1])
     }
 
@@ -1188,18 +989,18 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     override fun onSurfaceTextureAvailable(arg0: SurfaceTexture, width: Int, height: Int) {
         if (MyDebug.LOG) Log.d(TAG, "onSurfaceTextureAvailable()")
-        this.setTextureviewSize = true
-        this.textureviewW = width
-        this.textureviewH = height
+        this.setTextureViewSize = true
+        this.textureViewW = width
+        this.textureViewH = height
         mySurfaceCreated()
     }
 
     override fun onSurfaceTextureDestroyed(arg0: SurfaceTexture): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "onSurfaceTextureDestroyed()")
         (applicationInterface.context as? com.hightechif.openkamera.MainActivity)?.cameraViewModel?.detachSurface()
-        this.setTextureviewSize = false
-        this.textureviewW = 0
-        this.textureviewH = 0
+        this.setTextureViewSize = false
+        this.textureViewW = 0
+        this.textureViewH = 0
         mySurfaceDestroyed()
         return true
     }
@@ -1229,9 +1030,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             }
         }
 
-        this.setTextureviewSize = true
-        this.textureviewW = width
-        this.textureviewH = height
+        this.setTextureViewSize = true
+        this.textureViewW = width
+        this.textureViewH = height
         mySurfaceChanged()
         configureTransform()
         recreatePreviewBitmap()
@@ -1243,45 +1044,29 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     private fun configureTransform() {
         if (MyDebug.LOG) Log.d(TAG, "configureTransform")
-        if (cameraController == null || !this.setPreviewSize || !this.setTextureviewSize) {
+        if (cameraController == null || !this.setPreviewSize || !this.setTextureViewSize) {
             if (MyDebug.LOG) Log.d(TAG, "nothing to do")
             return
         }
         if (MyDebug.LOG) {
             Log.d(
                 TAG,
-                "textureview size: $textureviewW, $textureviewH"
+                "textureview size: $textureViewW, $textureViewH"
             )
             Log.d(TAG, "preview size: $previewW, $previewH")
         }
-        // Important to use preferLater==true, as in split-screen or multi-window mode, we don't always get a call
-        // to MainActivity.onConfigurationChanged() when device orientation changes, so have no way to know to
-        // reset the cached rotation. But we want the latest rotation value here anyway.
         val rotation: Int = applicationInterface.getDisplayRotation(true)
         if (MyDebug.LOG) Log.d(
             TAG,
             "configureTransform rotation: $rotation"
         )
-        val matrix = Matrix()
-        val viewRect = RectF(
-            0f, 0f, textureviewW.toFloat(),
-            textureviewH.toFloat()
+        val matrix = ViewportTransformHelper.calculateTextureTransform(
+            textureViewWidth = textureViewW,
+            textureViewHeight = textureViewH,
+            previewWidth = previewW,
+            previewHeight = previewH,
+            displayRotation = rotation
         )
-        val bufferRect = RectF(0f, 0f, previewH.toFloat(), previewW.toFloat())
-        val centerX = viewRect.centerX()
-        val centerY = viewRect.centerY()
-        if (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) {
-            bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY())
-            matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL)
-            val scale = max(
-                (textureviewH.toFloat() / previewH).toDouble(),
-                (textureviewW.toFloat() / previewW).toDouble()
-            ).toFloat()
-            matrix.postScale(scale, scale, centerX, centerY)
-            matrix.postRotate((90 * (rotation - 2)).toFloat(), centerX, centerY)
-        } else if (rotation == Surface.ROTATION_180) {
-            matrix.postRotate(180f, centerX, centerY)
-        }
         cameraSurface.setTransform(matrix)
     }
 
@@ -1354,7 +1139,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         videoRecorder!!.release()
         videoRecorder = null
         videoRecorderIsPaused = false
-        applicationInterface.cameraInOperation(false, true)
+        applicationInterface.cameraInOperation(inOperation = false, isVideo = true)
         reconnectCamera(false) // n.b., if something went wrong with video, then we reopen the camera - which may fail (or simply not reopen, e.g., if app is now paused)
         val validVideoToBroadcast =
             videoFileInfo.videoUri != null || !videoFileInfo.videoFilename.isNullOrEmpty()
@@ -1397,7 +1182,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 videoAccumulatedTime += lastTime
                 if (MyDebug.LOG) {
                     Log.d(TAG, "last_time: $lastTime")
-                    Log.d(TAG, "video_accumulated_time is now: " + videoAccumulatedTime)
+                    Log.d(TAG, "video_accumulated_time is now: $videoAccumulatedTime")
                 }
             } else {
                 videoAccumulatedTime = 0
@@ -1432,7 +1217,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     var toast: String? = null
                     if (!dueToMaxFilesize) toast =
                         remainingRestartVideo.toString() + " " + context.resources.getString(R.string.repeats_to_go)
-                    takePicture(dueToMaxFilesize, false, false)
+                    takePicture(
+                        maxFilesizeRestart = dueToMaxFilesize,
+                        photoSnapshot = false,
+                        continuousFastBurst = false
+                    )
                     if (!dueToMaxFilesize) {
                         showToast(
                             clearToast = null,
@@ -1478,7 +1267,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 }
             }
             try {
-                tryAutoFocus(false, false)
+                tryAutoFocus(startup = false, manual = false)
             } catch (e: RuntimeException) {
                 if (MyDebug.LOG) Log.e(TAG, "tryAutoFocus() threw exception: " + e.message)
                 e.printStackTrace()
@@ -1503,18 +1292,18 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     private inner class CloseCameraTask(
-        cameraControllerLocal: CameraController,
+        val cameraControllerLocal: CameraController,
         val closeCameraCallback: CloseCameraCallback?
     ) : AsyncTask<Void?, Void?, Void?>() {
         var reopen: Boolean = false // if set to true, reopen the camera once closed
-        val cameraControllerLocal: CameraController = cameraControllerLocal
-        private val TAG = "CloseCameraTask"
+
+        private val tag = "CloseCameraTask"
 
         override fun doInBackground(vararg voids: Void?): Void? {
             var debugTime: Long = 0
             if (MyDebug.LOG) {
                 Log.d(
-                    TAG,
+                    tag,
                     "doInBackground, async task: $this"
                 )
                 debugTime = System.currentTimeMillis()
@@ -1522,14 +1311,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             cameraControllerLocal.stopPreview()
             if (MyDebug.LOG) {
                 Log.d(
-                    TAG,
+                    tag,
                     "time to stop preview: " + (System.currentTimeMillis() - debugTime)
                 )
             }
             cameraControllerLocal.release()
             if (MyDebug.LOG) {
                 Log.d(
-                    TAG,
+                    tag,
                     "time to release camera controller: " + (System.currentTimeMillis() - debugTime)
                 )
             }
@@ -1540,24 +1329,24 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
          * the result from doInBackground()  */
         override fun onPostExecute(result: Void?) {
             if (MyDebug.LOG) Log.d(
-                TAG,
+                tag,
                 "onPostExecute, async task: $this"
             )
             cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
             closeCameraTask = null // just to be safe
             if (closeCameraCallback != null) {
                 if (MyDebug.LOG) Log.d(
-                    TAG,
+                    tag,
                     "onPostExecute, calling closeCameraCallback.onClosed"
                 )
                 closeCameraCallback.onClosed()
             }
             if (reopen) {
-                if (MyDebug.LOG) Log.d(TAG, "onPostExecute, reOpen Kamera")
+                if (MyDebug.LOG) Log.d(tag, "onPostExecute, reOpen Kamera")
                 openCamera()
             }
             if (MyDebug.LOG) Log.d(
-                Companion.TAG,
+                TAG,
                 "onPostExecute done, async task: $this"
             )
         }
@@ -2184,13 +1973,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     /** Returns true iff we've tried to open the camera (whether it was successful).
      */
-    fun OpenKameraAttempted(): Boolean {
+    fun openCameraAttempted(): Boolean {
         return cameraOpenState == CameraOpenState.CAMERAOPENSTATE_OPENED
     }
 
     /** Returns true iff we've tried to open the camera, and were unable to do so.
      */
-    fun OpenKameraFailed(): Boolean {
+    fun openCameraFailed(): Boolean {
         return cameraOpenState == CameraOpenState.CAMERAOPENSTATE_OPENED && cameraController == null
     }
 
@@ -2494,7 +2283,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             val handler = Handler()
             handler.postDelayed({
                 if (MyDebug.LOG) Log.d(TAG, "do automatic take picture")
-                takePicture(false, false, false)
+                takePicture(
+                    maxFilesizeRestart = false,
+                    photoSnapshot = false,
+                    continuousFastBurst = false
+                )
             }, delay.toLong())
         }
 
@@ -3105,10 +2898,10 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 // if in manual ISO mode, we still want to get the valid exposure compensations, but shouldn't set exposure compensation
                 if (!isManualIso) {
                     var exposure: Int = applicationInterface.getExposureCompensationPref()
-                    if (exposure < minExposure || exposure > maxExposure) {
+                    if (exposure !in minExposure..maxExposure) {
                         exposure = 0
                         if (MyDebug.LOG) Log.d(TAG, "saved exposure not supported, reset to 0")
-                        if (exposure < minExposure || exposure > maxExposure) {
+                        if (exposure !in minExposure..maxExposure) {
                             if (MyDebug.LOG) Log.d(
                                 TAG,
                                 "zero isn't an allowed exposure?! reset to min $minExposure"
@@ -3856,7 +3649,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 val camProfile: CamcorderProfile?
                 val cameraId: Int = cameraController!!.cameraId
 
-                // videoHighSpeed should only be for Camera2, where we don't support force4k option, but
+                // videoHighSpeed should only be for Camera2, where we don't support force 4k option, but
                 // put the check here just in case - don't want to be forcing 4K resolution if high speed
                 // frame rate!
                 val isFront = cameraController?.facing === Facing.FACING_FRONT
@@ -4192,7 +3985,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     fun getOptimalPreviewSize(sizes: List<CameraController.Size>?): CameraController.Size? {
         if (MyDebug.LOG) Log.d(TAG, "getOptimalPreviewSize()")
-        val ASPECT_TOLERANCE = 0.05
+        val aspectTolerance = 0.05
         if (sizes == null) return null
         if (isVideo && videoHighSpeed) {
             val profile: VideoProfile = videoProfile
@@ -4248,7 +4041,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 }
             }
             val ratio: Double = size.width.toDouble() / size.height
-            if (abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue
+            if (abs(ratio - targetRatio) > aspectTolerance) continue
             if (abs(size.height - targetHeight) < minDiff) {
                 optimalSize = size
                 minDiff = abs(size.height - targetHeight).toDouble()
@@ -4746,7 +4539,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 val focusValue: String = applicationInterface.getFocusPref(isVideo)
                 if (focusValue.isNotEmpty()) {
                     cameraController!!.focusValue =
-                        focusValue // in case using focus bracketing in auto focus mode
+                        focusValue // in case using focus bracketing in autofocus mode
                 }
             }
         }
@@ -4954,7 +4747,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         } else if (this.isVideo) {
             // For Nexus 5 and Nexus 6, we need to set the preview fps using matchPreviewFpsToVideo to avoid problem of dark preview in low light, as described above.
             // When the video recording starts, the preview automatically adjusts, but still good to avoid too-dark preview before the user starts recording.
-            // However I'm wary of changing the behavior for all devices at the moment, since some devices can be
+            // However, I'm wary of changing the behavior for all devices at the moment, since some devices can be
             // very picky about what works when it comes to recording video - e.g., corruption in preview or resultant video.
             // So for now, I'm just fixing the Nexus 5/6 behavior without changing behavior for other devices. Later we can test on other devices, to see if we can
             // use chooseBestPreviewFps() more widely.
@@ -4984,10 +4777,10 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     matchPreviewFpsToVideo(fpsRanges, (profile.videoCaptureRate * 1000).toInt())
             }
         } else {
-            // note that setting an fps here in continuous video focus mode causes preview to not restart after taking a photo on Galaxy Nexus
-            // but we need to do this, to get good light for Nexus 5 or 6
-            // we could hardcode behavior like we do for video, but this is the same way that Google Camera chooses preview fps for photos
-            // or I could hardcode behavior for Galaxy Nexus, but since it's an old device (and an obscure bug anyway - most users don't really need continuous focus in photo mode), better to live with the bug rather than complicating the code
+            // note that setting a fps here in continuous video focus mode causes preview to not restart after taking a photo on Galaxy Nexus
+            // but, we need to do this, to get good light for Nexus 5 or 6
+            // we could hard-code behavior like we do for video, but this is the same way that Google Camera chooses preview fps for photos,
+            // or I could hard-code behavior for Galaxy Nexus, but since it's an old device (and an obscure bug anyway - most users don't really need continuous focus in photo mode), better to live with the bug rather than complicating the code
             // Update for v1.29: this doesn't seem to happen on Galaxy Nexus with continuous picture focus mode, which is what we now use
             // Update for v1.31: we no longer seem to need this for old API - I no longer get a dark preview in photo or video mode if we don't set the fps range;
             // but leaving the code as it is, to be safe.
@@ -5168,7 +4961,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         return oldFocusMode
     }
 
-    /** If we've switch to video mode, ensures that we're not in a flash mode other than torch.
+    /** If we've switched to video mode, ensures that we're not in a flash mode other than torch.
      * This only changes the internal user setting, we don't tell the application interface to change
      * the flash mode.
      */
@@ -5352,13 +5145,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     val currentFlashValue: String?
-        // this returns the flash value indicated by the UI, rather than from the camera parameters (may be different, e.g., in startup autofocus!)
+        // this returns the flash value indicated by the UI, rather than from the camera parameters (maybe different, e.g., in startup autofocus!)
         get() {
             if (this.currentFlashIndex == -1) return null
             return supportedFlashValues!![currentFlashIndex]
         }
 
-    // this returns the flash mode indicated by the UI, rather than from the camera parameters (may be different, e.g., in startup autofocus!)
+    // this returns the flash mode indicated by the UI, rather than from the camera parameters (maybe different, e.g., in startup autofocus!)
     /*public String getCurrentFlashMode() {
 		if( currentFlashIndex == -1 )
 			return null;
@@ -5514,7 +5307,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 override fun onContinuousFocusMove(start: Boolean) {
                     if (start != continuousFocusMoveIsStarted) { // filter out repeated calls with same start value
                         continuousFocusMoveIsStarted = start
-                        count_cameraContinuousFocusMoving++
+                        countCameraContinuousFocusMoving++
                         applicationInterface.onContinuousFocusMove(start)
                     }
                 }
@@ -6044,7 +5837,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             cameraController!!.unlock()
             if (MyDebug.LOG) Log.d(TAG, "set video listeners")
 
-            localVideoRecorder.setOnInfoListener { mr, what, extra ->
+            localVideoRecorder.setOnInfoListener { _, what, extra -> // mr, what, extra
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "MediaRecorder info: $what extra: $extra"
@@ -6054,7 +5847,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     onVideoInfo(what, extra)
                 }
             }
-            localVideoRecorder.setOnErrorListener { mr, what, extra ->
+            localVideoRecorder.setOnErrorListener { _, what, extra -> // mr, what, extra
                 val activity = context as Activity
                 activity.runOnUiThread { // we run on main thread to avoid problem of camera closing at the same time
                     onVideoError(what, extra)
@@ -6160,7 +5953,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     localVideoRecorder,
                     wantPhotoVideoRecording
                 )
-                if (testVideoCameracontrollerexception) {
+                if (testVideoCameraControllerException) {
                     if (MyDebug.LOG) Log.d(TAG, "test_video_cameracontrollerexception is true")
                     throw CameraControllerException()
                 }
@@ -6332,7 +6125,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
         if (applicationInterface.getVideoLowPowerCheckPref()) {
             /* When a device shuts down due to power off, the application will receive shutdown signals, and normally the video
-             * should stop and be valid. However it can happen that the video ends up corrupted (I've had people telling me this
+             * should stop and be valid. However, it can happen that the video ends up corrupted (I've had people telling me this
              * can happen; Googling finds plenty of stories of this happening on Android devices). I think the issue is that for
              * very large videos, a lot of time is spent processing during the MediaRecorder.stop() call - if that doesn't complete
              * by the time the device switches off, the video may be corrupt.
@@ -6372,7 +6165,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                                 showToast(
                                     null,
                                     toast
-                                ) // show the toast afterwards, as we're hogging the UI thread here, and media recorder takes time to stop
+                                ) // show the toast afterward, as we're hogging the UI thread here, and media recorder takes time to stop
                             } else {
                                 if (MyDebug.LOG) Log.d(
                                     TAG,
@@ -6497,7 +6290,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 )
                 // we call via autoFocus(), to avoid risk of taking photo while the continuous focus is focusing - risk of blurred photo, also sometimes get bug in such situations where we end of repeatedly focusing
                 // this is the case even if skipAutofocus is true (as we still can't guarantee that continuous focusing might be occurring)
-                // note: if the user touches to focus in continuous mode, we camera controller may be in auto focus mode, so we should only enter this codepath if the cameraController is in continuous focus mode
+                // note: if the user touches to focus in continuous mode, the camera controller may be in autofocus mode, so we should only enter this codepath if the cameraController is in continuous focus mode
                 val autoFocusCallback: CameraController.AutoFocusCallback =
                     object : CameraController.AutoFocusCallback {
                         override fun onAutoFocus(success: Boolean) {
@@ -6553,7 +6346,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     }
                 if (MyDebug.LOG) Log.d(TAG, "start autofocus to take picture")
                 cameraController!!.autoFocus(autoFocusCallback, true)
-                count_cameraAutoFocus++
+                countCameraAutoFocus++
             }
         } else {
             takePhotoWhenFocused(continuousFastBurst)
@@ -6589,7 +6382,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * set to true (so that things work okay in continuous picture focus mode).
      */
     private fun takePhotoWhenFocused(continuousFastBurst: Boolean) {
-        // should be called when auto-focused
+        // should be called when autofocused
         if (MyDebug.LOG) Log.d(TAG, "takePhotoWhenFocused")
         if (cameraController == null) {
             if (MyDebug.LOG) Log.d(TAG, "camera not opened!")
@@ -6811,11 +6604,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             object : CameraController.ErrorCallback {
                 override fun onError() {
                     if (MyDebug.LOG) Log.e(TAG, "error from takePicture")
-                    count_cameraTakePicture-- // cancel out the increment from after the takePicture() call
+                    countCameraTakePicture-- // cancel out the increment from after the takePicture() call
                     if (MyDebug.LOG) {
                         Log.d(
                             TAG,
-                            "count_cameraTakePicture is now: $count_cameraTakePicture"
+                            "count_cameraTakePicture is now: $countCameraTakePicture"
                         )
                     }
                     applicationInterface.onPhotoError()
@@ -6854,11 +6647,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
             if (MyDebug.LOG) Log.d(TAG, "about to call takePicture")
             cameraController!!.takePicture(pictureCallback, errorCallback)
-            count_cameraTakePicture++
+            countCameraTakePicture++
             if (MyDebug.LOG) {
                 Log.d(
                     TAG,
-                    "count_cameraTakePicture is now: $count_cameraTakePicture"
+                    "count_cameraTakePicture is now: $countCameraTakePicture"
                 )
             }
         }
@@ -6917,7 +6710,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     private fun tryAutoFocus(startup: Boolean, manual: Boolean) {
         // manual: whether user has requested autofocus (e.g., by touching screen, or volume focus, or hardware focus button)
-        // consider whether you want to call requestAutoFocus() instead (which properly cancels any in-progress auto-focus first)
+        // consider whether you want to call requestAutoFocus() instead (which properly cancels any in-progress autofocus first)
         if (MyDebug.LOG) {
             Log.d(TAG, "tryAutoFocus")
             Log.d(TAG, "startup? $startup")
@@ -6986,11 +6779,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 this.focusCompleteTime = -1
                 this.successfullyFocused = false
                 cameraController!!.autoFocus(autoFocusCallback, false)
-                count_cameraAutoFocus++
+                countCameraAutoFocus++
                 this.focusStartedTime = System.currentTimeMillis()
                 if (MyDebug.LOG) Log.d(
                     TAG,
-                    "autofocus started, count now: $count_cameraAutoFocus"
+                    "autofocus started, count now: $countCameraAutoFocus"
                 )
             } else if (hasFocusArea) {
                 // do this so we get the focus box, for focus modes that support focus area, but don't support autofocus
@@ -7132,7 +6925,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             setPreviewFps()
             try {
                 cameraController!!.startPreview()
-                count_cameraStartPreview++
+                countCameraStartPreview++
             } catch (e: CameraControllerException) {
                 if (MyDebug.LOG) Log.d(TAG, "CameraControllerException trying to startPreview")
                 e.printStackTrace()
@@ -7500,7 +7293,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
          * - If non-null, this will include "auto" to indicate auto-ISO, and one or more numerical ISO
          * values.
          * If supportsISORange() returns true, then this method should not be used (and it will return
-         * null). Instead use getMinimumISO() and getMaximumISO().
+         * null). Instead, use getMinimumISO() and getMaximumISO().
          */
         get() {
             if (MyDebug.LOG) Log.d(TAG, "getSupportedISOs")
@@ -7821,7 +7614,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     }
                 }
                 return filteredVideoQuality
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "fps invalid format, can't parse to int: $fpsValue"
@@ -7854,7 +7647,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     Log.e(TAG, "fps is neither normal nor high speed")
                     return false
                 }
-            } catch (exception: NumberFormatException) {
+            } catch (_: NumberFormatException) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "fps invalid format, can't parse to int: $fpsValue"
@@ -8121,7 +7914,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             )
             // When targeting Android 11+, toasts with custom views won't be shown in background anyway - in theory we
             // shouldn't be making toasts when in background, but check just in case.
-            // However we no longer use custom views when useFakeToast==false, so fine to allow those - and indeed this
+            // However, we no longer use custom views when useFakeToast==false, so fine to allow those - and indeed this
             // is useful for cases where the toast is created shortly before Open Kamera resumes, e.g., cancelling SAF
             // (see toast in MainActivity.onActivityResult()), or denying location permission (see toast from
             // PermissionHandler.onRequestPermissionsResult()).
@@ -8373,12 +8166,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (previewBitmap != null) {
             recycleBitmapForPreviewTask(previewBitmap!!)
             // It's okay to set previewBitmap to null even if refreshPreviewBitmapTask is currently running in the background
-            // as it takes it's own reference. But we shouldn't recycle until the background thread is complete.
+            // as it takes its own reference. But we shouldn't recycle until the background thread is complete.
             previewBitmap = null
         }
 
         // It's okay to set these to -1 even if refreshPreviewBitmapTask is currently running in the background
-        // as it takes it's own reference. But we shouldn't recycle until the background thread is complete.
+        // as it takes its own reference. But we shouldn't recycle until the background thread is complete.
         previewBitmapFullW = -1
         previewBitmapFullH = -1
         preShotsRingBuffer.flush() // even if we're recreating the previewBitmapFull, it might be at a different resolution, so safest to flush the previous pre-shots
@@ -8395,8 +8188,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private fun recreatePreviewBitmap() {
         if (MyDebug.LOG) {
             Log.d(TAG, "recreatePreviewBitmap")
-            Log.d(TAG, "textureview_w: $textureviewW")
-            Log.d(TAG, "textureview_h: $textureviewH")
+            Log.d(TAG, "textureview_w: $textureViewW")
+            Log.d(TAG, "textureview_h: $textureViewH")
             Log.d(TAG, "want_preview_bitmap: $isPreviewBitmapEnabled")
             Log.d(
                 TAG,
@@ -8415,8 +8208,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (isPreviewBitmapEnabled && usePreviewBitmapSmall) {
             if (MyDebug.LOG) Log.d(TAG, "create preview_bitmap")
             val downscale = 4
-            var bitmapWidth = textureviewW / downscale
-            var bitmapHeight = textureviewH / downscale
+            var bitmapWidth = textureViewW / downscale
+            var bitmapHeight = textureViewH / downscale
             val rotation = getDisplayRotationDegrees(false)
             if (rotation == 90 || rotation == 270) {
                 val dummy = bitmapWidth
@@ -8443,8 +8236,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         }
         if (isPreviewBitmapEnabled && usePreviewBitmapFull) {
             if (MyDebug.LOG) Log.d(TAG, "set up preview_bitmap_full")
-            var bitmapWidth = textureviewW
-            var bitmapHeight = textureviewH
+            var bitmapWidth = textureViewW
+            var bitmapHeight = textureViewH
             val rotation = getDisplayRotationDegrees(false)
             if (rotation == 90 || rotation == 270) {
                 val dummy = bitmapWidth
@@ -9275,10 +9068,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 			layoutParams.gravity = Gravity.CENTER;
 			cameraSurface.view.setLayoutParams(layoutParams);
 		}*/
-        gestureDetector = GestureDetector(context, SimpleOnGestureListener())
-        gestureDetector.setOnDoubleTapListener(DoubleTapListener())
-        scaleGestureDetector = ScaleGestureDetector(context, ScaleListener())
-
         parent.addView(cameraSurface.view)
         if (canvasView != null) {
             parent.addView(canvasView)
@@ -9378,12 +9167,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                https://stackoverflow.com/questions/44233870/how-to-fix-slow-rendering-android-vitals -
                there is evidence that using an infrequent update actually results in poorer performance,
                due to devices running in a lower power state, but Google Play analytics do not take this
-               into consideration. Thus we are forced to request updates at 60fps whether we need them
-               or not. I can reproducing this giving improved performance on OnePlus 3T for old and
+               into consideration. Thus, we are forced to request updates at 60fps whether we need them
+               or not. I can reproduce this giving improved performance on OnePlus 3T for old and
                Camera2 API. Testing suggests this does not seem to adversely affect battery life.
                This is limited to Android 7+, to avoid causing problems on older devices (which don't
                contribute to Google Analytics anyway).
-               If we ever are able to use lower frame rates in future, remember we'll still need a high
+               If we ever are able to use lower frame rates in the future, remember we'll still need a high
                frame rate when applying the dimming effect when reopening or updating the camera (see
                DrawPreview.setDimPreview()) (especially for MainActivity.updateForSettings() when we
                pause/unpause the preview instead of reopening the camera).
@@ -9514,11 +9303,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 }
             }
             // FindBugs warns about returning the array directly, but in fact we need to return direct access rather than copying, so that the on-screen display of faces rectangles updates
-            return _facesDetected?.filterNotNull()?.toTypedArray()
+            return _facesDetected.filterNotNull().toTypedArray()
         }
 
     val zoomRatio: Float
-        /** Returns the current zoom factor of the camera. Always returns 1.0f if zoom isn't supported.
+        /** Returns the current zoom factor of the camera. Always returns 1.0f if Zoom isn't supported.
          */
         get() {
             if (zoomRatios == null) return 1.0f
@@ -9657,14 +9446,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             maxVideoSize: CameraController.Size
         ): CameraController.Size? {
             if (MyDebug.LOG) Log.d(TAG, "getOptimalVideoPictureSize()")
-            val ASPECT_TOLERANCE = 0.05
+            val aspectTolerance = 0.05
             if (sizes == null) return null
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "max_video_size: " + maxVideoSize.width + ", " + maxVideoSize.height
             )
             var optimalSize: CameraController.Size? = null
-            // Try to find largest size that matches aspect ratio.
+            // Try to find the largest size that matches aspect ratio.
             // But don't choose a size that's larger than the max video size (as this isn't supported for taking photos when
             // recording video for devices with LIMITED support in Camera2 mode).
             // In theory, for devices FULL Camera2 support, if the current video resolution is smaller than the max preview resolution,
@@ -9675,7 +9464,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     "    supported preview size: " + size.width + ", " + size.height
                 )
                 val ratio: Double = size.width.toDouble() / size.height
-                if (abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue
+                if (abs(ratio - targetRatio) > aspectTolerance) continue
                 if (size.width > maxVideoSize.width || size.height > maxVideoSize.height) continue
                 if (optimalSize == null || size.width > optimalSize.width) {
                     optimalSize = size
@@ -9707,7 +9496,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 }
                 val minFps = fpsRange[0]
                 val maxFps = fpsRange[1]
-                if (minFps <= videoFrameRate && maxFps >= videoFrameRate) {
+                if (videoFrameRate in minFps..maxFps) {
                     val diff = maxFps - minFps
                     if (selectedDiff == -1 || diff < selectedDiff) {
                         selectedMinFps = minFps

@@ -2642,7 +2642,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             p.textAlign = Paint.Align.CENTER
             val pixelsOffset = (20 * scaleFont + 0.5f).toInt() // convert dps to pixels
             if (preview.hasPermissions()) {
-                if (preview.OpenKameraFailed()) {
+                if (preview.openCameraFailed()) {
                     canvas.drawText(
                         context.resources.getString(R.string.failed_to_open_camera_1),
                         canvas.width / 2.0f,
