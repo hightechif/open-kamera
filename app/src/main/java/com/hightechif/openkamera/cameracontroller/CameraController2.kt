@@ -59,6 +59,7 @@ import com.hightechif.openkamera.cameracontroller.burst.Camera2CaptureCoordinato
 import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculator
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
+import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
 import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
@@ -1217,29 +1218,10 @@ class CameraController2(
             if (MyDebug.LOG) {
                 val hardwareLevel =
                     characteristics?.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-                when (hardwareLevel) {
-                    CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> Log.d(
-                        TAG, "Hardware Level: LEGACY"
-                    )
-
-                    CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED -> Log.d(
-                        TAG, "Hardware Level: LIMITED"
-                    )
-
-                    CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL -> Log.d(
-                        TAG, "Hardware Level: FULL"
-                    )
-
-                    CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3 -> Log.d(
-                        TAG,
-                        "Hardware Level: Level 3"
-                    )
-
-                    else -> Log.e(
-                        TAG,
-                        "Unknown Hardware Level: $hardwareLevel"
-                    )
-                }
+                Log.d(
+                    TAG,
+                    "Hardware Level: " + Camera2CapabilitiesResolver.getHardwareLevelDescription(hardwareLevel)
+                )
 
                 val nrModes =
                     characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
@@ -1266,35 +1248,9 @@ class CameraController2(
                 }
             }
 
-            var minZoom = 0.0f
-            var maxZoom = 0.0f
-            if (cameraIdSPhysical != null) {
-                // don't support zoom for physical lenses - problem on Galaxy S24+ that zooming on physical lense gives random colors!
-                // but in general, the exposed zoom ranges don't seem correct for physical lenses
-                // both the above are true for CONTROL_ZOOM_RATIO_RANGE and SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // use CONTROL_ZOOM_RATIO_RANGE on Android 11+, to support multiple cameras with zoom ratios
-                // less than 1
-                try {
-                    val zoomRatioRange =
-                        characteristics?.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
-                    if (zoomRatioRange != null) {
-                        minZoom = zoomRatioRange.lower
-                        maxZoom = zoomRatioRange.upper
-                    } else {
-                        if (MyDebug.LOG) Log.d(TAG, "zoom_ratio_range not supported")
-                    }
-                } catch (e: Throwable) {
-                    // have had this crash from characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) on Google Play for some older Samsung Galaxy A* and Nokia devices
-                    if (MyDebug.LOG) Log.e(TAG, "failed to get CONTROL_ZOOM_RATIO_RANGE", e)
-                }
-            }
-            if (cameraIdSPhysical == null && (minZoom == 0.0f || maxZoom == 0.0f)) {
-                minZoom = 1.0f
-                maxZoom =
-                    characteristics?.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
-                        ?: 0.0f
-            }
+            val zoomRange = Camera2CapabilitiesResolver.resolveZoomRange(characteristics, cameraIdSPhysical != null)
+            val minZoom = zoomRange.first
+            val maxZoom = zoomRange.second
             cameraFeatures.isZoomSupported = maxZoom > 0.0f && minZoom > 0.0f
             if (MyDebug.LOG) {
                 Log.d(TAG, "min_zoom: $minZoom")
@@ -8441,102 +8397,7 @@ class CameraController2(
          * @return         Index of ratios list that is for 1x zoom.
          */
         fun computeZoomRatios(ratios: MutableList<Int>, minZoom: Float, maxZoom: Float): Int {
-            val zoomValue1x: Int
-
-            // prepare zoom rations > 1x
-            // set 40 steps per 2x factor
-            val scaleFactorC = 1.0174796921026863936352862847966
-            val zoomRatiosAboveOne: MutableList<Int> = ArrayList()
-            var zoom = scaleFactorC
-            while (zoom < maxZoom - 1.0e-5f) {
-                val zoomRatio = (zoom * 100 + 1.0e-5).toInt()
-                zoomRatiosAboveOne.add(zoomRatio)
-                zoom *= scaleFactorC
-            }
-            val maxZoomRatio = (maxZoom * 100).toInt()
-            if (zoomRatiosAboveOne.isEmpty() || zoomRatiosAboveOne[zoomRatiosAboveOne.size - 1] != maxZoomRatio) {
-                zoomRatiosAboveOne.add(maxZoomRatio)
-            }
-            val nStepsAboveOne = zoomRatiosAboveOne.size
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "n_steps_above_one: $nStepsAboveOne"
-                )
-            }
-
-            // now populate full zoom ratios
-
-            // add minimum zoom
-            ratios.add((minZoom * 100).toInt())
-            if (ratios[0] / 100.0f < minZoom) {
-                // fix for rounding down to less than the minZoom
-                // e.g. if minZoom = 0.666, we'd have stored a zoom ratio of 66 which then would
-                // convert back to 0.66
-                ratios[0] = ratios[0] + 1
-            }
-
-            if (ratios[0] < 100) {
-                val nStepsBelowOne = max(1.0, (nStepsAboveOne / 5).toDouble()).toInt()
-                // if the min zoom is < 1.0, we add multiple entries for 1x zoom, when using the zoom
-                // seekbar it's easy for the user to zoom to exactly 1x
-                val nStepsOne = max(1.0, (nStepsAboveOne / 10).toDouble()).toInt()
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "n_steps_below_one: $nStepsBelowOne"
-                    )
-                    Log.d(TAG, "n_steps_one: $nStepsOne")
-                }
-
-                // add rest of zoom values < 1.0f
-                zoom = minZoom.toDouble()
-                val scaleFactor =
-                    (1.0f / minZoom).toDouble().pow(1.0 / nStepsBelowOne.toDouble())
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "scale_factor for below 1.0x: $scaleFactor"
-                    )
-                }
-                for (i in 0..<nStepsBelowOne - 1) {
-                    zoom *= scaleFactor
-                    val zoomRatio = (zoom * 100).toInt()
-                    if (zoomRatio > ratios[0]) {
-                        // on some devices (e.g., Pixel 6 Pro), the second entry would equal the first entry, due to the rounding fix above
-                        ratios.add(zoomRatio)
-                    }
-                }
-
-                // add values for 1.0f (we add repeated values so for cameras with minZoom < 1x, the zoom seekbar will snap to 1x)
-                zoomValue1x = ratios.size
-                for (i in 0..<nStepsOne) ratios.add(100)
-            } else {
-                zoomValue1x = 0
-            }
-
-            // add zoom values > 1.0f
-            val nStepsPowerTwo =
-                max(1.0, (0.5f + nStepsAboveOne / 15.0f).toInt().toDouble()).toInt()
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "n_steps_power_two: $nStepsPowerTwo"
-                )
-            }
-            for (zoomRatio in zoomRatiosAboveOne) {
-                ratios.add(zoomRatio)
-
-                if (zoomRatio != zoomRatiosAboveOne[zoomRatiosAboveOne.size - 1] && zoomRatio % 100 == 0) {
-                    val zoomRatioInt = zoomRatio / 100
-                    if (zoomRatioInt != 0 && (zoomRatioInt and (zoomRatioInt - 1)) == 0) {
-                        // is power of 2 that isn't the max zoom
-                        for (i in 0..<nStepsPowerTwo - 1) ratios.add(zoomRatio)
-                    }
-                }
-            }
-
-            return zoomValue1x
+            return Camera2CapabilitiesResolver.computeZoomRatios(ratios, minZoom, maxZoom)
         }
 
         /** Returns true iff every entry in cameraSizes is also a member of altCameraSizes (order
@@ -8548,46 +8409,14 @@ class CameraController2(
             altCameraWidths: IntArray?,
             altCameraHeights: IntArray?
         ): Boolean {
-            if (cameraWidths == null && cameraHeights == null) return true
-            if (altCameraWidths == null && altCameraHeights == null) return false
-            for (i in cameraWidths!!.indices) {
-                var found = false
-                for (j in altCameraWidths!!.indices) {
-                    if (cameraWidths[i] == altCameraWidths[j] && cameraHeights!![i] == altCameraHeights!![j]) {
-                        found = true
-                        break
-                    }
-                }
-                if (!found) return false
-            }
-            return true
+            return Camera2CapabilitiesResolver.sizeSubset(cameraWidths, cameraHeights, altCameraWidths, altCameraHeights)
         }
 
         private fun sizeSubset(
             cameraSizes: Array<android.util.Size>?,
             altCameraSizes: Array<android.util.Size>?
         ): Boolean {
-            var cameraWidths: IntArray? = null
-            var cameraHeights: IntArray? = null
-            var altCameraWidths: IntArray? = null
-            var altCameraHeights: IntArray? = null
-            if (cameraSizes != null) {
-                cameraWidths = IntArray(cameraSizes.size)
-                cameraHeights = IntArray(cameraSizes.size)
-                for (i in cameraSizes.indices) {
-                    cameraWidths[i] = cameraSizes[i].width
-                    cameraHeights[i] = cameraSizes[i].height
-                }
-            }
-            if (altCameraSizes != null) {
-                altCameraWidths = IntArray(altCameraSizes.size)
-                altCameraHeights = IntArray(altCameraSizes.size)
-                for (i in altCameraSizes.indices) {
-                    altCameraWidths[i] = altCameraSizes[i].width
-                    altCameraHeights[i] = altCameraSizes[i].height
-                }
-            }
-            return sizeSubset(cameraWidths, cameraHeights, altCameraWidths, altCameraHeights)
+            return Camera2CapabilitiesResolver.sizeSubset(cameraSizes, altCameraSizes)
         }
 
         /* If doAfTriggerForContinuous is false, doing an autoFocus() in continuous focus mode just
