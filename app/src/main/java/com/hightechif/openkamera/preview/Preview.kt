@@ -90,6 +90,8 @@ import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
 import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
 import com.hightechif.openkamera.preview.timer.CaptureTimerCoordinator
+import com.hightechif.openkamera.preview.video.VideoSessionManager
+import com.hightechif.openkamera.preview.video.VideoSessionOutput
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.ToastBoxer
 import kotlinx.coroutines.CoroutineScope
@@ -117,6 +119,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 import kotlin.math.tan
+
+private typealias VideoFileInfo = VideoSessionOutput
 
 /** This class was originally named due to encapsulating the camera preview,
  * but in practice it's grown to more than this, and includes most of the
@@ -265,31 +269,23 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var videoRecorderIsPaused = false // whether videoRecorder is running but has paused
     private var videoRestartOnMaxFilesize = false
 
-    /** Stores the file (or similar) to record a video.
-     * Important to call close() when the video recording is finished, to free up any resources
-     * (e.g., supplied ParcelFileDescriptor).
-     */
-    private data class VideoFileInfo(
-        val videoMethod: ApplicationInterface.VideoMethod = ApplicationInterface.VideoMethod.FILE,
-        val videoUri: Uri? = null,
-        val videoFilename: String? = null,
-        val videoPfdSaf: ParcelFileDescriptor? = null
-    ) {
-        fun close() {
-            if (this.videoPfdSaf != null) {
-                try {
-                    videoPfdSaf.close()
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                }
-            }
+    val videoSessionManager by lazy { VideoSessionManager() }
+    private var videoFileInfo: VideoFileInfo
+        get() = videoSessionManager.activeOutput ?: VideoFileInfo()
+        set(value) {
+            videoSessionManager.startSession(value)
         }
-    }
-
-    private var videoFileInfo = VideoFileInfo()
 
     // used for Android 8+ to handle seamless restart (see MediaRecorder.setNextOutputFile())
-    private var nextVideoFileInfo: VideoFileInfo? = null
+    private var nextVideoFileInfo: VideoFileInfo?
+        get() = videoSessionManager.nextOutput
+        set(value) {
+            if (value != null) {
+                videoSessionManager.prepareSeamlessRestart(value)
+            } else {
+                videoSessionManager.discardNextOutput()
+            }
+        }
 
     @Volatile
     private var phase = PHASE_NORMAL // must be volatile for test project reading the state
@@ -7716,6 +7712,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         cancelRefreshPreviewBitmap()
         frameAnalyzer.destroy()
         captureTimerCoordinator.destroy()
+        videoSessionManager.destroy()
         freePreviewBitmap() // in case onDestroy() called directly without onPause()
 
         if (rs != null) {
