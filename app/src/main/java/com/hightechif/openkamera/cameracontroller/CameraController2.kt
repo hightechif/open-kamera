@@ -45,7 +45,6 @@ import android.media.MediaActionSound
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
-import android.os.HandlerThread
 import android.util.Log
 import android.util.Pair
 import android.util.Range
@@ -57,10 +56,12 @@ import androidx.annotation.IntRange
 import androidx.annotation.RequiresApi
 import com.hightechif.openkamera.cameracontroller.burst.Camera2CaptureCoordinator
 import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculator
-import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
-import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
 import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
+import com.hightechif.openkamera.cameracontroller.extension.Camera2DeviceQuirks
+import com.hightechif.openkamera.cameracontroller.extension.Camera2VendorTagsExtension
+import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
+import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManager
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
@@ -98,10 +99,11 @@ class CameraController2(
     private var cameraIdS: String // ID string of logical camera
     private val cameraIdSPhysical: String? // if non-null, ID string of underlying physical camera
 
-    private val isSamsung: Boolean
-    private val isSamsungS7: Boolean // Galaxy S7 or Galaxy S7 Edge
-    private val isSamsungGalaxyS: Boolean
-    private val isSamsungGalaxyF: Boolean // Galaxy fold or flip series
+    val deviceQuirks = Camera2DeviceQuirks()
+    private val isSamsung: Boolean get() = deviceQuirks.isSamsung
+    private val isSamsungS7: Boolean get() = deviceQuirks.isSamsungS7
+    private val isSamsungGalaxyS: Boolean get() = deviceQuirks.isSamsungGalaxyS
+    private val isSamsungGalaxyF: Boolean get() = deviceQuirks.isSamsungGalaxyF
 
     // characteristics of camera - if a specific physical camera is being used, these are characteristics for the physical camera
     private var characteristics: CameraCharacteristics? = null
@@ -1216,7 +1218,9 @@ class CameraController2(
                     characteristics?.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
                 Log.d(
                     TAG,
-                    "Hardware Level: " + Camera2CapabilitiesResolver.getHardwareLevelDescription(hardwareLevel)
+                    "Hardware Level: " + Camera2CapabilitiesResolver.getHardwareLevelDescription(
+                        hardwareLevel
+                    )
                 )
 
                 val nrModes =
@@ -1244,7 +1248,10 @@ class CameraController2(
                 }
             }
 
-            val zoomRange = Camera2CapabilitiesResolver.resolveZoomRange(characteristics, cameraIdSPhysical != null)
+            val zoomRange = Camera2CapabilitiesResolver.resolveZoomRange(
+                characteristics,
+                cameraIdSPhysical != null
+            )
             val minZoom = zoomRange.first
             val maxZoom = zoomRange.second
             cameraFeatures.isZoomSupported = maxZoom > 0.0f && minZoom > 0.0f
@@ -2228,68 +2235,23 @@ class CameraController2(
         extensionPictureSizes: List<android.util.Size>,
         extension: Int
     ): Boolean {
-        var hasPictureResolution = false
-        for (size in pictureSizes) {
-            if (extensionPictureSizes.contains(android.util.Size(size.width, size.height))) {
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "    picture size supports extension: " + size.width + " , " + size.height
-                    )
-                }
-                hasPictureResolution = true
-                if (size.supportedExtensions == null) {
-                    size.supportedExtensions = ArrayList()
-                }
-                size.supportedExtensions?.add(extension)
-            } else {
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "    picture size does NOT support extension: " + size.width + " , " + size.height
-                    )
-                }
-            }
-        }
-        return hasPictureResolution
+        return Camera2VendorTagsExtension.updatePictureSizesForExtension(
+            pictureSizes,
+            extensionPictureSizes,
+            extension
+        )
     }
 
-    /** For each of the previewSizes, update the CameraController.Size.supportedExtensions field to record if that resolution
-     * supports the supplied extension.
-     * @param previewSizes           Preview sizes to update.
-     * @param extensionPreviewSizes Preview sizes supported by the extension.
-     * @param extension               Extension to test.
-     * @return                        If false, then none of the previewSizes are supported by this extension.
-     */
     private fun updatePreviewSizesForExtension(
         previewSizes: List<Size>,
         extensionPreviewSizes: List<android.util.Size>,
         extension: Int
     ): Boolean {
-        var hasPreviewResolution = false
-        for (size in previewSizes) {
-            if (extensionPreviewSizes.contains(android.util.Size(size.width, size.height))) {
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "    preview size supports extension: " + size.width + " , " + size.height
-                    )
-                }
-                hasPreviewResolution = true
-                if (size.supportedExtensions == null) {
-                    size.supportedExtensions = ArrayList()
-                }
-                size.supportedExtensions?.add(extension)
-            } else {
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "    preview size does NOT support extension: " + size.width + " , " + size.height
-                    )
-                }
-            }
-        }
-        return hasPreviewResolution
+        return Camera2VendorTagsExtension.updatePreviewSizesForExtension(
+            previewSizes,
+            extensionPreviewSizes,
+            extension
+        )
     }
 
     override fun shouldCoverPreview(): Boolean {
@@ -6921,13 +6883,7 @@ class CameraController2(
         this.previewErrorCb = previewErrorCb
         this.cameraErrorCb = cameraErrorCb
 
-        //this.isOneplus = Build.MANUFACTURER.toLowerCase(Locale.US).contains("oneplus");
-        this.isSamsung = Build.MANUFACTURER.lowercase().contains("samsung")
-        this.isSamsungS7 = Build.MODEL.lowercase().contains("sm-g93")
-        this.isSamsungGalaxyS =
-            isSamsung && (Build.MODEL.lowercase().contains("sm-g") || Build.MODEL.lowercase()
-                .contains("sm-s"))
-        this.isSamsungGalaxyF = isSamsung && Build.MODEL.lowercase().contains("sm-f")
+        // device quirks handled by Camera2DeviceQuirks
         if (MyDebug.LOG) {
             Log.d(TAG, "is_samsung: $isSamsung")
             Log.d(TAG, "is_samsung_s7: $isSamsungS7")
@@ -8397,7 +8353,12 @@ class CameraController2(
             altCameraWidths: IntArray?,
             altCameraHeights: IntArray?
         ): Boolean {
-            return Camera2CapabilitiesResolver.sizeSubset(cameraWidths, cameraHeights, altCameraWidths, altCameraHeights)
+            return Camera2CapabilitiesResolver.sizeSubset(
+                cameraWidths,
+                cameraHeights,
+                altCameraWidths,
+                altCameraHeights
+            )
         }
 
         private fun sizeSubset(
