@@ -61,6 +61,7 @@ import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoor
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
+import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
 import java.util.Collections
@@ -69,8 +70,6 @@ import java.util.LinkedList
 import java.util.Queue
 import java.util.concurrent.Executor
 import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -8414,166 +8413,25 @@ class CameraController2(
          */
         const val MAX_PREVIEW_EXPOSURE_TIME_C = 1000000000L / 5
 
-        private const val MIN_WHITE_BALANCE_TEMPERATURE_C = 1000
-        private const val MAX_WHITE_BALANCE_TEMPERATURE_C = 15000
+        const val MIN_WHITE_BALANCE_TEMPERATURE_C =
+            Camera2RequestBuilderHelper.MIN_WHITE_BALANCE_TEMPERATURE_C
+        const val MAX_WHITE_BALANCE_TEMPERATURE_C =
+            Camera2RequestBuilderHelper.MAX_WHITE_BALANCE_TEMPERATURE_C
 
         fun convertTemperatureToRggbVector(temperatureKelvin: Int): RggbChannelVector {
-            val rggb = convertTemperatureToRggb(temperatureKelvin)
-            return RggbChannelVector(rggb[0], rggb[1], rggb[2], rggb[3])
+            return Camera2RequestBuilderHelper.convertTemperatureToRggbVector(temperatureKelvin)
         }
 
-        /** Converts a white balance temperature to red, green even, green odd and blue components.
-         */
         fun convertTemperatureToRggb(temperatureKelvin: Int): FloatArray {
-            val temperature = temperatureKelvin / 100.0f
-            var red: Float
-            var green: Float
-            var blue: Float
-
-            if (temperature <= 66) {
-                red = 255f
-            } else {
-                red = temperature - 60
-                red = (329.698727446 * (red.toDouble().pow(-0.1332047592))).toFloat()
-                if (red < 0) red = 0f
-                if (red > 255) red = 255f
-            }
-
-            if (temperature <= 66) {
-                green = temperature
-                green = (99.4708025861 * ln(green.toDouble()) - 161.1195681661).toFloat()
-                if (green < 0) green = 0f
-                if (green > 255) green = 255f
-            } else {
-                green = temperature - 60
-                green = (288.1221695283 * (green.toDouble().pow(-0.0755148492))).toFloat()
-                if (green < 0) green = 0f
-                if (green > 255) green = 255f
-            }
-
-            if (temperature >= 66) blue = 255f
-            else if (temperature <= 19) blue = 0f
-            else {
-                blue = temperature - 10
-                blue = (138.5177312231 * ln(blue.toDouble()) - 305.0447927307).toFloat()
-                if (blue < 0) blue = 0f
-                if (blue > 255) blue = 255f
-            }
-
-            if (MyDebug.LOG) {
-                Log.d(TAG, "red: $red")
-                Log.d(TAG, "green: $green")
-                Log.d(TAG, "blue: $blue")
-            }
-
-            red = (red / 255.0f)
-            green = (green / 255.0f)
-            blue = (blue / 255.0f)
-
-            red = convertRGBtoGain(red)
-            green = convertRGBtoGain(green)
-            blue = convertRGBtoGain(blue)
-            if (MyDebug.LOG) {
-                Log.d(TAG, "red gain: $red")
-                Log.d(TAG, "green gain: $green")
-                Log.d(TAG, "blue gain: $blue")
-            }
-
-            return floatArrayOf(red, green / 2, green / 2, blue)
-        }
-
-        private fun convertRGBtoGain(value: Float): Float {
-            var value = value
-            val maxGainC = 10.0f
-            if (value < 1.0e-5f) {
-                return maxGainC
-            }
-            value = 1.0f / value
-            value = min(maxGainC.toDouble(), value.toDouble()).toFloat()
-            return value
+            return Camera2RequestBuilderHelper.convertTemperatureToRggb(temperatureKelvin)
         }
 
         fun convertRggbVectorToTemperature(rggbChannelVector: RggbChannelVector): Int {
-            return convertRggbToTemperature(
-                floatArrayOf(
-                    rggbChannelVector.red,
-                    rggbChannelVector.greenEven,
-                    rggbChannelVector.greenOdd,
-                    rggbChannelVector.blue
-                )
-            )
+            return Camera2RequestBuilderHelper.convertRggbVectorToTemperature(rggbChannelVector)
         }
 
-        /** Converts a red, green even, green odd and blue components to a white balance temperature.
-         * Note that this is not necessarily an inverse of convertTemperatureToRggb, since many rggb
-         * values can map to the same temperature.
-         */
         fun convertRggbToTemperature(rggb: FloatArray): Int {
-            if (MyDebug.LOG) {
-                Log.d(TAG, "temperature:")
-                Log.d(TAG, "    red: " + rggb[0])
-                Log.d(TAG, "    green even: " + rggb[1])
-                Log.d(TAG, "    green odd: " + rggb[2])
-                Log.d(TAG, "    blue: " + rggb[3])
-            }
-            var red = rggb[0]
-            val greenEven = rggb[1]
-            val greenOdd = rggb[2]
-            var blue = rggb[3]
-            var green = (greenEven + greenOdd)
-
-            red = convertGaintoRGB(red)
-            green = convertGaintoRGB(green)
-            blue = convertGaintoRGB(blue)
-
-            red *= 255.0f
-            green *= 255.0f
-            blue *= 255.0f
-
-            val redI = (red + 0.5f).toInt()
-            val greenI = (green + 0.5f).toInt()
-            val blueI = (blue + 0.5f).toInt()
-            var temperature: Int
-            if (redI == blueI) {
-                temperature = 6600
-            } else if (redI > blueI) {
-                // temperature <= 6600
-                val tG = (100 * exp((green + 161.1195681661) / 99.4708025861)).toFloat()
-                if (blueI == 0) {
-                    temperature = (tG + 0.5f).toInt()
-                } else {
-                    val tB = (100 * (exp((blue + 305.0447927307) / 138.5177312231) + 10)).toFloat()
-                    temperature = ((tG + tB) / 2 + 0.5f).toInt()
-                }
-            } else {
-                // temperature >= 6600
-                if (redI <= 1 || greenI <= 1) {
-                    temperature = MAX_WHITE_BALANCE_TEMPERATURE_C
-                } else {
-                    val tR =
-                        (100 * ((red / 329.698727446).pow(1.0 / -0.1332047592) + 60.0)).toFloat()
-                    val tG =
-                        (100 * ((green / 288.1221695283).pow(1.0 / -0.0755148492) + 60.0)).toFloat()
-                    temperature = ((tR + tG) / 2 + 0.5f).toInt()
-                }
-            }
-            temperature =
-                max(temperature.toDouble(), MIN_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
-            temperature =
-                min(temperature.toDouble(), MAX_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
-            if (MyDebug.LOG) {
-                Log.d(TAG, "    temperature: $temperature")
-            }
-            return temperature
-        }
-
-        private fun convertGaintoRGB(value: Float): Float {
-            var value = value
-            if (value <= 1.0f) {
-                return 1.0f
-            }
-            value = 1.0f / value
-            return value
+            return Camera2RequestBuilderHelper.convertRggbToTemperature(rggb)
         }
 
         /** Computes the zoom ratios to use, for devices that support zoom.
