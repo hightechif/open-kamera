@@ -55,6 +55,7 @@ import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
+import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
 import com.hightechif.openkamera.preview.ApplicationInterface.NoFreeStorageException
 import com.hightechif.openkamera.preview.ApplicationInterface.RawPref
@@ -3654,7 +3655,7 @@ class MyApplicationInterface internal constructor(
         var preshotBitmaps: MutableList<Bitmap?>? = null
         if (!imageCaptureIntent && nCaptureImages <= 1 && getPreShotsPref(photoMode)) {
             // n.b., nCaptureImages == 0 if using onBurstPictureTaken(), e.g., for photo mode HDR
-            val ringBuffer: Preview.RingBuffer = mainActivity.preview.preShotsRingBuffer
+            val ringBuffer: PreShotsRingBuffer = mainActivity.preview.preShotsRingBuffer
 
             if (ringBuffer.nBitmaps >= 3) {
                 if (MyDebug.LOG) Log.d(TAG, "save pre-shots")

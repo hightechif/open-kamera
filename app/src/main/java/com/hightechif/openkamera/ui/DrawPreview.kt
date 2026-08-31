@@ -43,6 +43,7 @@ import androidx.core.view.isVisible
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MainActivity.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
+import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
 import com.hightechif.openkamera.MyApplicationInterface.Shadow
@@ -135,7 +136,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private var ghostSelectedImageBitmap: Bitmap? = null
     private var ghostImageAlpha = 0
     private var wantHistogram = false
-    private lateinit var histogramType: Preview.HistogramType
+    private lateinit var histogramType: HistogramType
     private var wantZebraStripes = false
     private var zebraStripesThreshold = 0
     private var zebraStripesColorForeground = 0
@@ -343,8 +344,8 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private var lastUpdateFocusSeekbarAutoTime: Long = 0
 
     // OSD extra lines
-    private lateinit var OSDLine1: String
-    private lateinit var OSDLine2: String
+    private lateinit var varOSDLine1: String
+    private lateinit var varOSDLine2: String
 
     init {
         if (MyDebug.LOG) Log.d(TAG, "DrawPreview")
@@ -873,23 +874,23 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             )!!
         wantHistogram =
             histogramPref != "preference_histogram_off" && mainActivity.supportsPreviewBitmaps()
-        histogramType = Preview.HistogramType.HISTOGRAM_TYPE_VALUE
+        histogramType = HistogramType.HISTOGRAM_TYPE_VALUE
         if (wantHistogram) {
             when (histogramPref) {
                 "preference_histogram_rgb" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_RGB
+                    HistogramType.HISTOGRAM_TYPE_RGB
 
                 "preference_histogram_luminance" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_LUMINANCE
+                    HistogramType.HISTOGRAM_TYPE_LUMINANCE
 
                 "preference_histogram_value" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_VALUE
+                    HistogramType.HISTOGRAM_TYPE_VALUE
 
                 "preference_histogram_intensity" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_INTENSITY
+                    HistogramType.HISTOGRAM_TYPE_INTENSITY
 
                 "preference_histogram_lightness" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_LIGHTNESS
+                    HistogramType.HISTOGRAM_TYPE_LIGHTNESS
             }
         }
 
@@ -1687,11 +1688,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         // Now draw additional info in the lower left corner if needed
         val yOffset = (27 * scaleFont + 0.5f).toInt()
         p.textSize = 24 * scaleFont + 0.5f // convert dps to pixels
-        if (::OSDLine1.isInitialized && OSDLine1.isNotEmpty()) {
+        if (::varOSDLine1.isInitialized && varOSDLine1.isNotEmpty()) {
             applicationInterface.drawTextWithBackground(
                 canvas,
                 p,
-                OSDLine1,
+                varOSDLine1,
                 Color.WHITE,
                 Color.BLACK,
                 locationX,
@@ -1701,11 +1702,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 Shadow.SHADOW_OUTLINE
             )
         }
-        if (::OSDLine2.isInitialized && OSDLine2.isNotEmpty()) {
+        if (::varOSDLine2.isInitialized && varOSDLine2.isNotEmpty()) {
             applicationInterface.drawTextWithBackground(
                 canvas,
                 p,
-                OSDLine2,
+                varOSDLine2,
                 Color.WHITE,
                 Color.BLACK,
                 locationX,
@@ -3884,8 +3885,8 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
      * @param line2 Second line to display
      */
     fun onExtraOSDValuesChanged(line1: String, line2: String) {
-        OSDLine1 = line1
-        OSDLine2 = line2
+        varOSDLine1 = line1
+        varOSDLine2 = line2
     }
 
     // for testing:

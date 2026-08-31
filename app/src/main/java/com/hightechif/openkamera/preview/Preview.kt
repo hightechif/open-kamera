@@ -64,6 +64,16 @@ import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.ScriptC_histogram_compute
 import com.hightechif.openkamera.TakePhoto
+import com.hightechif.openkamera.preview.analysis.FrameAnalysisConfig
+import com.hightechif.openkamera.preview.analysis.FrameAnalysisResult
+import com.hightechif.openkamera.preview.analysis.HistogramType
+import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
+import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
@@ -174,18 +184,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var previewBitmapFullH =
         -1 // for full bitmaps, we generate copies on the fly (as these need to be saved for preshots feature)
     private var lastPreviewBitmapTimeMs: Long = 0 // time the last previewBitmap was updated
-    private var refreshPreviewBitmapTask: RefreshPreviewBitmapTask? = null
+    private val frameAnalyzer: PreviewFrameAnalyzer by lazy { PreviewFrameAnalyzer(context) }
+    private var isAnalyzingFrame = false
+    private var analysisJob: Job? = null
 
     private var wantHistogram =
         false // whether to generate a histogram, requires wantPreviewBitmap==true and usePreviewBitmapSmall==true
-
-    enum class HistogramType {
-        HISTOGRAM_TYPE_RGB,
-        HISTOGRAM_TYPE_LUMINANCE,
-        HISTOGRAM_TYPE_VALUE,
-        HISTOGRAM_TYPE_INTENSITY,
-        HISTOGRAM_TYPE_LIGHTNESS
-    }
 
     private var histogramType = HistogramType.HISTOGRAM_TYPE_VALUE
     var histogram: IntArray? = null
@@ -7739,18 +7743,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     fun onDestroy() {
         if (MyDebug.LOG) Log.d(TAG, "on_destroy")
 
-        if (refreshPreviewBitmapTaskIsRunning()) {
-            // if we're being destroyed, better to wait until completion rather than just cancelling
-            try {
-                refreshPreviewBitmapTask!!.get() // forces thread to complete
-            } catch (e: ExecutionException) {
-                Log.e(TAG, "exception while waiting for background_task to finish")
-                e.printStackTrace()
-            } catch (e: InterruptedException) {
-                Log.e(TAG, "exception while waiting for background_task to finish")
-                e.printStackTrace()
-            }
-        }
+        cancelRefreshPreviewBitmap()
+        frameAnalyzer.destroy()
         freePreviewBitmap() // in case onDestroy() called directly without onPause()
 
         if (rs != null) {
@@ -8112,7 +8106,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     fun refreshPreviewBitmapTaskIsRunning(): Boolean {
-        return refreshPreviewBitmapTask != null
+        return isAnalyzingFrame
     }
 
     /** Runs the supplied runnable, but waits until the refreshPreviewBitmapTask is no longer running.
@@ -8373,655 +8367,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         }
     }
 
-    class RingBuffer {
-        val maxSizeC: Int = 12
-        val bitmaps: MutableList<Bitmap?> = ArrayList()
-
-        fun flush() {
-            if (MyDebug.LOG) Log.d(TAG, "RingBuffer.flush()")
-            while (bitmaps.isNotEmpty()) {
-                val bm = bitmaps.removeAt(0)
-                bm!!.recycle()
-            }
-        }
-
-        fun add(bitmap: Bitmap?) {
-            while (bitmaps.size >= maxSizeC) {
-                val bm = bitmaps.removeAt(0)
-                bm!!.recycle()
-            }
-            bitmaps.add(bitmap)
-        }
-
-        fun hasBitmaps(): Boolean {
-            return bitmaps.isNotEmpty()
-        }
-
-        val nBitmaps: Int
-            get() = bitmaps.size
-
-        fun get(): Bitmap? {
-            return bitmaps.removeAt(0)
-        }
-    }
-
-    val preShotsRingBuffer: RingBuffer = RingBuffer()
-
-    private class RefreshPreviewBitmapTaskResult {
-        var newHistogram: IntArray? = null
-        var newZebraStripesBitmap: Bitmap? = null
-        var newFocusPeakingBitmap: Bitmap? = null
-        var previewBitmapFullCopy: Bitmap? = null
-    }
-
-    // use static class, and WeakReferences, to avoid memory leaks: https://stackoverflow.com/questions/44309241/warning-this-asynctask-class-should-be-static-or-leaks-might-occur/46166223
-    private class RefreshPreviewBitmapTask(
-        preview: Preview,
-        private val updateHistogram: Boolean,
-        private val updatePreshot: Boolean,
-        private val previewBitmapFullW: Int,
-        private val previewBitmapFullH: Int
-    ) : AsyncTask<Void?, Void?, RefreshPreviewBitmapTaskResult?>() {
-        private val previewReference = WeakReference(preview)
-        private var histogramScriptReference: WeakReference<ScriptC_histogram_compute?>? = null
-
-        // we take references to the bitmaps, so the Preview class can set this to null even whilst the background thread is running
-        private val previewBitmapReference = WeakReference(preview.previewBitmap)
-        private val zebraStripesBitmapBufferReference =
-            WeakReference(preview.zebraStripesBitmapBuffer)
-        private val focusPeakingBitmapBufferReference =
-            WeakReference(preview.focusPeakingBitmapBuffer)
-        private val focusPeakingBitmapBufferTempReference =
-            WeakReference(preview.focusPeakingBitmapBufferTemp)
-
-        init {
-            if (HDRProcessor.USE_RENDERSCRIPT) {
-                if (preview.rs == null) {
-                    // create on the UI thread rather than doInBackground(), to avoid threading issues
-                    if (MyDebug.LOG) Log.d(TAG, "create renderscript object")
-                    preview.rs = RenderScript.create(preview.context)
-                }
-                if (preview.histogramScript == null) {
-                    // create on the UI thread rather than doInBackground(), to avoid threading issues
-                    if (MyDebug.LOG) Log.d(TAG, "create histogramScript")
-                    preview.histogramScript = ScriptC_histogram_compute(preview.rs)
-                }
-                // take a local copy, so preview.histogramScript can be set to null whilst background thread is running
-                this.histogramScriptReference =
-                    WeakReference<ScriptC_histogram_compute?>(preview.histogramScript)
-            } else {
-                this.histogramScriptReference = null
-            }
-        }
-
-        override fun doInBackground(vararg voids: Void?): RefreshPreviewBitmapTaskResult? {
-            var debugTime: Long = 0
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "doInBackground, async task: $this"
-                )
-                debugTime = System.currentTimeMillis()
-            }
-
-            val preview = previewReference.get()
-            if (preview == null) {
-                if (MyDebug.LOG) Log.d(TAG, "preview is null")
-                return null
-            }
-            var histogramScript: ScriptC_histogram_compute? = null
-            if (HDRProcessor.USE_RENDERSCRIPT) {
-                histogramScript = histogramScriptReference!!.get()
-                if (histogramScript == null) {
-                    if (MyDebug.LOG) Log.d(TAG, "histogramScript is null")
-                    return null
-                }
-            }
-            val previewBitmap = previewBitmapReference.get()
-            val zebraStripesBitmapBuffer = zebraStripesBitmapBufferReference.get()
-            val focusPeakingBitmapBuffer = focusPeakingBitmapBufferReference.get()
-            val focusPeakingBitmapBufferTemp = focusPeakingBitmapBufferTempReference.get()
-            val activity = preview.context as Activity
-            if (activity == null || activity.isFinishing) {
-                if (MyDebug.LOG) Log.d(TAG, "activity is null or finishing")
-                return null
-            }
-
-            val result = RefreshPreviewBitmapTaskResult()
-
-            try {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "time before getBitmap: " + (System.currentTimeMillis() - debugTime)
-                )
-                val textureView = preview.cameraSurface as TextureView?
-                if (previewBitmap != null) {
-                    textureView!!.getBitmap(previewBitmap)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after getBitmap: " + (System.currentTimeMillis() - debugTime)
-                    )
-                }
-                if (previewBitmapFullW != -1 && previewBitmapFullH != -1 && updatePreshot) {
-                    // much faster to create a fresh previewBitmapFull to read into, instead of copying it after
-                    try {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time before creating preview_bitmap_full_copy: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        result.previewBitmapFullCopy =
-                            createBitmap(previewBitmapFullW, previewBitmapFullH)
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time after creating preview_bitmap_full_copy: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        textureView!!.getBitmap(result.previewBitmapFullCopy!!)
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time after getBitmap for preview_bitmap_full_copy: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        // See comments below for zebra stripes for why we need to rotate
-                        // But since rotating is slower (and presumably more CPU intensive) than taking a copy, we leave this to the ImageSaver thread -
-                        // although that'll also be just as slow, better to only do it when we're actually saving pre-shots,
-                        // rather than having this run all the time.
-                        // Also see above - it's much faster to create a new bitmap to read into, than to copy a bitmap
-                    } catch (e: IllegalArgumentException) {
-                        if (MyDebug.LOG) Log.e(TAG, "failed to create preview_bitmap_full_copy")
-                        e.printStackTrace()
-                    }
-                }
-
-                var allocationIn: Allocation? = null
-                if (previewBitmap == null) {
-                    // do nothing
-                } else if (!HDRProcessor.USE_RENDERSCRIPT) {
-                    // do nothing
-                } else {
-                    allocationIn = Allocation.createFromBitmap(preview.rs, previewBitmap)
-                }
-                /*if( true )
-					throw new RSInvalidStateException("test"); // test*/
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "time after createFromBitmap: " + (System.currentTimeMillis() - debugTime)
-                )
-
-                if (updateHistogram && previewBitmap != null) {
-                    if (MyDebug.LOG) Log.d(TAG, "generate histogram")
-
-                    var debugTimeHistogram: Long = 0
-                    if (MyDebug.LOG) {
-                        debugTimeHistogram = System.currentTimeMillis()
-                    }
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time before computeHistogram: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    if (!HDRProcessor.USE_RENDERSCRIPT) {
-                        val javaType: JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type =
-                            when (preview.histogramType) {
-                                HistogramType.HISTOGRAM_TYPE_RGB -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_RGB
-                                HistogramType.HISTOGRAM_TYPE_LUMINANCE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LUMINANCE
-                                HistogramType.HISTOGRAM_TYPE_VALUE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_VALUE
-                                HistogramType.HISTOGRAM_TYPE_INTENSITY -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_INTENSITY
-                                HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LIGHTNESS
-                                else -> throw RuntimeException("unknown histogram type: " + preview.histogramType)
-                            }
-                        val function: JavaImageFunctionsHDR.ComputeHistogramApplyFunction =
-                            JavaImageFunctionsHDR.ComputeHistogramApplyFunction(javaType)
-                        JavaImageProcessing.applyFunction(
-                            function,
-                            previewBitmap,
-                            null,
-                            0,
-                            0,
-                            previewBitmap.width,
-                            previewBitmap.height
-                        )
-                        result.newHistogram = function.histogram
-                    } else {
-                        result.newHistogram = computeHistogramRS(
-                            allocationIn,
-                            preview.rs,
-                            histogramScript!!,
-                            preview.histogramType
-                        )
-                    }
-
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "time for computeHistogram: " + (System.currentTimeMillis() - debugTimeHistogram)
-                        )
-                        Log.d(
-                            TAG,
-                            "time after computeHistogram: " + (System.currentTimeMillis() - debugTime)
-                        )
-                    }
-                }
-
-                if (preview.wantZebraStripes && previewBitmap != null && zebraStripesBitmapBuffer != null) {
-                    if (MyDebug.LOG) Log.d(TAG, "generate zebra stripes bitmap")
-
-                    var debugTimeZebra: Long = 0
-                    if (MyDebug.LOG) {
-                        debugTimeZebra = System.currentTimeMillis()
-                    }
-
-                    val zebraStripesWidth = zebraStripesBitmapBuffer.width / 20
-
-                    if (!HDRProcessor.USE_RENDERSCRIPT) {
-                        val function: JavaImageFunctionsPreview.ZebraStripesApplyFunction =
-                            JavaImageFunctionsPreview.ZebraStripesApplyFunction(
-                                preview.zebraStripesThreshold,
-                                preview.zebraStripesColorForeground,
-                                preview.zebraStripesColorBackground,
-                                zebraStripesWidth
-                            )
-                        JavaImageProcessing.applyFunction(
-                            function,
-                            previewBitmap,
-                            zebraStripesBitmapBuffer,
-                            0,
-                            0,
-                            previewBitmap.width,
-                            previewBitmap.height
-                        )
-                    } else {
-                        val outputAllocation =
-                            Allocation.createFromBitmap(preview.rs, zebraStripesBitmapBuffer)
-
-                        val script = histogramScript!!
-                        script.set_zebra_stripes_threshold(preview.zebraStripesThreshold)
-                        script.set_zebra_stripes_foreground_r(Color.red(preview.zebraStripesColorForeground))
-                        script.set_zebra_stripes_foreground_g(Color.green(preview.zebraStripesColorForeground))
-                        script.set_zebra_stripes_foreground_b(Color.blue(preview.zebraStripesColorForeground))
-                        script.set_zebra_stripes_foreground_a(Color.alpha(preview.zebraStripesColorForeground))
-                        script.set_zebra_stripes_background_r(Color.red(preview.zebraStripesColorBackground))
-                        script.set_zebra_stripes_background_g(Color.green(preview.zebraStripesColorBackground))
-                        script.set_zebra_stripes_background_b(Color.blue(preview.zebraStripesColorBackground))
-                        script.set_zebra_stripes_background_a(Color.alpha(preview.zebraStripesColorBackground))
-                        script.set_zebra_stripes_width(zebraStripesWidth)
-
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time before histogramScript generate_zebra_stripes: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        script.forEach_generate_zebra_stripes(
-                            allocationIn,
-                            outputAllocation
-                        )
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time after histogramScript generate_zebra_stripes: " + (System.currentTimeMillis() - debugTime)
-                        )
-
-                        outputAllocation.copyTo(zebraStripesBitmapBuffer)
-                        outputAllocation.destroy()
-                    }
-
-                    // The original orientation of the bitmap we get from textureView.getBitmap() needs to be rotated to
-                    // account for the orientation of camera vs device, but not to account for the current orientation
-                    // of the device.
-                    // This is because TextureView.getBitmap() returns the texture in the "natural" orientation of the device - it doesn't take the transform
-                    // we've applied in configureTransform() into account.
-                    val rotationDegrees = preview.getDisplayRotationDegrees(false)
-                    /*if( MyDebug.LOG ) {
-						Log.d(TAG, "orientation of display relative to natural orientation: " + rotationDegrees);
-					}*/
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time before creating new_zebra_stripes_bitmap: " + (System.currentTimeMillis() - debugTime)
-                    )
-                    val matrix = Matrix()
-                    matrix.postRotate(-rotationDegrees.toFloat())
-                    result.newZebraStripesBitmap = Bitmap.createBitmap(
-                        zebraStripesBitmapBuffer,
-                        0,
-                        0,
-                        zebraStripesBitmapBuffer.width,
-                        zebraStripesBitmapBuffer.height,
-                        matrix,
-                        false
-                    )
-
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after creating new_zebra_stripes_bitmap: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "time for zebra stripes: " + (System.currentTimeMillis() - debugTimeZebra)
-                        )
-                    }
-                    /*
-					// test:
-					//File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/zebra_stripes_bitmap_buffer.jpg");
-					File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/zebra_stripes_bitmap.jpg");
-					try {
-						OutputStream outputStream = new FileOutputStream(file);
-						//zebra_stripes_bitmap_buffer.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-						preview.zebra_stripes_bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-						outputStream.close();
-						MainActivity mActivity = (MainActivity) preview.context;
-						mActivity.storageUtils.broadcastFile(file, true, false, true);
-					}
-					catch(IOException e) {
-						e.printStackTrace();
-					}
-					*/
-                }
-
-                if (preview.wantFocusPeaking && previewBitmap != null && focusPeakingBitmapBuffer != null && focusPeakingBitmapBufferTemp != null) {
-                    if (MyDebug.LOG) Log.d(TAG, "generate focus peaking bitmap")
-
-                    var debugTimeFocusPeaking: Long = 0
-                    if (MyDebug.LOG) {
-                        debugTimeFocusPeaking = System.currentTimeMillis()
-                    }
-
-                    if (!HDRProcessor.USE_RENDERSCRIPT) {
-                        val function: JavaImageFunctionsPreview.FocusPeakingApplyFunction =
-                            JavaImageFunctionsPreview.FocusPeakingApplyFunction(previewBitmap)
-                        JavaImageProcessing.applyFunction(
-                            function,
-                            previewBitmap,
-                            focusPeakingBitmapBufferTemp,
-                            0,
-                            0,
-                            previewBitmap.width,
-                            previewBitmap.height
-                        )
-
-                        val functionFiltered: JavaImageFunctionsPreview.FocusPeakingFilteredApplyFunction =
-                            JavaImageFunctionsPreview.FocusPeakingFilteredApplyFunction(
-                                focusPeakingBitmapBufferTemp
-                            )
-                        JavaImageProcessing.applyFunction(
-                            functionFiltered,
-                            focusPeakingBitmapBufferTemp,
-                            focusPeakingBitmapBuffer,
-                            0,
-                            0,
-                            previewBitmap.width,
-                            previewBitmap.height
-                        )
-                    } else {
-                        var outputAllocation =
-                            Allocation.createFromBitmap(preview.rs, focusPeakingBitmapBuffer)
-
-                        val script = histogramScript!!
-                        script.set_bitmap(allocationIn)
-
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time before histogramScript generate_focus_peaking: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        script.forEach_generate_focus_peaking(
-                            allocationIn,
-                            outputAllocation
-                        )
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time after histogramScript generate_focus_peaking: " + (System.currentTimeMillis() - debugTime)
-                        )
-
-                        // median filter
-                        val filteredAllocation = Allocation.createTyped(
-                            preview.rs,
-                            Type.createXY(
-                                preview.rs,
-                                Element.RGBA_8888(preview.rs),
-                                focusPeakingBitmapBuffer.width,
-                                focusPeakingBitmapBuffer.height
-                            )
-                        )
-                        script.set_bitmap(outputAllocation)
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time before histogramScript generate_focus_peaking_filtered: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        script.forEach_generate_focus_peaking_filtered(
-                            outputAllocation,
-                            filteredAllocation
-                        )
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "time after histogramScript generate_focus_peaking_filtered: " + (System.currentTimeMillis() - debugTime)
-                        )
-                        outputAllocation.destroy()
-                        outputAllocation = filteredAllocation
-
-                        outputAllocation.copyTo(focusPeakingBitmapBuffer)
-                        outputAllocation.destroy()
-                    }
-
-                    // See comments above for zebra stripes
-                    val rotationDegrees = preview.getDisplayRotationDegrees(false)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time before creating new_focus_peaking_bitmap: " + (System.currentTimeMillis() - debugTime)
-                    )
-                    val matrix = Matrix()
-                    matrix.postRotate(-rotationDegrees.toFloat())
-                    result.newFocusPeakingBitmap = Bitmap.createBitmap(
-                        focusPeakingBitmapBuffer,
-                        0,
-                        0,
-                        focusPeakingBitmapBuffer.width,
-                        focusPeakingBitmapBuffer.height,
-                        matrix,
-                        false
-                    )
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after creating new_focus_peaking_bitmap: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "time for focus peaking: " + (System.currentTimeMillis() - debugTimeFocusPeaking)
-                        )
-                    }
-                }
-
-                allocationIn?.destroy()
-            } catch (e: IllegalStateException) {
-                if (MyDebug.LOG) Log.e(TAG, "failed to getBitmap")
-                e.printStackTrace()
-            } catch (e: RSInvalidStateException) {
-                if (MyDebug.LOG) Log.e(TAG, "renderscript failure")
-                e.printStackTrace()
-            }
-
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "time taken for RefreshPreviewBitmapTaskResult: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-            return result
-        }
-
-        /** The system calls this to perform work in the UI thread and delivers
-         * the result from doInBackground()  */
-        override fun onPostExecute(result: RefreshPreviewBitmapTaskResult?) {
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "onPostExecute, async task: $this"
-            )
-
-            val preview = previewReference.get() ?: return
-            val activity = preview.context as Activity
-            if (activity == null || activity.isFinishing) {
-                return
-            }
-            if (result == null) {
-                return
-            }
-
-            if (result.newHistogram != null) preview.histogram = result.newHistogram
-
-            /*if( MyDebug.LOG && preview.histogram != null ) {
-				for(int i=0;i<preview.histogram.length;i++)
-					Log.d(TAG, "    histogram[" + i + "]: " + preview.histogram[i]);
-			}*/
-            if (preview.zebraStripesBitmap != null) {
-                preview.zebraStripesBitmap!!.recycle()
-            }
-            preview.zebraStripesBitmap = result.newZebraStripesBitmap
-
-            if (preview.focusPeakingBitmap != null) {
-                preview.focusPeakingBitmap!!.recycle()
-            }
-            preview.focusPeakingBitmap = result.newFocusPeakingBitmap
-
-            if (preview.wantPreShots && result.previewBitmapFullCopy != null) {
-                if (preview.isTakingPhoto) {
-                    // don't add pre-shots once already taking a photo (otherwise we may have pre-shots after the photo was taken)
-                    result.previewBitmapFullCopy!!.recycle()
-                } else {
-                    // add to ringBuffer on UI thread, to avoid threading issues
-                    preview.preShotsRingBuffer.add(result.previewBitmapFullCopy)
-                }
-            }
-
-            preview.refreshPreviewBitmapTask = null
-
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "onPostExecute done, async task: $this"
-            )
-        }
-
-        override fun onCancelled() {
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "onCancelled, async task: $this"
-            )
-            val preview = previewReference.get() ?: return
-            preview.refreshPreviewBitmapTask = null
-        }
-
-        companion object {
-            private const val TAG = "RefreshPreviewBmTask"
-            private fun computeHistogramRS(
-                allocationIn: Allocation?,
-                rs: RenderScript?,
-                histogramScript: ScriptC_histogram_compute,
-                histogramType: HistogramType
-            ): IntArray {
-                var debugTime: Long = 0
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "computeHistogramRS")
-                    debugTime = System.currentTimeMillis()
-                }
-
-                val newHistogram: IntArray
-
-                if (histogramType == HistogramType.HISTOGRAM_TYPE_RGB) {
-                    if (MyDebug.LOG) Log.d(TAG, "rgb histogram")
-                    val histogramAllocationR = Allocation.createSized(rs, Element.I32(rs), 256)
-                    val histogramAllocationG = Allocation.createSized(rs, Element.I32(rs), 256)
-                    val histogramAllocationB = Allocation.createSized(rs, Element.I32(rs), 256)
-
-                    if (MyDebug.LOG) Log.d(TAG, "bind histogram allocations")
-                    histogramScript.bind_histogram_r(histogramAllocationR)
-                    histogramScript.bind_histogram_g(histogramAllocationG)
-                    histogramScript.bind_histogram_b(histogramAllocationB)
-                    histogramScript.invoke_init_histogram_rgb()
-                    if (MyDebug.LOG) Log.d(TAG, "call histogramScript")
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time before histogramScript: " + (System.currentTimeMillis() - debugTime)
-                    )
-                    histogramScript.forEach_histogram_compute_rgb(allocationIn)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after histogramScript: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    newHistogram = IntArray(256 * 3)
-                    var c = 0
-                    val temp = IntArray(256)
-
-                    histogramAllocationR.copyTo(temp)
-                    for (i in 0..255) newHistogram[c++] = temp[i]
-
-                    histogramAllocationG.copyTo(temp)
-                    for (i in 0..255) newHistogram[c++] = temp[i]
-
-                    histogramAllocationB.copyTo(temp)
-                    for (i in 0..255) newHistogram[c++] = temp[i]
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after copying histogram data: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    histogramAllocationR.destroy()
-                    histogramAllocationG.destroy()
-                    histogramAllocationB.destroy()
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after destroying allocations: " + (System.currentTimeMillis() - debugTime)
-                    )
-                } else {
-                    if (MyDebug.LOG) Log.d(TAG, "single channel histogram")
-                    val histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256)
-
-                    if (MyDebug.LOG) Log.d(TAG, "bind histogram allocation")
-                    histogramScript.bind_histogram(histogramAllocation)
-                    histogramScript.invoke_init_histogram()
-                    if (MyDebug.LOG) Log.d(TAG, "call histogramScript")
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time before histogramScript: " + (System.currentTimeMillis() - debugTime)
-                    )
-                    when (histogramType) {
-                        HistogramType.HISTOGRAM_TYPE_LUMINANCE -> histogramScript.forEach_histogram_compute_by_luminance(
-                            allocationIn
-                        )
-
-                        HistogramType.HISTOGRAM_TYPE_VALUE -> histogramScript.forEach_histogram_compute_by_value(
-                            allocationIn
-                        )
-
-                        HistogramType.HISTOGRAM_TYPE_INTENSITY -> histogramScript.forEach_histogram_compute_by_intensity(
-                            allocationIn
-                        )
-
-                        HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> histogramScript.forEach_histogram_compute_by_lightness(
-                            allocationIn
-                        )
-
-                        else -> {}
-                    }
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after histogramScript: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    newHistogram = IntArray(256)
-                    histogramAllocation.copyTo(newHistogram)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after copying histogram data: " + (System.currentTimeMillis() - debugTime)
-                    )
-
-                    histogramAllocation.destroy()
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "time after destroying allocations: " + (System.currentTimeMillis() - debugTime)
-                    )
-                }
-                return newHistogram
-            }
-        }
-    }
+    val preShotsRingBuffer: PreShotsRingBuffer = PreShotsRingBuffer()
 
     init {
         if (MyDebug.LOG) {
@@ -9117,24 +8463,78 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 updatePreshot = true
             }
 
-            refreshPreviewBitmapTask = RefreshPreviewBitmapTask(
-                this,
-                updateHistogram,
-                updatePreshot,
-                previewBitmapFullW,
-                previewBitmapFullH
-            )
-            refreshPreviewBitmapTask!!.execute()
+            val textureView = cameraSurface as? TextureView
+            if (previewBitmap != null && textureView != null) {
+                try {
+                    textureView.getBitmap(previewBitmap!!)
+                } catch (e: Exception) {
+                    if (MyDebug.LOG) Log.e(TAG, "failed to getBitmap: ${e.message}")
+                }
+            }
+
+            if (previewBitmapFullW != -1 && previewBitmapFullH != -1 && updatePreshot && textureView != null) {
+                try {
+                    val fullCopy = createBitmap(previewBitmapFullW, previewBitmapFullH)
+                    textureView.getBitmap(fullCopy)
+                    if (isTakingPhoto) {
+                        fullCopy.recycle()
+                    } else {
+                        preShotsRingBuffer.add(fullCopy)
+                    }
+                } catch (e: Exception) {
+                    if (MyDebug.LOG) Log.e(TAG, "failed to create preview full bitmap: ${e.message}")
+                }
+            }
+
+            if (previewBitmap != null) {
+                val rotationDeg = getDisplayRotationDegrees(false)
+                val config = FrameAnalysisConfig(
+                    wantHistogram = updateHistogram,
+                    histogramType = this.histogramType,
+                    wantZebraStripes = this.wantZebraStripes,
+                    zebraStripesThreshold = this.zebraStripesThreshold,
+                    zebraStripesColorForeground = this.zebraStripesColorForeground,
+                    zebraStripesColorBackground = this.zebraStripesColorBackground,
+                    wantFocusPeaking = this.wantFocusPeaking,
+                    rotationDegrees = rotationDeg
+                )
+
+                isAnalyzingFrame = true
+                analysisJob = CoroutineScope(Dispatchers.Default).launch {
+                    val result = frameAnalyzer.analyzeFrameDirect(
+                        previewBitmap = previewBitmap!!,
+                        config = config,
+                        zebraStripesBuffer = zebraStripesBitmapBuffer,
+                        focusPeakingBuffer = focusPeakingBitmapBuffer,
+                        focusPeakingBufferTemp = focusPeakingBitmapBufferTemp
+                    )
+                    withContext(Dispatchers.Main) {
+                        isAnalyzingFrame = false
+                        val activity = context as? Activity
+                        if (activity != null && !activity.isFinishing && result != null) {
+                            if (result.histogram != null) {
+                                histogram = result.histogram
+                            }
+                            if (zebraStripesBitmap != null) {
+                                zebraStripesBitmap?.recycle()
+                            }
+                            zebraStripesBitmap = result.zebraStripesBitmap
+
+                            if (focusPeakingBitmap != null) {
+                                focusPeakingBitmap?.recycle()
+                            }
+                            focusPeakingBitmap = result.focusPeakingBitmap
+                        }
+                    }
+                }
+            }
         }
     }
 
     private fun cancelRefreshPreviewBitmap() {
         if (MyDebug.LOG) Log.d(TAG, "cancelRefreshPreviewBitmap")
-        if (refreshPreviewBitmapTaskIsRunning()) {
-            refreshPreviewBitmapTask!!.cancel(true)
-            // we don't set refreshPreviewBitmapTask to null - this will be done by the task itself when it completes;
-            // and we want to know when the task is no longer running (e.g., for freePreviewBitmap()).
-        }
+        analysisJob?.cancel()
+        isAnalyzingFrame = false
     }
 
     val isVideoRecording: Boolean
