@@ -59,6 +59,8 @@ import com.hightechif.openkamera.cameracontroller.burst.Camera2CaptureCoordinato
 import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculator
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
+import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
+import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
 import java.util.Collections
@@ -190,7 +192,12 @@ class CameraController2(
     // lock to synchronize between UI thread and the background "CameraBackground" thread/handler
     private val backgroundCameraLock = Any()
 
-    private var imageReader: ImageReader? = null
+    val imageReaderPipeline = Camera2ImageReaderPipeline()
+    private val imageReader: ImageReader?
+        get() = imageReaderPipeline.imageReaderJpeg
+    private val imageReaderRaw: ImageReader?
+        get() = imageReaderPipeline.imageReaderRaw
+    private var onImageAvailableListener: OnImageAvailableListener? = null
 
     val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
 
@@ -263,8 +270,6 @@ class CameraController2(
     //private boolean wantRaw = true;
     private var maxRawImages = 0
     private var rawSize: android.util.Size? = null
-    private var imageReaderRaw: ImageReader? = null
-    private var onImageAvailableListener: OnImageAvailableListener? = null
     private var onRawImageAvailableListener: OnRawImageAvailableListener? = null
     private var pictureCb: PictureCallback? = null
     private var jpegTodo = false // whether we are still waiting for JPEG images
@@ -1137,16 +1142,9 @@ class CameraController2(
 
     private fun closePictureImageReader() {
         if (MyDebug.LOG) Log.d(TAG, "closePictureImageReader()")
-        if (imageReader != null) {
-            imageReader!!.close()
-            imageReader = null
-            onImageAvailableListener = null
-        }
-        if (imageReaderRaw != null) {
-            imageReaderRaw!!.close()
-            imageReaderRaw = null
-            onRawImageAvailableListener = null
-        }
+        imageReaderPipeline.closePipeline()
+        onImageAvailableListener = null
+        onRawImageAvailableListener = null
     }
 
     private fun convertFocusModesToValues(supportedFocusModesArr: IntArray): MutableList<String>? {
@@ -3385,47 +3383,33 @@ class CameraController2(
             if (MyDebug.LOG) Log.e(TAG, "application needs to call setPictureSize()")
             throw RuntimeException() // throw as RuntimeException, as this is a programming error
         }
-        // maxImages only needs to be 2, as we always read the JPEG data and close the image straight away in the imageReader
-        imageReader = ImageReader.newInstance(
-            pictureWidth,
-            pictureHeight,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && wantJpegR) ImageFormat.JPEG_R else ImageFormat.JPEG,
-            2
+        val config = ImageReaderConfig(
+            pictureWidth = pictureWidth,
+            pictureHeight = pictureHeight,
+            isJpegR = wantJpegR,
+            wantRaw = wantRaw,
+            rawSize = rawSize,
+            maxRawImages = maxRawImages,
+            isVideoMode = previewIsVideoMode
         )
-        //imageReader = ImageReader.newInstance(pictureWidth, pictureHeight, ImageFormat.YUV_420_888, 2);
-        if (MyDebug.LOG) {
-            Log.d(
-                TAG,
-                "created new imageReader: $imageReader"
-            )
-            Log.d(TAG, "imageReader surface: " + imageReader!!.surface.toString())
-        }
-        // It's intentional that we pass a handler on null, so the OnImageAvailableListener runs on the UI thread.
-        // If ever we want to change this on future, we should ensure that all image available listeners (JPEG+RAW) are
-        // using the same handler/thread.
-        imageReader!!.setOnImageAvailableListener(OnImageAvailableListener().also {
+        val jpegListener = OnImageAvailableListener().also {
             onImageAvailableListener = it
-        }, null)
-        if (wantRaw && rawSize != null && !previewIsVideoMode) {
-            // unlike the JPEG imageReader, we can't read the data and close the image straight away, so we need to allow a larger
-            // value for maxImages
-            imageReaderRaw = ImageReader.newInstance(
-                rawSize!!.width,
-                rawSize!!.height,
-                ImageFormat.RAW_SENSOR,
-                maxRawImages
-            )
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "created new imageReaderRaw: $imageReaderRaw"
-                )
-                Log.d(TAG, "imageReaderRaw surface: " + imageReaderRaw!!.surface.toString())
-            }
-            // see note above for imageReader.setOnImageAvailableListener for why we use a null handler
-            imageReaderRaw!!.setOnImageAvailableListener(OnRawImageAvailableListener().also {
+        }
+        val rawListener = if (wantRaw && rawSize != null && !previewIsVideoMode) {
+            OnRawImageAvailableListener().also {
                 onRawImageAvailableListener = it
-            }, null)
+            }
+        } else {
+            null
+        }
+        imageReaderPipeline.createPipeline(config, jpegListener, rawListener, null)
+        if (MyDebug.LOG) {
+            Log.d(TAG, "created new imageReader: $imageReader")
+            Log.d(TAG, "imageReader surface: " + imageReader?.surface.toString())
+            if (imageReaderRaw != null) {
+                Log.d(TAG, "created new imageReaderRaw: $imageReaderRaw")
+                Log.d(TAG, "imageReaderRaw surface: " + imageReaderRaw?.surface.toString())
+            }
         }
     }
 
