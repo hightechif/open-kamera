@@ -60,6 +60,7 @@ import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculato
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
+import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManager
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
 import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
@@ -192,6 +193,7 @@ class CameraController2(
     // lock to synchronize between UI thread and the background "CameraBackground" thread/handler
     private val backgroundCameraLock = Any()
 
+    val sessionManager = Camera2SessionManager()
     val imageReaderPipeline = Camera2ImageReaderPipeline()
     private val imageReader: ImageReader?
         get() = imageReaderPipeline.imageReaderJpeg
@@ -4423,21 +4425,7 @@ class CameraController2(
         surfaces: List<Surface>,
         previewSurface: Surface?
     ): List<OutputConfiguration> {
-        val outputs: MutableList<OutputConfiguration> = ArrayList()
-        for (surface in surfaces) {
-            val config = OutputConfiguration(surface)
-            if (cameraIdSPhysical != null) {
-                config.setPhysicalCameraId(cameraIdSPhysical)
-            }
-            // On Galaxy S24+ at least, we seem to get UltraHDR photos even without setting DynamicRangeProfiles.HLG10
-            // furthermore, calling setDynamicRangeProfile with HLG10 gives photos with much lower saturation, so have
-            // disabled this
-            /*if( wantJpegR && surface == previewSurface && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ) {
-                config.setDynamicRangeProfile(DynamicRangeProfiles.HLG10);
-            }*/
-            outputs.add(config)
-        }
-        return outputs
+        return sessionManager.createOutputConfigurations(surfaces, cameraIdSPhysical)
     }
 
     @Throws(CameraControllerException::class)
