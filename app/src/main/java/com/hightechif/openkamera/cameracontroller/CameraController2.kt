@@ -55,6 +55,8 @@ import android.view.SurfaceHolder
 import android.view.TextureView
 import androidx.annotation.IntRange
 import androidx.annotation.RequiresApi
+import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
+import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
 import java.util.Collections
@@ -156,15 +158,32 @@ class CameraController2(
 
     private var previewBuilder: CaptureRequest.Builder? = null
     var previewIsVideoMode = false
-    private var autofocusCb: AutoFocusCallback? = null
-    private var autofocusTimeMs: Long = -1 // time we set autofocusCb to non-null
-    private var captureFollowsAutofocusHint = false
+    val focusMeteringCoordinator = Camera2FocusMeteringCoordinator()
+    private var autofocusCb: AutoFocusCallback?
+        get() = focusMeteringCoordinator.getAutofocusCallback()
+        set(value) {
+            if (value != null) {
+                focusMeteringCoordinator.startAutofocusTracking(value, captureFollowsAutofocusHint)
+            } else {
+                focusMeteringCoordinator.resetAutofocusTracking()
+            }
+        }
+    private var autofocusTimeMs: Long
+        get() = focusMeteringCoordinator.autofocusTimeMs
+        set(value) {
+            // Managed via focusMeteringCoordinator
+        }
+    private var captureFollowsAutofocusHint: Boolean
+        get() = focusMeteringCoordinator.captureFollowsAutofocusHint
+        set(value) {
+            focusMeteringCoordinator.setCaptureFollowsAutofocusHint(value)
+        }
     private var readyForCapture = false
     private var faceDetectionListener: FaceDetectionListener? = null
     private var lastFacesDetected = -1
 
     // lock to wait for camera to be opened from CameraDevice.StateCallback
-    private val OpenKameraLock = Any()
+    private val openCameraLock = Any()
 
     // lock to synchronize between UI thread and the background "CameraBackground" thread/handler
     private val backgroundCameraLock = Any()
@@ -297,8 +316,6 @@ class CameraController2(
     // when we last checked to use flash in auto mode
     private var fakePrecaptureUseFlashTimeMs: Long = -1
 
-    private var continuousFocusMoveCallback: ContinuousFocusMoveCallback? = null
-
     private val mediaActionSound = MediaActionSound()
     private val shutterClickSound: Int // which sound to use for shutter click
     private var soundsEnabled = true
@@ -380,7 +397,7 @@ class CameraController2(
         return captureSession != null
     }
 
-    private fun BLOCK_FOR_EXTENSIONS() {
+    private fun blockForExtensions() {
         if (sessionType == SessionType.SESSIONTYPE_EXTENSION) {
             throw RuntimeException("not supported for extension session")
         }
@@ -463,8 +480,8 @@ class CameraController2(
             }
 
             var singleBurstCompleteImages: List<ByteArray?>? = null
-            var call_takePhotoPartial = false
-            var call_takePhotoCompleted = false
+            var callTakePhotoPartial = false
+            var callTakePhotoCompleted = false
 
             val image = reader.acquireNextImage()
             if (image == null) {
@@ -510,7 +527,7 @@ class CameraController2(
                             TAG,
                             "number of burst images is now: " + pendingBurstImages.size
                         )
-                        call_takePhotoPartial = true
+                        callTakePhotoPartial = true
                     }
                 }
             }
@@ -528,7 +545,7 @@ class CameraController2(
                 if (singleBurstCompleteImages != null) {
                     pendingBurstImages.clear()
 
-                    call_takePhotoCompleted = true
+                    callTakePhotoCompleted = true
                 } else if (!burstSingleRequest) {
                     nBurst--
                     if (MyDebug.LOG) Log.d(
@@ -540,19 +557,19 @@ class CameraController2(
                         // also note if we do have continuousBurstRequestedLastCapture==true, we still check for
                         // nBurst==0 below (as there may have been more than one image still to be received)
                         if (MyDebug.LOG) Log.d(TAG, "continuous burst mode still in progress")
-                        call_takePhotoPartial = true
+                        callTakePhotoPartial = true
                     } else if (nBurst == 0) {
-                        call_takePhotoCompleted = true
+                        callTakePhotoCompleted = true
                     } else {
-                        call_takePhotoPartial = true
+                        callTakePhotoPartial = true
                     }
                 }
             }
 
             // need to call outside of lock (because they can lead to calls to external callbacks)
-            if (call_takePhotoPartial) {
+            if (callTakePhotoPartial) {
                 takePhotoPartial()
-            } else if (call_takePhotoCompleted) {
+            } else if (callTakePhotoCompleted) {
                 takePhotoCompleted()
             }
 
@@ -564,7 +581,7 @@ class CameraController2(
          */
         fun takePhotoPartial() {
             if (MyDebug.LOG) Log.d(TAG, "takePhotoPartial")
-            BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+            blockForExtensions() // not supported for extension sessions
 
             var pushTakePictureErrorCb: ErrorCallback? = null
 
@@ -653,8 +670,8 @@ class CameraController2(
                             this@CameraController2.nBurstTaken + 1,
                             slowBurstCaptureRequests.size
                         ).clear() // resize to nBurstTaken
-                        // if burstSingleRequest==true, nBurst is constant and we stop when pending_burst_images.size() >= nBurst
-                        // if burstSingleRequest==false, nBurst counts down and we stop when nBurst==0
+                        // if burstSingleRequest==true, nBurst is constant, and we stop when pending_burst_images.size() >= nBurst
+                        // if burstSingleRequest==false, nBurst counts down, and we stop when nBurst==0
                         if (burstSingleRequest) {
                             nBurst = slowBurstCaptureRequests.size
                             if (nBurstRaw > 0) {
@@ -1293,7 +1310,7 @@ class CameraController2(
                 // we currently only make use of the "SIMPLE" features, documented as:
                 // "Return face rectangle and confidence values only."
                 // note that devices that support STATISTICS_FACE_DETECT_MODE_FULL (e.g., Nexus 6) don't return
-                // STATISTICS_FACE_DETECT_MODE_SIMPLE in the list, so we have check for either
+                // STATISTICS_FACE_DETECT_MODE_SIMPLE in the list, so we have checked for either
                 if (faceMode == CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_SIMPLE) {
                     cameraFeatures.supportsFaceDetection = true
                     supportsFaceDetectModeSimple = true
@@ -1382,7 +1399,7 @@ class CameraController2(
                      // had previously worked for them. Note that we still check below for SENSOR_INFO_SENSITIVITY_RANGE and
                      // SENSOR_INFO_EXPOSURE_TIME_RANGE, so not checking REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR shouldn't
                      // enable manual ISO/exposure on devices that don't support it.
-                     // Also may affect Samsung Galaxy A8(2018).
+                     // Also, may affect Samsung Galaxy A8(2018).
                      // Instead we just block LEGACY devices (probably don't need to, again because we check
                      // SENSOR_INFO_SENSITIVITY_RANGE and SENSOR_INFO_EXPOSURE_TIME_RANGE, but just in case).
                      capabilitiesManualSensor = true;
@@ -1415,7 +1432,7 @@ class CameraController2(
             // (before 1.45) worked for them. It might be that this can still work, just not at 20fps.
             // So instead set to true for all LIMITED devices. Still keep block for LEGACY devices (which definitely shouldn't
             // support fast burst - and which Open Kamera never allowed with Camera2 before 1.45).
-            // Also may affect Samsung Galaxy A8(2018).
+            // Also, may affect Samsung Galaxy A8(2018).
             cameraFeatures.supportsBurst = CameraControllerManager2.isHardwareLevelSupported(
                 characteristics!!,
                 CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
@@ -2100,7 +2117,7 @@ class CameraController2(
                     if (exposureTimeRange != null) {
                         cameraFeatures.supportsExposureTime = true
                         cameraFeatures.supportsExpoBracketing = true
-                        cameraFeatures.maxExpoBracketingNImages = maxExpoBracketingNImages
+                        cameraFeatures.maxExpoBracketingNImages = MAX_EXPO_BRACKETING_N_IMAGES
                         cameraFeatures.minExposureTime = exposureTimeRange.lower
                         cameraFeatures.maxExposureTime = exposureTimeRange.upper
                         if ((isSamsungGalaxyS || isSamsungGalaxyF) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -2115,7 +2132,7 @@ class CameraController2(
                                 "boost max_exposure_time, was: $maxExposureTime"
                             )
                             cameraFeatures.maxExposureTime =
-                                Math.max(cameraFeatures.maxExposureTime, 1_000_000_000L / 2)
+                                cameraFeatures.maxExposureTime.coerceAtLeast(1_000_000_000L / 2)
                         }
                     }
                 }
@@ -2173,7 +2190,7 @@ class CameraController2(
                         // if supportsTonemapContrastCurve==true but supportsTonemapPresetCurve==false, we'll still support tonemapping, but always use contrast curves
                         if (supportsTonemapContrastCurve) {
                             cameraFeatures.tonemapMaxCurvePoints = tonemapMaxCurvePoints
-                            // for now we only expose supporting of custom tonemap curves if there are enough curve points for all the
+                            // for now, we only expose supporting of custom tonemap curves if there are enough curve points for all the
                             // profiles we support
                             // remember to divide by 2 if we're comparing against the raw array length!
                             cameraFeatures.supportsTonemapCurve =
@@ -2745,7 +2762,7 @@ class CameraController2(
         val supportedValues = checkModeIsSupported(values, value, EDGE_MODE_DEFAULT)
         if (supportedValues != null) {
             // for edge mode, if the requested value isn't available, we don't modify it at all
-            if (supportedValues.selectedValue.equals(value)) {
+            if (supportedValues.selectedValue == value) {
                 var hasEdgeMode = false
                 var selectedValue2 = CameraMetadata.EDGE_MODE_FAST
                 // if EDGE_MODE_DEFAULT, this means to stick with the device default
@@ -2841,7 +2858,7 @@ class CameraController2(
         val supportedValues = checkModeIsSupported(values, value, NOISE_REDUCTION_MODE_DEFAULT)
         if (supportedValues != null) {
             // for noise reduction, if the requested value isn't available, we don't modify it at all
-            if (supportedValues.selectedValue.equals(value)) {
+            if (supportedValues.selectedValue == value) {
                 var hasNoiseReductionMode = false
                 var selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST
                 // if NOISE_REDUCTION_MODE_DEFAULT, this means to stick with the device default
@@ -3229,8 +3246,8 @@ class CameraController2(
             if (MyDebug.LOG) Log.e(TAG, "n_images should be an odd number greater than 1")
             throw RuntimeException("n_images should be an odd number greater than 1") // throw as RuntimeException, as this is a programming error
         }
-        if (newNImages > maxExpoBracketingNImages) {
-            newNImages = maxExpoBracketingNImages
+        if (newNImages > MAX_EXPO_BRACKETING_N_IMAGES) {
+            newNImages = MAX_EXPO_BRACKETING_N_IMAGES
             if (MyDebug.LOG) Log.e(
                 TAG,
                 "limiting n_images to max of $newNImages"
@@ -3590,7 +3607,7 @@ class CameraController2(
     override var jpegQuality: Int
         get() = cameraSettings.jpegQuality.toInt()
         set(quality) {
-            if (quality < 0 || quality > 100) {
+            if (quality !in 0..100) {
                 if (MyDebug.LOG) Log.e(
                     TAG,
                     "invalid jpeg quality$quality"
@@ -3867,7 +3884,7 @@ class CameraController2(
                 TAG,
                 "setFocusValue: $focusValue"
             )
-            BLOCK_FOR_EXTENSIONS()
+            blockForExtensions()
             val focusMode: Int
             when (focusValue) {
                 "focus_mode_auto", "focus_mode_locked" -> focusMode =
@@ -4068,7 +4085,7 @@ class CameraController2(
         get() = previewBuilder?.get(CaptureRequest.CONTROL_AE_LOCK) ?: false
         set(enabled) {
             if (enabled) {
-                BLOCK_FOR_EXTENSIONS()
+                blockForExtensions()
             }
             cameraSettings.aeLock = enabled
             previewBuilder?.let { cameraSettings.setAutoExposureLock(it) }
@@ -4088,7 +4105,7 @@ class CameraController2(
         get() = previewBuilder?.get(CaptureRequest.CONTROL_AWB_LOCK) ?: false
         set(enabled) {
             if (enabled) {
-                BLOCK_FOR_EXTENSIONS()
+                blockForExtensions()
             }
             cameraSettings.wbLock = enabled
             previewBuilder?.let { cameraSettings.setAutoWhiteBalanceLock(it) }
@@ -4135,9 +4152,9 @@ class CameraController2(
     private val viewableRect: Rect
         /** Returns the viewable rect - this is crop region if available.
          * We need this as callers will pass in (or expect returned) CameraController.Area values that
-         * are relative to the current view (i.e., taking zoom into account) (the old Camera API in
+         * are relative to the current view (i.e., taking Zoom into account) (the old Camera API in
          * CameraController1 always works in terms of the current view, whilst Camera2 works in terms
-         * of the full view always). Similarly for the rect field in CameraController.Face.
+         * of the full view always). Similarly, for the rect field in CameraController.Face.
          */
         get() {
             if (previewBuilder != null) {
@@ -4179,73 +4196,53 @@ class CameraController2(
     }
 
     private fun convertAreaToMeteringRectangle(sensorRect: Rect, area: Area): MeteringRectangle {
-        val camera2Rect = convertRectToCamera2(sensorRect, area.rect)
-        return MeteringRectangle(camera2Rect, area.weight)
+        return MeteringAreaConverter.convertAreaToMeteringRectangle(sensorRect, area)
     }
 
     private fun convertRectFromCamera2(cropRect: Rect, camera2Rect: Rect): Rect {
-        // inverse of convertRectToCamera2()
-        val leftF = (camera2Rect.left - cropRect.left) / (cropRect.width() - 1).toDouble()
-        val topF = (camera2Rect.top - cropRect.top) / (cropRect.height() - 1).toDouble()
-        val rightF = (camera2Rect.right - cropRect.left) / (cropRect.width() - 1).toDouble()
-        val bottomF = (camera2Rect.bottom - cropRect.top) / (cropRect.height() - 1).toDouble()
-        var left = (leftF * 2000).toInt() - 1000
-        var right = (rightF * 2000).toInt() - 1000
-        var top = (topF * 2000).toInt() - 1000
-        var bottom = (bottomF * 2000).toInt() - 1000
-
-        left = max(left.toDouble(), -1000.0).toInt()
-        right = max(right.toDouble(), -1000.0).toInt()
-        top = max(top.toDouble(), -1000.0).toInt()
-        bottom = max(bottom.toDouble(), -1000.0).toInt()
-        left = min(left.toDouble(), 1000.0).toInt()
-        right = min(right.toDouble(), 1000.0).toInt()
-        top = min(top.toDouble(), 1000.0).toInt()
-        bottom = min(bottom.toDouble(), 1000.0).toInt()
-
-        return Rect(left, top, right, bottom)
+        return MeteringAreaConverter.convertRectFromCamera2(cropRect, camera2Rect)
     }
 
     private fun convertMeteringRectangleToArea(
         sensorRect: Rect,
         meteringRectangle: MeteringRectangle
     ): Area {
-        val areaRect = convertRectFromCamera2(sensorRect, meteringRectangle.rect)
-        return Area(areaRect, meteringRectangle.meteringWeight)
+        return MeteringAreaConverter.convertMeteringRectangleToArea(sensorRect, meteringRectangle)
     }
 
     private fun convertFromCameraFace(
         sensorRect: Rect,
         camera2Face: android.hardware.camera2.params.Face
     ): Face {
-        val areaRect = convertRectFromCamera2(sensorRect, camera2Face.bounds)
-        return Face(camera2Face.score, areaRect)
+        return MeteringAreaConverter.convertFromCameraFace(sensorRect, camera2Face)
     }
 
     override fun setFocusAndMeteringArea(areas: List<Area>): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "setFocusAndMeteringArea")
-        BLOCK_FOR_EXTENSIONS()
+        blockForExtensions()
         val sensorRect = viewableRect
         if (MyDebug.LOG) Log.d(
             TAG,
             "sensor_rect: " + sensorRect.left + " , " + sensorRect.top + " x " + sensorRect.right + " , " + sensorRect.bottom
         )
-        var hasFocus = false
-        var hasMetering = false
-        if ((characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) {
-            hasFocus = true
-            cameraSettings.afRegions = Array(areas.size) { i ->
-                convertAreaToMeteringRectangle(sensorRect, areas[i])
-            }
+        val maxAf = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+        val maxAe = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0
+        val regions =
+            focusMeteringCoordinator.calculateFocusAndMeteringAreas(areas, sensorRect, maxAf, maxAe)
+        cameraSettings.afRegions = regions.first
+        if (regions.first != null) {
             cameraSettings.setAFRegions(previewBuilder)
-        } else cameraSettings.afRegions = null
-        if ((characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) {
-            hasMetering = true
-            cameraSettings.aeRegions = Array(areas.size) { i ->
-                convertAreaToMeteringRectangle(sensorRect, areas[i])
-            }
+        } else {
+            cameraSettings.afRegions = null
+        }
+        cameraSettings.aeRegions = regions.second
+        if (regions.second != null) {
             cameraSettings.setAERegions(previewBuilder)
-        } else cameraSettings.aeRegions = null
+        } else {
+            cameraSettings.aeRegions = null
+        }
+        val hasFocus = regions.first != null
+        val hasMetering = regions.second != null
         if (hasFocus || hasMetering) {
             try {
                 setRepeatingRequest()
@@ -4263,30 +4260,26 @@ class CameraController2(
 
     override fun clearFocusAndMetering() {
         if (MyDebug.LOG) Log.d(TAG, "clearFocusAndMetering")
-        BLOCK_FOR_EXTENSIONS()
+        blockForExtensions()
         val sensorRect = viewableRect
-        var hasFocus = false
-        var hasMetering = false
-        if (sensorRect.width() <= 0 || sensorRect.height() <= 0) {
-            // had a crash on Google Play due to creating a MeteringRectangle with -ve width/height ?!
-            cameraSettings.afRegions = null
-            cameraSettings.aeRegions = null
+        val maxAf = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+        val maxAe = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0
+        val regions =
+            focusMeteringCoordinator.calculateClearFocusAndMeteringAreas(sensorRect, maxAf, maxAe)
+        cameraSettings.afRegions = regions.first
+        if (regions.first != null) {
+            cameraSettings.setAFRegions(previewBuilder)
         } else {
-            if ((characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) {
-                hasFocus = true
-                cameraSettings.afRegions = arrayOf(
-                    MeteringRectangle(0, 0, sensorRect.width() - 1, sensorRect.height() - 1, 0)
-                )
-                cameraSettings.setAFRegions(previewBuilder)
-            } else cameraSettings.afRegions = null
-            if ((characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) {
-                hasMetering = true
-                cameraSettings.aeRegions = arrayOf(
-                    MeteringRectangle(0, 0, sensorRect.width() - 1, sensorRect.height() - 1, 0)
-                )
-                cameraSettings.setAERegions(previewBuilder)
-            } else cameraSettings.aeRegions = null
+            cameraSettings.afRegions = null
         }
+        cameraSettings.aeRegions = regions.second
+        if (regions.second != null) {
+            cameraSettings.setAERegions(previewBuilder)
+        } else {
+            cameraSettings.aeRegions = null
+        }
+        val hasFocus = regions.first != null
+        val hasMetering = regions.second != null
         if (hasFocus || hasMetering) {
             try {
                 setRepeatingRequest()
@@ -4307,44 +4300,20 @@ class CameraController2(
 
     override val focusAreas: List<Area>?
         get() {
-            if (characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) == 0) return null
-            if (cameraSettings.afRegions == null) {
-                // needed to fix failure on Android emulator in testTakePhotoContinuousNoTouch - can happen when CONTROL_MAX_REGIONS_AF > 0, but Camera only has 1 focus mode so Preview doesn't set focus areas
-                return null
-            }
-            val meteringRectangles = previewBuilder?.get(CaptureRequest.CONTROL_AF_REGIONS)
-                ?: return null
-            val sensorRect = viewableRect
-            if (meteringRectangles.size == 1 && meteringRectangles[0].rect.left == 0 && meteringRectangles[0].rect.top == 0 && meteringRectangles[0].rect.right == sensorRect.width() - 1 && meteringRectangles[0].rect.bottom == sensorRect.height() - 1) {
-                // for compatibility with CameraController1
-                return null
-            }
-            val areas: MutableList<Area> = ArrayList()
-            for (meteringRectangle in meteringRectangles) {
-                areas.add(convertMeteringRectangleToArea(sensorRect, meteringRectangle))
-            }
-            return areas
+            val maxAf = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+            if (maxAf == 0 || cameraSettings.afRegions == null) return null
+            val meteringRectangles =
+                previewBuilder?.get(CaptureRequest.CONTROL_AF_REGIONS) ?: return null
+            return focusMeteringCoordinator.extractAreas(meteringRectangles, viewableRect, maxAf)
         }
 
     override val meteringAreas: List<Area>?
         get() {
-            if (characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) == 0) return null
-            if (cameraSettings.aeRegions == null) {
-                // needed to fix failure on Android emulator in testTakePhotoContinuousNoTouch - can happen when CONTROL_MAX_REGIONS_AF > 0, but Camera only has 1 focus mode so Preview doesn't set focus areas
-                return null
-            }
-            val meteringRectangles = previewBuilder?.get(CaptureRequest.CONTROL_AE_REGIONS)
-                ?: return null
-            val sensorRect = viewableRect
-            if (meteringRectangles.size == 1 && meteringRectangles[0].rect.left == 0 && meteringRectangles[0].rect.top == 0 && meteringRectangles[0].rect.right == sensorRect.width() - 1 && meteringRectangles[0].rect.bottom == sensorRect.height() - 1) {
-                // for compatibility with CameraController1
-                return null
-            }
-            val areas: MutableList<Area> = ArrayList()
-            for (meteringRectangle in meteringRectangles) {
-                areas.add(convertMeteringRectangleToArea(sensorRect, meteringRectangle))
-            }
-            return areas
+            val maxAe = characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0
+            if (maxAe == 0 || cameraSettings.aeRegions == null) return null
+            val meteringRectangles =
+                previewBuilder?.get(CaptureRequest.CONTROL_AE_REGIONS) ?: return null
+            return focusMeteringCoordinator.extractAreas(meteringRectangles, viewableRect, maxAe)
         }
 
     override fun supportsAutoFocus(): Boolean {
@@ -4457,7 +4426,7 @@ class CameraController2(
                 if (MyDebug.LOG) Log.d(TAG, "no camera or capture session")
                 return
             }
-            BLOCK_FOR_EXTENSIONS() // not yet supported for extension sessions
+            blockForExtensions() // not yet supported for extension sessions
             captureSession?.capture(request, previewCaptureCallback, handler)
         }
     }
@@ -4960,8 +4929,8 @@ class CameraController2(
             // the preview builder defaults to CONTROL_AF_MODE_CONTINUOUS_PICTURE! This meant we froze when trying to take a photo, because we thought
             // we were in continuous picture mode and so waited in state STATE_WAITING_AUTOFOCUS, but the focus never occurred.
             // Ideally the caller to CameraController2 (Preview) should always explicitly set a focus mode if at least 1 focus mode is supported. At the
-            // time of writing, Preview only sets a focus if at least 2 focus modes are supported. But even if we fix that in future, still good to have
-            // well defined behavior at the CameraController level.
+            // time of writing, Preview only sets a focus if at least 2 focus modes are supported. But even if we fix that in the future, still good to have
+            // well-defined behavior at the CameraController level.
             focusValue = initialFocusMode
         }
 
@@ -5042,7 +5011,7 @@ class CameraController2(
 
     override fun startFaceDetection(): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "startFaceDetection")
-        BLOCK_FOR_EXTENSIONS()
+        blockForExtensions()
         if (previewBuilder?.get(CaptureRequest.STATISTICS_FACE_DETECT_MODE) != null && previewBuilder?.get(
                 CaptureRequest.STATISTICS_FACE_DETECT_MODE
             ) != CaptureRequest.STATISTICS_FACE_DETECT_MODE_OFF
@@ -5082,7 +5051,7 @@ class CameraController2(
 
     override fun setFaceDetectionListener(listener: FaceDetectionListener?) {
         if (listener != null) {
-            BLOCK_FOR_EXTENSIONS()
+            blockForExtensions()
         }
         this.faceDetectionListener = listener
         this.lastFacesDetected = -1
@@ -5201,7 +5170,7 @@ class CameraController2(
                         // setRepeatingRequest.
                         // Update for 1.37: now we do need this for Nexus 6 too, after switching to setting CONTROL_AE_MODE_ON_AUTO_FLASH
                         // or CONTROL_AE_MODE_ON_ALWAYS_FLASH even for fake flash (see note in CameraSettings.setAEMode()) - and we
-                        // needed to increase to 200ms! Otherwise photos come out too dark for flash on if doing touch to focus then
+                        // needed to increase to 200ms! Otherwise, photos come out too dark for flash on if doing touch to focus then
                         // quickly taking a photo. (It also work to previously switch to CONTROL_AE_MODE_ON/FLASH_MODE_OFF first,
                         // but then the same problem shows up on OnePlus 3T again!)
                         try {
@@ -5256,7 +5225,7 @@ class CameraController2(
                 "capture_follows_autofocus_hint? $captureFollowsAutofocusHint"
             )
         }
-        BLOCK_FOR_EXTENSIONS()
+        blockForExtensions()
         synchronized(backgroundCameraLock) {
             this.captureFollowsAutofocusHint = captureFollowsAutofocusHint
         }
@@ -5326,9 +5295,9 @@ class CameraController2(
     override fun setContinuousFocusMoveCallback(cb: ContinuousFocusMoveCallback?) {
         if (MyDebug.LOG) Log.d(TAG, "setContinuousFocusMoveCallback")
         if (cb != null) {
-            BLOCK_FOR_EXTENSIONS()
+            blockForExtensions()
         }
-        this.continuousFocusMoveCallback = cb
+        focusMeteringCoordinator.setContinuousFocusMoveCallback(cb)
     }
 
     /** Whether the stillRequest has a manual exposure time different to the preview, and if so,
@@ -5628,7 +5597,7 @@ class CameraController2(
                 "takePictureBurstBracketing called but unexpected burst_type: $burstType"
             )
         }
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
 
         val requests: MutableList<CaptureRequest> = ArrayList()
         var ok = true
@@ -5641,15 +5610,15 @@ class CameraController2(
             }
             try {
                 if (MyDebug.LOG) {
-                    Log.d(TAG, "imageReader: " + imageReader.toString())
+                    Log.d(TAG, "imageReader: $imageReader")
                     Log.d(TAG, "imageReader surface: " + imageReader!!.surface.toString())
                 }
                 var nDummyRequests = 0
 
                 val stillBuilder =
                     camera!!.createCaptureRequest(if (burstType === BurstType.BURSTTYPE_EXPO || cameraSettings.hasIso) CameraDevice.TEMPLATE_MANUAL else CameraDevice.TEMPLATE_STILL_CAPTURE)
-                // Needs to be TEMPLATE_MANUAL! Otherwise first image in burst may come out incorrectly (on Pixel 6 Pro,
-                // the first image incorrectly had HDR+ applied, which we don't want here). Also problem on Pixel 6 Pro
+                // Needs to be TEMPLATE_MANUAL! Otherwise, first image in burst may come out incorrectly (on Pixel 6 Pro,
+                // the first image incorrectly had HDR+ applied, which we don't want here). Also, problem on Pixel 6 Pro
                 // where manual exposure is ignored when longer than the preview exposure.
                 // Update: but only when doing burst for expo bracketing, not focus bracketing (unless actually doing that
                 // in manual mode)! (Only manual exposure should use TEMPLATE_MANUAL, otherwise focus bracketing images
@@ -6164,7 +6133,7 @@ class CameraController2(
                 "takePictureBurstBracketing called but unexpected burst_type: $burstType"
             )
         }
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
 
         var isNewBurst = true
         var request: CaptureRequest? = null
@@ -6393,7 +6362,7 @@ class CameraController2(
     private fun runPrecapture() {
         if (MyDebug.LOG) Log.d(TAG, "runPrecapture")
 
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
 
         var debugTime: Long = 0
         if (MyDebug.LOG) {
@@ -6476,7 +6445,7 @@ class CameraController2(
     private fun runFakePrecapture() {
         if (MyDebug.LOG) Log.d(TAG, "runFakePrecapture")
 
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
 
         var debugTime: Long = 0
         if (MyDebug.LOG) {
@@ -6630,9 +6599,9 @@ class CameraController2(
             debugTime = System.currentTimeMillis()
         }
 
-        var call_takePictureAfterPrecapture = false
-        var call_runFakePrecapture = false
-        var call_runPrecapture = false
+        var callTakePictureAfterPrecapture = false
+        var callRunFakePrecapture = false
+        var callRunPrecapture = false
 
         synchronized(backgroundCameraLock) {
             if (camera == null || !hasCaptureSession()) {
@@ -6660,10 +6629,10 @@ class CameraController2(
                 }
                 if (sessionType == SessionType.SESSIONTYPE_EXTENSION) {
                     // precapture not supported for extensions
-                    call_takePictureAfterPrecapture = true
+                    callTakePictureAfterPrecapture = true
                 } else if (cameraSettings.flashValue == "flash_off" || cameraSettings.flashValue == "flash_torch" || cameraSettings.flashValue == "flash_frontscreen_torch") {
                     // Don't need precapture if flash off or torch
-                    call_takePictureAfterPrecapture = true
+                    callTakePictureAfterPrecapture = true
                 } else if (useFakePrecaptureMode) {
                     // fake flash auto/on mode
                     // fake precapture works by turning on torch (or using a "front screen flash"), so we can't use the camera's own decision for flash auto
@@ -6680,7 +6649,7 @@ class CameraController2(
                             TAG,
                             "fake precapture flash auto: seems bright enough to not need flash"
                         )
-                        call_takePictureAfterPrecapture = true
+                        callTakePictureAfterPrecapture = true
                     } else if (flashMode != null && flashMode == CameraMetadata.FLASH_MODE_TORCH) {
                         if (MyDebug.LOG) Log.d(
                             TAG,
@@ -6702,7 +6671,7 @@ class CameraController2(
                         state = STATE_WAITING_FAKE_PRECAPTURE_DONE
                         precaptureStateChangeTimeMs = System.currentTimeMillis()
                     } else {
-                        call_runFakePrecapture = true
+                        callRunFakePrecapture = true
                     }
                 } else {
                     // standard flash, flash auto or on
@@ -6715,20 +6684,20 @@ class CameraController2(
                         // if we call precapture anyway, flash wouldn't fire - but we tend to have a pause
                         // so skipping the precapture if flash isn't going to fire makes this faster
                         if (MyDebug.LOG) Log.d(TAG, "flash auto, but we don't need flash")
-                        call_takePictureAfterPrecapture = true
+                        callTakePictureAfterPrecapture = true
                     } else {
-                        call_runPrecapture = true
+                        callRunPrecapture = true
                     }
                 }
             }
         }
 
         // important to call functions outside of locks, so that they can in turn call callbacks without a lock
-        if (call_takePictureAfterPrecapture) {
+        if (callTakePictureAfterPrecapture) {
             takePictureAfterPrecapture()
-        } else if (call_runFakePrecapture) {
+        } else if (callRunFakePrecapture) {
             runFakePrecapture()
-        } else if (call_runPrecapture) {
+        } else if (callRunPrecapture) {
             runPrecapture()
         }
         if (MyDebug.LOG) {
@@ -6753,7 +6722,7 @@ class CameraController2(
 
     override fun initVideoRecorderPrePrepare(videoRecorder: MediaRecorder?) {
         // if we change where we play the START_VIDEO_RECORDING sound, make sure it can't be heard in resultant video
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
         playSound(MediaActionSound.START_VIDEO_RECORDING)
     }
 
@@ -6767,7 +6736,7 @@ class CameraController2(
             Log.e(TAG, "no camera")
             throw CameraControllerException()
         }
-        BLOCK_FOR_EXTENSIONS() // not supported for extension sessions
+        blockForExtensions() // not supported for extension sessions
         try {
             if (MyDebug.LOG) Log.d(TAG, "obtain video_recorder surface")
             previewBuilder = camera?.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
@@ -7070,7 +7039,7 @@ class CameraController2(
                     firstCallback = false
 
                     try {
-                        // we should be able to get characteristics at any time, but Google Camera only does so when camera opened - so do so similarly to be safe
+                        // we should be able to get characteristics at any time, but Google Camera only does so when camera opened - so do similarly to be safe
                         if (MyDebug.LOG) Log.d(TAG, "try to get camera characteristics")
                         characteristics =
                             manager.getCameraCharacteristics((cameraIdSPhysical ?: cameraIdS))
@@ -7139,10 +7108,10 @@ class CameraController2(
                     }
 
                     if (MyDebug.LOG) Log.d(TAG, "about to synchronize to say callback done")
-                    synchronized(OpenKameraLock) {
+                    synchronized(openCameraLock) {
                         callbackDone = true
                         if (MyDebug.LOG) Log.d(TAG, "callback done, about to notify")
-                        (OpenKameraLock as Object).notifyAll()
+                        (openCameraLock as Object).notifyAll()
                         if (MyDebug.LOG) Log.d(TAG, "callback done, notify done")
                     }
                 }
@@ -7173,10 +7142,10 @@ class CameraController2(
                     cam.close()
                     if (MyDebug.LOG) Log.d(TAG, "onDisconnected: camera is now closed")
                     if (MyDebug.LOG) Log.d(TAG, "about to synchronize to say callback done")
-                    synchronized(OpenKameraLock) {
+                    synchronized(openCameraLock) {
                         callbackDone = true
                         if (MyDebug.LOG) Log.d(TAG, "callback done, about to notify")
-                        (OpenKameraLock as Object).notifyAll()
+                        (openCameraLock as Object).notifyAll()
                         if (MyDebug.LOG) Log.d(TAG, "callback done, notify done")
                     }
                 }
@@ -7198,10 +7167,10 @@ class CameraController2(
                 }
                 this@CameraController2.onError(cam)
                 if (MyDebug.LOG) Log.d(TAG, "about to synchronize to say callback done")
-                synchronized(OpenKameraLock) {
+                synchronized(openCameraLock) {
                     callbackDone = true
                     if (MyDebug.LOG) Log.d(TAG, "callback done, about to notify")
-                    (OpenKameraLock as Object).notifyAll()
+                    (openCameraLock as Object).notifyAll()
                     if (MyDebug.LOG) Log.d(TAG, "callback done, notify done")
                 }
             }
@@ -7269,7 +7238,7 @@ class CameraController2(
                     TAG,
                     "check if camera has opened in reasonable time: $this"
                 )
-                synchronized(OpenKameraLock) {
+                synchronized(openCameraLock) {
                     if (MyDebug.LOG) {
                         Log.d(TAG, "synchronized on open_camera_lock")
                         Log.d(TAG, "callback_done: " + myStateCallback.callbackDone)
@@ -7279,7 +7248,7 @@ class CameraController2(
                         Log.e(TAG, "timeout waiting for camera callback")
                         myStateCallback.firstCallback = true
                         myStateCallback.callbackDone = true
-                        (OpenKameraLock as Object).notifyAll()
+                        (openCameraLock as Object).notifyAll()
                     }
                 }
             }
@@ -7290,11 +7259,11 @@ class CameraController2(
         // whilst this blocks, this should be running on a background thread anyway (see Preview.OpenKamera()) - due to maintaining
         // compatibility with the way the old camera API works, it's easier to handle running on a background thread at a higher level,
         // rather than exiting here
-        synchronized(OpenKameraLock) {
+        synchronized(openCameraLock) {
             while (!myStateCallback.callbackDone) {
                 try {
                     // release the lock, and wait until myStateCallback calls notifyAll()
-                    (OpenKameraLock as Object).wait()
+                    (openCameraLock as Object).wait()
                 } catch (e: InterruptedException) {
                     if (MyDebug.LOG) Log.d(TAG, "interrupted while waiting until camera opened")
                     e.printStackTrace()
@@ -7433,25 +7402,6 @@ class CameraController2(
             // n.b., we don't play the shutter sound here for RequestTagType.CAPTURE, as it typically sounds "too late"
             // (if ever we changed this, would also need to fix for burst, where we only set the RequestTagType.CAPTURE for the last image)
             super.onCaptureStarted(session, request, timestamp, frameNumber)
-        }
-
-        override fun onCaptureProgressed(
-            session: CameraCaptureSession,
-            request: CaptureRequest,
-            partialResult: CaptureResult
-        ) {
-            /*if( MyDebug.LOG )
-                Log.d(TAG, "onCaptureProgressed");*/
-            //process(request, partialResult);
-            // Note that we shouldn't try to process partial results - or if in future we decide to, remember that it's documented that
-            // not all results may be available. E.g., OnePlus 3T on Android 7 (OxygenOS 4.0.2) reports null for AF_STATE from this method.
-            // We'd also need to fix up the discarding of old frames in process(), as we probably don't want to be discarding the
-            // complete results from onCaptureCompleted()!
-            super.onCaptureProgressed(
-                session,
-                request,
-                partialResult
-            ) // API docs say this does nothing, but call it just to be safe (as with Google Camera)
         }
 
         override fun onCaptureCompleted(
@@ -7603,7 +7553,7 @@ class CameraController2(
                     Log.d(TAG, "CONTROL_AWB_STATE = " + awbState);
             }*/
             val autofocusTimeout =
-                autofocusTimeMs != -1L && System.currentTimeMillis() > autofocusTimeMs + autofocusTimeoutC
+                autofocusTimeMs != -1L && System.currentTimeMillis() > autofocusTimeMs + AUTOFOCUS_TIMEOUT_C
             if (MyDebug.LOG && autofocusTimeout) Log.d(TAG, "autofocus timeout!")
             if (afState != null && afState == CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN && !autofocusTimeout) {
                 /*if( MyDebug.LOG )
@@ -7774,7 +7724,7 @@ class CameraController2(
                     }
                     state = STATE_WAITING_PRECAPTURE_DONE
                     precaptureStateChangeTimeMs = System.currentTimeMillis()
-                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > precaptureStartTimeoutC) {
+                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > PRECAPTURE_START_TIMEOUT_C) {
                     // hack - give up waiting - sometimes we never get a CONTROL_AE_STATE_PRECAPTURE so would end up stuck
                     // always log error, so we can look for it when manually testing with logging disabled
                     Log.e(TAG, "precapture start timeout")
@@ -7801,7 +7751,7 @@ class CameraController2(
                     state = STATE_NORMAL
                     precaptureStateChangeTimeMs = -1
                     takePictureAfterPrecapture()
-                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > precaptureDoneTimeoutC) {
+                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > PRECAPTURE_DONE_TIMEOUT_C) {
                     // just in case
                     // always log error, so we can look for it when manually testing with logging disabled
                     Log.e(TAG, "precapture done timeout")
@@ -7849,7 +7799,7 @@ class CameraController2(
                     }
                     state = STATE_WAITING_FAKE_PRECAPTURE_DONE
                     precaptureStateChangeTimeMs = System.currentTimeMillis()
-                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > precaptureStartTimeoutC) {
+                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > PRECAPTURE_START_TIMEOUT_C) {
                     // just in case
                     // always log error, so we can look for it when manually testing with logging disabled
                     Log.e(TAG, "fake precapture start timeout")
@@ -7882,7 +7832,7 @@ class CameraController2(
                     state = STATE_NORMAL
                     precaptureStateChangeTimeMs = -1
                     takePictureAfterPrecapture()
-                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > precaptureDoneTimeoutC) {
+                } else if (precaptureStateChangeTimeMs != -1L && System.currentTimeMillis() - precaptureStateChangeTimeMs > PRECAPTURE_DONE_TIMEOUT_C) {
                     // sometimes camera can take a while to stop ae/af scanning, better to just go ahead and take photo
                     // always log error, so we can look for it when manually testing with logging disabled
                     Log.e(TAG, "fake precapture done timeout")
@@ -7896,19 +7846,7 @@ class CameraController2(
 
         fun handleContinuousFocusMove(result: CaptureResult) {
             val afState = result.get(CaptureResult.CONTROL_AF_STATE)
-            if (afState != null && afState == CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN && afState != lastAfState) {
-                /*if( MyDebug.LOG )
-                    Log.d(TAG, "continuous focusing started");*/
-                if (continuousFocusMoveCallback != null) {
-                    continuousFocusMoveCallback!!.onContinuousFocusMove(true)
-                }
-            } else if (afState != null && lastAfState == CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN && afState != lastAfState) {
-                /*if( MyDebug.LOG )
-                    Log.d(TAG, "continuous focusing stopped");*/
-                if (continuousFocusMoveCallback != null) {
-                    continuousFocusMoveCallback!!.onContinuousFocusMove(false)
-                }
-            }
+            focusMeteringCoordinator.evaluateContinuousFocusMove(afState)
         }
 
         /** Processes either a partial or total result.
@@ -7960,7 +7898,7 @@ class CameraController2(
                 /*if( camera_settings.hasIso && Math.abs(camera_settings.iso - captureResultIso) > 10 && previewBuilder != null ) {
                     // ugly hack: problem (on Nexus 6 at least) that when we start recording video (video_recorder.start() call), this often causes the ISO setting to reset to the wrong value!
                     // seems to happen more often with shorter exposure time
-                    // seems to happen on other camera apps with Camera2 API too
+                    // seems to happen on other camera apps with Camera2 API to
                     // update: allow some tolerance, as on OnePlus 3T it's normal to have some slight difference between requested and actual
                     // this workaround still means a brief flash with incorrect ISO, but is best we can do for now!
                     // check previewBuilder != null as we have had Google Play crashes from the setRepeatingRequest() call via here
@@ -8459,19 +8397,21 @@ class CameraController2(
             0.99f, 0.98f,
             1.00f, 1.00f
         )
-        private const val autofocusTimeoutC: Long =
-            1000 // timeout for calling autofocusCb (applies for both auto and continuous focus)
+
+        // timeout for calling autofocusCb (applies for both auto and continuous focus)
+        private const val AUTOFOCUS_TIMEOUT_C: Long = 1000
 
         // for BURSTTYPE_EXPO:
-        private const val maxExpoBracketingNImages = 5 // could be more, but limit to 5 for now
+        // could be more, but limit to 5 for now
+        private const val MAX_EXPO_BRACKETING_N_IMAGES = 5
         private const val STATE_NORMAL = 0
         private const val STATE_WAITING_AUTOFOCUS = 1
         private const val STATE_WAITING_PRECAPTURE_START = 2
         private const val STATE_WAITING_PRECAPTURE_DONE = 3
         private const val STATE_WAITING_FAKE_PRECAPTURE_START = 4
         private const val STATE_WAITING_FAKE_PRECAPTURE_DONE = 5
-        private const val precaptureStartTimeoutC: Long = 2000
-        private const val precaptureDoneTimeoutC: Long = 3000
+        private const val PRECAPTURE_START_TIMEOUT_C: Long = 2000
+        private const val PRECAPTURE_DONE_TIMEOUT_C: Long = 3000
 
         /*private boolean captureResultHasFocusDistance;
     private float captureResultFocusDistanceMin;
@@ -8825,7 +8765,7 @@ class CameraController2(
          - On both Nexus 6 and OnePlus 3T, taking photos with flash is longer, as we have flash firing
            for autofocus and precapture. Though note this is the case with autofocus mode anyway.
        Note for fake flash mode, we still can use doAfTriggerForContinuous==false (and doing the
-       af trigger for fake flash mode can sometimes mean flash fires for too long and we get a worse
+       af trigger for fake flash mode can sometimes mean flash fires for too long, and we get a worse
        result).
      */
         private const val DO_AF_TRIGGER_FOR_CONTINUOUS = false
@@ -8842,11 +8782,11 @@ class CameraController2(
             focusDistanceS = max(
                 focusDistanceS.toDouble(),
                 maxFocusBracketDistanceC.toDouble()
-            ).toFloat() // since we'll dealing with 1/distance, use Math.max
+            ).toFloat() // since we'll deal with 1/distance, use Math.max
             focusDistanceE = max(
                 focusDistanceE.toDouble(),
                 maxFocusBracketDistanceC.toDouble()
-            ).toFloat() // since we'll dealing with 1/distance, use Math.max
+            ).toFloat() // since we'll deal with 1/distance, use Math.max
             if (MyDebug.LOG) {
                 Log.d(
                     TAG,
