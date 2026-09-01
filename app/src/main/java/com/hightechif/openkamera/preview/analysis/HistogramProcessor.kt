@@ -8,13 +8,9 @@
 package com.hightechif.openkamera.preview.analysis
 
 import android.graphics.Bitmap
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import com.hightechif.openkamera.ScriptC_histogram_compute
-import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.JavaImageFunctionsHDR
 import com.hightechif.openkamera.processing.JavaImageProcessing
+import com.hightechif.openkamera.processing.NativeImageProcessorBridge
 
 /**
  * Encapsulates histogram computation across RGB, Luminance, Value, Intensity, and Lightness modes.
@@ -23,16 +19,29 @@ object HistogramProcessor {
 
     fun computeHistogram(
         bitmap: Bitmap,
-        type: HistogramType,
-        rs: RenderScript? = null,
-        histogramScript: ScriptC_histogram_compute? = null,
-        allocationIn: Allocation? = null
+        type: HistogramType
     ): IntArray {
-        return if (!HDRProcessor.USE_RENDERSCRIPT || rs == null || histogramScript == null || allocationIn == null) {
-            computeHistogramJava(bitmap, type)
-        } else {
-            computeHistogramRS(allocationIn, rs, histogramScript, type)
+        // 1. Try Native C++17 NEON Engine
+        if (NativeImageProcessorBridge.isAvailable()) {
+            val nativeResult = if (type == HistogramType.HISTOGRAM_TYPE_RGB) {
+                NativeImageProcessorBridge.computeHistogramRgb(bitmap)
+            } else {
+                val mode = when (type) {
+                    HistogramType.HISTOGRAM_TYPE_LUMINANCE -> 0
+                    HistogramType.HISTOGRAM_TYPE_VALUE -> 1
+                    HistogramType.HISTOGRAM_TYPE_INTENSITY -> 2
+                    HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> 3
+                    else -> 0
+                }
+                NativeImageProcessorBridge.computeHistogram(bitmap, mode)
+            }
+            if (nativeResult != null) {
+                return nativeResult
+            }
         }
+
+        // 2. Fallback to CPU Kotlin/Java
+        return computeHistogramJava(bitmap, type)
     }
 
     private fun computeHistogramJava(bitmap: Bitmap, type: HistogramType): IntArray {
@@ -54,54 +63,5 @@ object HistogramProcessor {
             bitmap.height
         )
         return function.histogram
-    }
-
-    private fun computeHistogramRS(
-        allocationIn: Allocation,
-        rs: RenderScript,
-        histogramScript: ScriptC_histogram_compute,
-        type: HistogramType
-    ): IntArray {
-        val newHistogram: IntArray
-        if (type == HistogramType.HISTOGRAM_TYPE_RGB) {
-            val histogramAllocationR = Allocation.createSized(rs, Element.I32(rs), 256)
-            val histogramAllocationG = Allocation.createSized(rs, Element.I32(rs), 256)
-            val histogramAllocationB = Allocation.createSized(rs, Element.I32(rs), 256)
-
-            histogramScript.bind_histogram_r(histogramAllocationR)
-            histogramScript.bind_histogram_g(histogramAllocationG)
-            histogramScript.bind_histogram_b(histogramAllocationB)
-            histogramScript.invoke_init_histogram_rgb()
-            histogramScript.forEach_histogram_compute_rgb(allocationIn)
-
-            newHistogram = IntArray(256 * 3)
-            var c = 0
-            val temp = IntArray(256)
-            histogramAllocationR.copyTo(temp)
-            for (i in 0 until 256) newHistogram[c++] = temp[i]
-            histogramAllocationG.copyTo(temp)
-            for (i in 0 until 256) newHistogram[c++] = temp[i]
-            histogramAllocationB.copyTo(temp)
-            for (i in 0 until 256) newHistogram[c++] = temp[i]
-
-            histogramAllocationR.destroy()
-            histogramAllocationG.destroy()
-            histogramAllocationB.destroy()
-        } else {
-            val histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256)
-            histogramScript.bind_histogram(histogramAllocation)
-            histogramScript.invoke_init_histogram()
-            when (type) {
-                HistogramType.HISTOGRAM_TYPE_LUMINANCE -> histogramScript.forEach_histogram_compute_by_luminance(allocationIn)
-                HistogramType.HISTOGRAM_TYPE_VALUE -> histogramScript.forEach_histogram_compute_by_value(allocationIn)
-                HistogramType.HISTOGRAM_TYPE_INTENSITY -> histogramScript.forEach_histogram_compute_by_intensity(allocationIn)
-                HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> histogramScript.forEach_histogram_compute_by_lightness(allocationIn)
-                else -> throw RuntimeException("unknown histogram type: $type")
-            }
-            newHistogram = IntArray(256)
-            histogramAllocation.copyTo(newHistogram)
-            histogramAllocation.destroy()
-        }
-        return newHistogram
     }
 }

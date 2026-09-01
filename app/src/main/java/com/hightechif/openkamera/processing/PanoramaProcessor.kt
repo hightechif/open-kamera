@@ -28,8 +28,6 @@ import android.util.Log
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withSave
 import com.hightechif.openkamera.MainActivity
-import com.hightechif.openkamera.ScriptC_feature_detector
-import com.hightechif.openkamera.ScriptC_pyramid_blending
 import com.hightechif.openkamera.processing.HDRProcessor.HistogramInfo
 import com.hightechif.openkamera.processing.JavaImageFunctionsPanorama.AddBitmapFunction
 import com.hightechif.openkamera.processing.JavaImageFunctionsPanorama.Blur1dXFullFunction
@@ -63,17 +61,8 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
     private var rs: RenderScript? =
         null // lazily created, so we don't take up resources if application isn't using panorama
 
-    // we lazily create and cache scripts that would otherwise have to be repeatedly created in a single
-    // panorama photo
-    // these should be set to null in freeScript(), to help garbage collection
-    private var pyramidBlendingScript: ScriptC_pyramid_blending? = null
-    private var featureDetectorScript: ScriptC_feature_detector? = null
-
     private fun freeScripts() {
         if (MyDebug.LOG) Log.d(TAG, "freeScripts")
-
-        pyramidBlendingScript = null
-        featureDetectorScript = null
     }
 
     fun onDestroy() {
@@ -104,25 +93,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             this.rs = RenderScript.create(context)
             if (MyDebug.LOG) Log.d(TAG, "create renderscript object")
         }
-    }
-
-    private fun reduceBitmapRS(
-        script: ScriptC_pyramid_blending,
-        allocation: Allocation
-    ): Allocation {
-        if (MyDebug.LOG) Log.d(TAG, "reduceBitmapRS")
-        val width = allocation.type.x
-        val height = allocation.type.y
-
-        val reducedAllocation = Allocation.createTyped(
-            rs,
-            Type.createXY(rs, Element.RGBA_8888(rs), width / 2, height / 2)
-        )
-
-        script.set_bitmap(allocation)
-        script.forEach_reduce(reducedAllocation, reducedAllocation)
-
-        return reducedAllocation
     }
 
     private fun reduceBitmap(bitmap: Bitmap): Bitmap {
@@ -235,83 +205,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         )
 
         return reducedBitmap
-    }
-
-    private fun expandBitmapRS(
-        script: ScriptC_pyramid_blending,
-        allocation: Allocation
-    ): Allocation {
-        if (MyDebug.LOG) Log.d(TAG, "expandBitmapRS")
-        var timeS: Long = 0
-        if (MyDebug.LOG) timeS = System.currentTimeMillis()
-
-        val width = allocation.type.x
-        val height = allocation.type.y
-        val resultAllocation: Allocation
-
-        val expandedAllocation = Allocation.createTyped(
-            rs,
-            Type.createXY(rs, Element.RGBA_8888(rs), 2 * width, 2 * height)
-        )
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### expandBitmap: time after creating expanded_allocation: " + (System.currentTimeMillis() - timeS)
-        )
-
-        script.set_bitmap(allocation)
-        script.forEach_expand(expandedAllocation, expandedAllocation)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### expandBitmap: time after expand: " + (System.currentTimeMillis() - timeS)
-        )
-
-        val useBlur2d = false // faster to do blur as two 1D passes
-        if (useBlur2d) {
-            resultAllocation = Allocation.createTyped(
-                rs,
-                Type.createXY(rs, Element.RGBA_8888(rs), 2 * width, 2 * height)
-            )
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### expandBitmap: time after creating result_allocation: " + (System.currentTimeMillis() - timeS)
-            )
-            script.set_bitmap(expandedAllocation)
-            script.forEach_blur(expandedAllocation, resultAllocation)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### expandBitmap: time after blur: " + (System.currentTimeMillis() - timeS)
-            )
-            expandedAllocation.destroy()
-            //resultAllocation = expandedAllocation;
-        } else {
-            val tempAllocation = Allocation.createTyped(
-                rs,
-                Type.createXY(rs, Element.RGBA_8888(rs), 2 * width, 2 * height)
-            )
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### expandBitmap: time after creating temp_allocation: " + (System.currentTimeMillis() - timeS)
-            )
-            script.set_bitmap(expandedAllocation)
-            script.forEach_blur1dX(expandedAllocation, tempAllocation)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### expandBitmap: time after blur1dX: " + (System.currentTimeMillis() - timeS)
-            )
-
-            // now re-use expandedAllocation for the resultAllocation
-            resultAllocation = expandedAllocation
-            script.set_bitmap(tempAllocation)
-            script.forEach_blur1dY(tempAllocation, resultAllocation)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### expandBitmap: time after blur1dY: " + (System.currentTimeMillis() - timeS)
-            )
-
-            tempAllocation.destroy()
-        }
-
-        return resultAllocation
     }
 
     private fun expandBitmap(bitmap: Bitmap): Bitmap {
@@ -489,26 +382,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
     /** Creates an allocation where each pixel equals the pixel from allocation0 minus the corresponding
      * pixel from allocation1.
      */
-    private fun subtractBitmapRS(
-        script: ScriptC_pyramid_blending,
-        allocation0: Allocation,
-        allocation1: Allocation
-    ): Allocation {
-        if (MyDebug.LOG) Log.d(TAG, "subtractBitmapRS")
-        val width = allocation0.type.x
-        val height = allocation0.type.y
-        if (allocation1.type.x != width || allocation1.type.y != height) {
-            Log.e(TAG, "allocations of different dimensions")
-            throw RuntimeException()
-        }
-        val resultAllocation =
-            Allocation.createTyped(rs, Type.createXY(rs, Element.F32_3(rs), width, height))
-        script.set_bitmap(allocation1)
-        script.forEach_subtract(allocation0, resultAllocation)
-
-        return resultAllocation
-    }
-
     /** Creates a floating point array represending a bitmap where each pixel equals the pixel from
      * bitmap0 minus the corresponding pixel from bitmap1.
      */
@@ -536,26 +409,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         return resultRgbf
     }
 
-    /** Updates allocation0 such that each pixel equals the pixel from allocation0 plus the
-     * corresponding pixel from allocation1.
-     * allocation0 should be of type RGBA_8888, allocation1 should be of type F32_3.
-     */
-    private fun addBitmapRS(
-        script: ScriptC_pyramid_blending,
-        allocation0: Allocation,
-        allocation1: Allocation
-    ) {
-        if (MyDebug.LOG) Log.d(TAG, "addBitmapRS")
-        val width = allocation0.type.x
-        val height = allocation0.type.y
-        if (allocation1.type.x != width || allocation1.type.y != height) {
-            Log.e(TAG, "allocations of different dimensions")
-            throw RuntimeException()
-        }
-        script.set_bitmap(allocation1)
-        script.forEach_add(allocation0, allocation0)
-    }
-
     /** Updates bitmap0 such that each pixel equals the pixel from bitmap0 plus the
      * corresponding pixel from bitmap1.
      * bitmap0 should be of type RGBA_8888, bitmap1 should be of type RGBf.
@@ -580,24 +433,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         )
     }
 
-    private fun createGaussianPyramidRS(
-        script: ScriptC_pyramid_blending,
-        bitmap: Bitmap,
-        nLevels: Int
-    ): MutableList<Allocation?> {
-        if (MyDebug.LOG) Log.d(TAG, "createGaussianPyramidRS")
-        val pyramid: MutableList<Allocation?> = ArrayList()
-
-        var allocation = Allocation.createFromBitmap(rs, bitmap)
-        pyramid.add(allocation)
-        for (i in 0..<nLevels) {
-            allocation = reduceBitmapRS(script, allocation)
-            pyramid.add(allocation)
-        }
-
-        return pyramid
-    }
-
     private fun createGaussianPyramid(bitmap: Bitmap, nLevels: Int): MutableList<Bitmap?> {
         var bitmap = bitmap
         if (MyDebug.LOG) Log.d(TAG, "createGaussianPyramid")
@@ -608,87 +443,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             bitmap = reduceBitmap(bitmap)
             pyramid.add(bitmap)
         }
-
-        return pyramid
-    }
-
-    /** Creates a laplacian pyramid of the supplied bitmap, ordered from bottom to top. The i-th
-     * entry is equal to [G(i) - G'(i+1)], where G(i) is the i-th level of the gaussian pyramid,
-     * and G' is created by expanding a level of the gaussian pyramid; except the last entry
-     * is simply equal to the last (i.e., top) level of the gaussian pyramid.
-     * The allocations are of type floating point (F32_3), except the last which is of type
-     * RGBA_8888.
-     */
-    private fun createLaplacianPyramidRS(
-        script: ScriptC_pyramid_blending,
-        bitmap: Bitmap,
-        nLevels: Int,
-        name: String
-    ): List<Allocation> {
-        if (MyDebug.LOG) Log.d(TAG, "createLaplacianPyramidRS")
-        var timeS: Long = 0
-        if (MyDebug.LOG) timeS = System.currentTimeMillis()
-
-        val gaussianPyramid = createGaussianPyramidRS(script, bitmap, nLevels)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### createLaplacianPyramid: time after createGaussianPyramid: " + (System.currentTimeMillis() - timeS)
-        )
-        /*if( MyDebug.LOG )
-        {
-            // debug
-            savePyramid("gaussian", gaussianPyramid);
-        }*/
-        val pyramid: MutableList<Allocation> = ArrayList()
-
-        for (i in 0..<gaussianPyramid.size - 1) {
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "createLaplacianPyramid: i = $i"
-            )
-            val thisGauss = gaussianPyramid[i]!!
-            val nextGauss = gaussianPyramid[i + 1]!!
-            val nextGaussExpanded = expandBitmapRS(script, nextGauss)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### createLaplacianPyramid: time after expandBitmap for level " + i + ": " + (System.currentTimeMillis() - timeS)
-            )
-            if (MyDebug.LOG) {
-                Log.d(TAG, "this_gauss: " + thisGauss.type.x + " , " + thisGauss.type.y)
-                Log.d(TAG, "next_gauss: " + nextGauss.type.x + " , " + nextGauss.type.y)
-                Log.d(
-                    TAG,
-                    "next_gauss_expanded: " + nextGaussExpanded.type.x + " , " + nextGaussExpanded.type.y
-                )
-            }
-            /*if( MyDebug.LOG )
-            {
-                // debug
-                saveAllocation(name + "_this_gauss_" + i + ".jpg", thisGauss);
-                saveAllocation(name + "_next_gauss_expanded_" + i + ".jpg", nextGaussExpanded);
-            }*/
-            val difference = subtractBitmapRS(script, thisGauss, nextGaussExpanded)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### createLaplacianPyramid: time after subtractBitmap for level " + i + ": " + (System.currentTimeMillis() - timeS)
-            )
-            /*if( MyDebug.LOG )
-            {
-                // debug
-                saveAllocation(name + "_difference_" + i + ".jpg", difference);
-            }*/
-            pyramid.add(difference)
-
-            //pyramid.add(thisGauss);
-            thisGauss.destroy()
-            gaussianPyramid[i] = null // to help garbage collection
-            nextGaussExpanded.destroy()
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### createLaplacianPyramid: time after level " + i + ": " + (System.currentTimeMillis() - timeS)
-            )
-        }
-        pyramid.add(gaussianPyramid[gaussianPyramid.size - 1]!!)
 
         return pyramid
     }
@@ -800,34 +554,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         return pyramid
     }
 
-    private fun collapseLaplacianPyramidRS(
-        script: ScriptC_pyramid_blending,
-        pyramid: List<Allocation>
-    ): Bitmap {
-        if (MyDebug.LOG) Log.d(TAG, "collapseLaplacianPyramidRS")
-
-        var allocation = pyramid[pyramid.size - 1]
-        var first = true
-        for (i in pyramid.size - 2 downTo 0) {
-            val expandedAllocation = expandBitmapRS(script, allocation)
-            if (!first) {
-                allocation.destroy()
-            }
-            addBitmapRS(script, expandedAllocation, pyramid[i])
-            allocation = expandedAllocation
-            first = false
-        }
-
-        val width = allocation.type.x
-        val height = allocation.type.y
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        allocation.copyTo(bitmap)
-        if (!first) {
-            allocation.destroy()
-        }
-        return bitmap
-    }
-
     private fun collapseLaplacianPyramid(pyramid: LaplacianPyramid): Bitmap? {
         if (MyDebug.LOG) Log.d(TAG, "collapseLaplacianPyramid")
 
@@ -909,121 +635,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 throw RuntimeException("blend window runs off right hand size")
             }
         }
-    }
-
-    /** Updates every allocation in pyramid0 to be a blend from the left hand of pyramid0 to the
-     * right hand of pyramid1.
-     * Note that the width of the blend region will be half of the width of each image.
-     * @param bestPath If non-null, the blend region will follow the supplied best path.
-     */
-    private fun mergePyramidsRS(
-        script: ScriptC_pyramid_blending,
-        pyramid0: List<Allocation>,
-        pyramid1: List<Allocation>,
-        bestPath: IntArray?,
-        bestPathNX: Int
-    ) {
-        var bestPath = bestPath
-        var bestPathNX = bestPathNX
-        if (MyDebug.LOG) Log.d(TAG, "mergePyramidsRS")
-
-        if (bestPath == null) {
-            bestPath = IntArray(1)
-            bestPathNX = 3
-            bestPath[0] = 1
-            //bestPath[0] = 2; // test
-        }
-        if (MyDebug.LOG) {
-            for (i in bestPath.indices) Log.d(TAG, "best_path[" + i + "]: " + bestPath[i])
-        }
-
-        //Allocation bestPathAllocation = Allocation.createSized(rs, Element.I32(rs), best_path.length);
-        //script.bindBestPath(bestPathAllocation);
-        //bestPathAllocation.copyFrom(bestPath);
-        var maxHeight = 0
-        for (i in pyramid0.indices) {
-            val allocation0 = pyramid0[i]
-            val height = allocation0.type.y
-            maxHeight = max(maxHeight.toDouble(), height.toDouble()).toInt()
-        }
-
-        val interpolatedbestPathAllocation = Allocation.createSized(rs, Element.I32(rs), maxHeight)
-        script.bind_interpolated_best_path(interpolatedbestPathAllocation)
-        val interpolatedBestPath = IntArray(maxHeight)
-
-        for (i in pyramid0.indices) {
-            val allocation0 = pyramid0[i]
-            val allocation1 = pyramid1[i]
-
-            val width = allocation0.type.x
-            val height = allocation0.type.y
-            if (allocation1.type.x != width || allocation1.type.y != height) {
-                Log.e(TAG, "allocations of different dimensions")
-                throw RuntimeException()
-            } else if (allocation0.type.element.dataType != allocation1.type.element.dataType) {
-                Log.e(TAG, "allocations of different data types")
-                throw RuntimeException()
-            }
-
-            script.set_bitmap(allocation1)
-
-            // when using bestPath, we have a narrower region to blend across
-            //int blendWindowWidth = width;
-            val blendWindowWidth = width / 2
-            //int blendWidth = (i==pyramid0.size()-1) ? blendWindowWidth : 2;
-            var blendWidth: Int
-            if (i == pyramid0.size - 1) {
-                blendWidth = blendWindowWidth
-            } else {
-                blendWidth = 2
-                for (j in 0..<i) {
-                    blendWidth *= 2
-                }
-                blendWidth = min(blendWidth.toDouble(), blendWindowWidth.toDouble()).toInt()
-            }
-
-            /*int blendWidth = blendWindowWidth;
-            for(int j=i;j<pyramid0.size()-1;j++) {
-                blendWidth /= 2;
-            }
-            blendWidth = Math.max(blendWidth, 2);*/
-            //blendWidth = 1; // test
-
-            //float bestPathXWidth = width / (bestPathNX+1.0f); // width of each "bucket" for the best paths
-            //blendWidth = Math.min(blendWidth, (int)(2.0f*bestPathXWidth+0.5f));
-            /*if( MyDebug.LOG ) {
-                Log.d(TAG, "i = " + i);
-                Log.d(TAG, "    width: " + width);
-                Log.d(TAG, "    blendWidth: " + blendWidth);
-                Log.d(TAG, "    height: " + height);
-                //Log.d(TAG, "    bestPathXWidth: " + bestPathXWidth);
-                Log.d(TAG, "    bestPathYScale: " + bestPathYScale);
-            }*/
-
-            // compute interpolatedBestPath
-            computeInterpolatedBestPath(
-                interpolatedBestPath,
-                width,
-                height,
-                blendWidth,
-                bestPath,
-                bestPathNX
-            )
-            interpolatedbestPathAllocation.copyFrom(interpolatedBestPath)
-
-            script.invoke_setBlendWidth(blendWidth, width)
-
-            //script.setBestPathXWidth(bestPathXWidth);
-            //script.setBestPathYScale(best_path.length/(float)height);
-            if (allocation0.type.element.dataType == Element.DataType.FLOAT_32) {
-                script.forEach_merge_f(allocation0, allocation0)
-            } else {
-                script.forEach_merge(allocation0, allocation0)
-            }
-        }
-
-        //bestPathAllocation.destroy();
-        interpolatedbestPathAllocation.destroy()
     }
 
     /** Updates every entry in pyramid0 to be a blend from the left hand of pyramid0 to the
@@ -1219,37 +830,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         var timeS: Long = 0
         if (MyDebug.LOG) timeS = System.currentTimeMillis()
 
-        if (!HDRProcessor.USE_RENDERSCRIPT) {
-        } else {
-            if (pyramidBlendingScript == null) {
-                pyramidBlendingScript = ScriptC_pyramid_blending(rs)
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after creating ScriptC_pyramid_blending: " + (System.currentTimeMillis() - timeS)
-            )
-        }
-
-        // debug
-        /*if( MyDebug.LOG )
-        {
-            saveBitmap(lhs, "lhs.jpg");
-            saveBitmap(rhs, "rhs.jpg");
-        }*/
-        // debug
-        /*if( MyDebug.LOG )
-        {
-            List<Allocation> lhsPyramid = createGaussianPyramid(script, lhs, blendNLevels);
-            List<Allocation> rhsPyramid = createGaussianPyramid(script, rhs, blendNLevels);
-            savePyramid("lhs_gauss", lhsPyramid);
-            savePyramid("rhs_gauss", rhsPyramid);
-            for(Allocation allocation : lhsPyramid) {
-                allocation.destroy();
-            }
-            for(Allocation allocation : rhsPyramid) {
-                allocation.destroy();
-            }
-        }*/
         if (lhs.width != rhs.width || lhs.height != rhs.height) {
             Log.e(TAG, "lhs/rhs bitmaps of different dimensions")
             throw RuntimeException()
@@ -1264,18 +844,13 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             throw RuntimeException()
         }
 
-        //final boolean findBestPath = false;
         val findBestPath = true
-        //final int bestPathNX = 3;
         val bestPathNX = 7
         val bestPathNY = 8
-        //final int bestPathNY = 16;
         var bestPath: IntArray? = null
         if (findBestPath) {
             bestPath = IntArray(bestPathNY)
 
-            //Bitmap bestPathLhs = lhs;
-            //Bitmap bestPathRhs = rhs;
             val scaleFactor = 4
             val bestPathLhs = Bitmap.createScaledBitmap(
                 lhs,
@@ -1290,37 +865,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 true
             )
 
-            // debug
-            /*if( MyDebug.LOG )
-            {
-                saveBitmap(bestPathLhs, "best_path_lhs.jpg");
-                saveBitmap(bestPathRhs, "best_path_rhs.jpg");
-            }*/
-            var computeErrorFunction: PyramidBlendingComputeErrorFunction? = null
-            var lhsAllocation: Allocation? = null
-            var rhsAllocation: Allocation? = null
-            var errors: IntArray? = null
-            var errorsAllocation: Allocation? = null
-            var launchOptions: LaunchOptions? = null
-            if (!HDRProcessor.USE_RENDERSCRIPT) {
-                computeErrorFunction = PyramidBlendingComputeErrorFunction(bestPathRhs)
-            } else {
-                lhsAllocation = Allocation.createFromBitmap(rs, bestPathLhs)
-                rhsAllocation = Allocation.createFromBitmap(rs, bestPathRhs)
-
-                errors = IntArray(1)
-                errorsAllocation = Allocation.createSized(rs, Element.I32(rs), 1)
-                pyramidBlendingScript?.bind_errors(errorsAllocation)
-
-                launchOptions = LaunchOptions()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### blendPyramids: time after creating allocations for best path: " + (System.currentTimeMillis() - timeS)
-                )
-
-                pyramidBlendingScript?.set_bitmap(rhsAllocation)
-            }
-
+            val computeErrorFunction = PyramidBlendingComputeErrorFunction(bestPathRhs)
             val windowWidth = max(2.0, (bestPathLhs.width / 8).toDouble()).toInt()
             var startY = 0
             var stopY: Int
@@ -1329,42 +874,26 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 var bestError = -1
 
                 stopY = ((y + 1) * bestPathLhs.height) / bestPathNY
-                if (!HDRProcessor.USE_RENDERSCRIPT) {
-                } else {
-                    launchOptions!!.setY(startY, stopY)
-                }
 
-                //int startX = 0, stopX;
                 for (x in 0..<bestPathNX) {
-                    // windows for computing best path should be centred with the path centres we'll actually take
                     val alpha = (x.toFloat()) / (bestPathNX - 1.0f)
                     val frac = (1.0f - alpha) * 0.25f + alpha * 0.75f
                     val midX = (frac * bestPathLhs.width + 0.5f).toInt()
                     val startX = midX - windowWidth / 2
                     val stopX = midX + windowWidth / 2
 
-                    //stopX = ((x+1) * best_path_lhs.getWidth()) / bestPathNX;
                     val thisError: Int
-                    if (!HDRProcessor.USE_RENDERSCRIPT) {
-                        JavaImageProcessing.applyFunction(
-                            computeErrorFunction!!,
-                            bestPathLhs,
-                            null,
-                            startX,
-                            startY,
-                            stopX,
-                            stopY
-                        )
-                        thisError = computeErrorFunction.getError()
-                    } else {
-                        launchOptions!!.setX(startX, stopX)
-                        pyramidBlendingScript?.invoke_init_errors()
-                        pyramidBlendingScript?.forEach_compute_error(lhsAllocation, launchOptions)
-                        errorsAllocation!!.copyTo(errors)
-                        thisError = errors!![0]
-                    }
+                    JavaImageProcessing.applyFunction(
+                        computeErrorFunction,
+                        bestPathLhs,
+                        null,
+                        startX,
+                        startY,
+                        stopX,
+                        stopY
+                    )
+                    thisError = computeErrorFunction.getError()
 
-                    //startX = stopX; // set for next iteration
                     if (MyDebug.LOG) Log.d(
                         TAG,
                         "    best_path error[$x][$y]: $thisError"
@@ -1375,18 +904,8 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     }
                 }
 
-                startY = stopY // set for next iteration
-
-                //bestPath[y] = 1; // test
-                //bestPath[y] = y % bestPathNX; // test
+                startY = stopY
                 if (MyDebug.LOG) Log.d(TAG, "best_path [" + y + "]: " + bestPath[y])
-            }
-
-            if (!HDRProcessor.USE_RENDERSCRIPT) {
-            } else {
-                lhsAllocation!!.destroy()
-                rhsAllocation!!.destroy()
-                errorsAllocation!!.destroy()
             }
 
             if (bestPathLhs != lhs) {
@@ -1402,135 +921,32 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             )
         }
 
-        val mergedBitmap: Bitmap?
-        if (!HDRProcessor.USE_RENDERSCRIPT) {
-            val lhsPyramid = createLaplacianPyramid(lhs, BLEND_N_LEVELS, "lhs")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after createLaplacianPyramid 1st call: " + (System.currentTimeMillis() - timeS)
-            )
-            val rhsPyramid = createLaplacianPyramid(rhs, BLEND_N_LEVELS, "rhs")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after createLaplacianPyramid 2nd call: " + (System.currentTimeMillis() - timeS)
-            )
+        val lhsPyramid = createLaplacianPyramid(lhs, BLEND_N_LEVELS, "lhs")
+        if (MyDebug.LOG) Log.d(
+            TAG,
+            "### blendPyramids: time after createLaplacianPyramid 1st call: " + (System.currentTimeMillis() - timeS)
+        )
+        val rhsPyramid = createLaplacianPyramid(rhs, BLEND_N_LEVELS, "rhs")
+        if (MyDebug.LOG) Log.d(
+            TAG,
+            "### blendPyramids: time after createLaplacianPyramid 2nd call: " + (System.currentTimeMillis() - timeS)
+        )
 
-            /*{
-                lhsPyramidRs = new ArrayList<>();
-                for(int i=0;i<lhs_pyramid.diffs.size();i++) {
-                    float [] differenceRgbf = lhs_pyramid.diffs.get(i);
-                    int width = lhs_pyramid.widths.get(i);
-                    int height = lhs_pyramid.heights.get(i);
-                    Allocation allocation = Allocation.createTyped(rs, Type.createXY(rs, Element.F32_3(rs), width, height));
-                    HDRProcessor.RGBfToAllocation(differenceRgbf, allocation, width, height);
-                    lhs_pyramid_rs.add(allocation);
-                }
-                Allocation allocation = Allocation.createFromBitmap(rs, lhs_pyramid.topLevel);
-                lhs_pyramid_rs.add(allocation);
-            }
-            {
-                rhsPyramidRs = new ArrayList<>();
-                for(int i=0;i<rhs_pyramid.diffs.size();i++) {
-                    float [] differenceRgbf = rhs_pyramid.diffs.get(i);
-                    int width = rhs_pyramid.widths.get(i);
-                    int height = rhs_pyramid.heights.get(i);
-                    Allocation allocation = Allocation.createTyped(rs, Type.createXY(rs, Element.F32_3(rs), width, height));
-                    HDRProcessor.RGBfToAllocation(differenceRgbf, allocation, width, height);
-                    rhs_pyramid_rs.add(allocation);
-                }
-                Allocation allocation = Allocation.createFromBitmap(rs, rhs_pyramid.topLevel);
-                rhs_pyramid_rs.add(allocation);
-            }*/
-            mergePyramids(lhsPyramid, rhsPyramid, bestPath, bestPathNX)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after mergePyramids: " + (System.currentTimeMillis() - timeS)
-            )
+        mergePyramids(lhsPyramid, rhsPyramid, bestPath, bestPathNX)
+        if (MyDebug.LOG) Log.d(
+            TAG,
+            "### blendPyramids: time after mergePyramids: " + (System.currentTimeMillis() - timeS)
+        )
 
-            /*{
-                lhsPyramidRs = new ArrayList<>();
-                for(int i=0;i<lhs_pyramid.diffs.size();i++) {
-                    float [] differenceRgbf = lhs_pyramid.diffs.get(i);
-                    int width = lhs_pyramid.widths.get(i);
-                    int height = lhs_pyramid.heights.get(i);
-                    Allocation allocation = Allocation.createTyped(rs, Type.createXY(rs, Element.F32_3(rs), width, height));
-                    HDRProcessor.RGBfToAllocation(differenceRgbf, allocation, width, height);
-                    lhs_pyramid_rs.add(allocation);
-                }
-                Allocation allocation = Allocation.createFromBitmap(rs, lhs_pyramid.topLevel);
-                lhs_pyramid_rs.add(allocation);
-            }*/
-            mergedBitmap = collapseLaplacianPyramid(lhsPyramid)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after collapseLaplacianPyramid: " + (System.currentTimeMillis() - timeS)
-            )
+        val mergedBitmap = collapseLaplacianPyramid(lhsPyramid)
+        if (MyDebug.LOG) Log.d(
+            TAG,
+            "### blendPyramids: time after collapseLaplacianPyramid: " + (System.currentTimeMillis() - timeS)
+        )
 
-            lhsPyramid.topLevel!!.recycle()
-            rhsPyramid.topLevel!!.recycle()
-        } else {
-            val lhsPyramidRs =
-                createLaplacianPyramidRS(pyramidBlendingScript!!, lhs, BLEND_N_LEVELS, "lhs")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after createLaplacianPyramid 1st call: " + (System.currentTimeMillis() - timeS)
-            )
-            val rhsPyramidRs =
-                createLaplacianPyramidRS(pyramidBlendingScript!!, rhs, BLEND_N_LEVELS, "rhs")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after createLaplacianPyramid 2nd call: " + (System.currentTimeMillis() - timeS)
-            )
+        lhsPyramid.topLevel!!.recycle()
+        rhsPyramid.topLevel!!.recycle()
 
-            // debug
-            /*if( MyDebug.LOG )
-            {
-                savePyramid("lhs_laplacian", lhsPyramid);
-                savePyramid("rhs_laplacian", rhsPyramid);
-            }*/
-
-            // debug
-            /*if( MyDebug.LOG )
-            {
-                Bitmap lhsCollapsed = collapseLaplacianPyramid(script, lhsPyramid);
-                saveBitmap(lhsCollapsed, "lhs_collapsed.jpg");
-                Bitmap rhsCollapsed = collapseLaplacianPyramid(script, rhsPyramid);
-                saveBitmap(rhsCollapsed, "rhs_collapsed.jpg");
-                lhs_collapsed.recycle();
-                rhs_collapsed.recycle();
-            }*/
-            mergePyramidsRS(
-                pyramidBlendingScript!!,
-                lhsPyramidRs,
-                rhsPyramidRs,
-                bestPath,
-                bestPathNX
-            )
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after mergePyramids: " + (System.currentTimeMillis() - timeS)
-            )
-
-            mergedBitmap = collapseLaplacianPyramidRS(pyramidBlendingScript!!, lhsPyramidRs)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### blendPyramids: time after collapseLaplacianPyramid: " + (System.currentTimeMillis() - timeS)
-            )
-
-            for (allocation in lhsPyramidRs) {
-                allocation.destroy()
-            }
-            for (allocation in rhsPyramidRs) {
-                allocation.destroy()
-            }
-        }
-
-        // debug
-        /*if( MyDebug.LOG )
-        {
-            savePyramid("merged_laplacian", lhsPyramid);
-            saveBitmap(mergedBitmap, "merged_bitmap.jpg");
-        }*/
         if (MyDebug.LOG) Log.d(
             TAG,
             "### blendPyramids: time taken: " + (System.currentTimeMillis() - timeS)
@@ -1607,206 +1023,68 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             throw PanoramaProcessorException(PanoramaProcessorException.INVALID_N_IMAGES)
         }
 
-        var allocations: Array<Allocation?>? = null
-        if (HDRProcessor.USE_RENDERSCRIPT) {
-            initRenderscript()
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "### autoAlignmentByFeature: time after initRenderscript: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-            allocations = Array(bitmaps.size) { i ->
-                Allocation.createFromBitmap(rs, bitmaps[i])
-            }
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "### autoAlignmentByFeature: time after creating allocations: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-            if (featureDetectorScript == null) {
-                featureDetectorScript = ScriptC_feature_detector(rs)
-            }
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "### autoAlignmentByFeature: time after create featureDetectorScript: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-        }
-
-
-        //final int featureDescriptorRadius = 2; // radius of square used to compare features
         val featureDescriptorRadius = 3 // radius of square used to compare features
-        //final int featureDescriptorRadius = 5; // radius of square used to compare features
         val pointsArrays = arrayOfNulls<Array<Point>>(2)
 
         for (i in bitmaps.indices) {
             if (MyDebug.LOG) Log.d(TAG, "detect features for image: $i")
 
-            var strengthRgbf: FloatArray = floatArrayOf()
-            var strengthAllocation: Allocation? = null
-            var localMaxFeaturesAllocation: Allocation? = null
+            if (MyDebug.LOG) Log.d(TAG, "convert to greyscale")
 
-            if (!HDRProcessor.USE_RENDERSCRIPT) {
-                if (MyDebug.LOG) Log.d(TAG, "convert to greyscale")
-
-                val gsBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
-                JavaImageProcessing.applyFunction(
-                    JavaImageFunctionsPanorama.ConvertToGreyscaleFunction(),
-                    bitmaps[i],
-                    gsBitmap,
-                    0,
-                    0,
-                    width,
-                    height
-                )
-
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "### autoAlignmentByFeature: time after ConvertToGreyscaleFunction: " + (System.currentTimeMillis() - timeS)
-                    )
-                }
-
-                if (MyDebug.LOG) Log.d(TAG, "compute derivatives")
-
-                val ixBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
-                val iyBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
-                JavaImageProcessing.applyFunction(
-                    JavaImageFunctionsPanorama.ComputeDerivativesFunction(
-                        ixBitmap,
-                        iyBitmap,
-                        gsBitmap
-                    ), null, null, 0, 0, width, height
-                )
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "### autoAlignmentByFeature: time after ComputeDerivativesFunction: " + (System.currentTimeMillis() - timeS)
-                    )
-                }
-                gsBitmap.recycle()
-
-                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: $i")
-                strengthRgbf = FloatArray(width * height)
-                JavaImageProcessing.applyFunction(
-                    JavaImageFunctionsPanorama.CornerDetectorFunction(
-                        strengthRgbf,
-                        ixBitmap,
-                        iyBitmap
-                    ), null, null, 0, 0, width, height
-                )
-                if (MyDebug.LOG) Log.d(
+            val gsBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            JavaImageProcessing.applyFunction(
+                JavaImageFunctionsPanorama.ConvertToGreyscaleFunction(),
+                bitmaps[i],
+                gsBitmap,
+                0,
+                0,
+                width,
+                height
+            )
+            if (MyDebug.LOG) {
+                Log.d(
                     TAG,
-                    "### autoAlignmentByFeature: time after CornerDetectorFunction: " + (System.currentTimeMillis() - timeS)
+                    "### autoAlignmentByFeature: time after ConvertToGreyscaleFunction: " + (System.currentTimeMillis() - timeS)
                 )
-
-                ixBitmap.recycle()
-                iyBitmap.recycle()
-            } else {
-                if (MyDebug.LOG) Log.d(TAG, "convert to greyscale")
-                val gsAllocation =
-                    Allocation.createTyped(rs, Type.createXY(rs, Element.U8(rs), width, height))
-                featureDetectorScript?.forEach_create_greyscale(allocations!![i], gsAllocation)
-
-                if (MyDebug.LOG) Log.d(TAG, "compute derivatives")
-                val ixAllocation =
-                    Allocation.createTyped(rs, Type.createXY(rs, Element.U8(rs), width, height))
-                val iyAllocation =
-                    Allocation.createTyped(rs, Type.createXY(rs, Element.U8(rs), width, height))
-                featureDetectorScript?.apply {
-                    set_bitmap(gsAllocation)
-                    set_bitmap_Ix(ixAllocation)
-                    set_bitmap_Iy(iyAllocation)
-                    forEach_compute_derivatives(gsAllocation)
-                }
-
-                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: $i")
-                strengthAllocation =
-                    Allocation.createTyped(rs, Type.createXY(rs, Element.F32(rs), width, height))
-                featureDetectorScript?.apply {
-                    set_bitmap(gsAllocation)
-                    set_bitmap_Ix(ixAllocation)
-                    set_bitmap_Iy(iyAllocation)
-                    forEach_corner_detector(gsAllocation, strengthAllocation)
-                }
-
-                ixAllocation.destroy()
-                iyAllocation.destroy()
-                localMaxFeaturesAllocation = gsAllocation // Reuse U8 allocation
             }
 
-            //Allocation gsAllocation = Allocation.createFromBitmap(rs, gsBitmaps[i]);
+            if (MyDebug.LOG) Log.d(TAG, "compute derivatives")
 
-            /*if( MyDebug.LOG ) {
-                // debugging
-                byte [] bytesX = new byte[width*height];
-                byte [] bytesY = new byte[width*height];
-                ix_allocation.copyTo(bytesX);
-                iy_allocation.copyTo(bytesY);
-                int [] pixelsX = new int[width*height];
-                int [] pixelsY = new int[width*height];
-                for(int j=0;j<width*height;j++) {
-                    int b = bytesX[j];
-                    if( b < 0 )
-                        b += 255;
-                    pixelsX[j] = Color.argb(255, b, b, b);
-                    b = bytesY[j];
-                    if( b < 0 )
-                        b += 255;
-                    pixelsY[j] = Color.argb(255, b, b, b);
-                }
-                Bitmap bitmapX = Bitmap.createBitmap(pixelsX, width, height, Bitmap.Config.ARGB_8888);
-                Bitmap bitmapY = Bitmap.createBitmap(pixelsY, width, height, Bitmap.Config.ARGB_8888);
-                File fileX = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/ixBitmap" + debugIndex + "_" + i + ".png");
-                File fileY = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/iyBitmap" + debugIndex + "_" + i + ".png");
-                try {
-                    MainActivity mActivity = (MainActivity) context;
-
-                    OutputStream outputStream = new FileOutputStream(fileX);
-                    bitmap_x.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-                    outputStream.close();
-                    mActivity.storageUtils.broadcastFile(fileX, true, false, true);
-
-                    outputStream = new FileOutputStream(fileY);
-                    bitmap_y.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-                    outputStream.close();
-                    mActivity.storageUtils.broadcastFile(fileY, true, false, true);
-                }
-                catch(IOException e) {
-                    e.printStackTrace();
-                }
-                bitmap_x.recycle();
-                bitmap_y.recycle();
-            }*/
-
-            /*featureDetectorScript.setCornerThreshold(100000000.0f);
-            featureDetectorScript.set_bitmap(strengthAllocation);
-            featureDetectorScript.forEach_local_maximum(strengthAllocation, localMaxFeaturesAllocation);
-            // collect points
-            byte [] bytes = new byte[width*height];
-            local_max_features_allocation.copyTo(bytes);
-            // find points
-            List<Point> points = new ArrayList<>();
-            for(int y=featureDescriptorRadius;y<height-featureDescriptorRadius;y++) {
-                for(int x=featureDescriptorRadius;x<width-featureDescriptorRadius;x++) {
-                    int j = y*width + x;
-                    // remember, bytes are signed!
-                    if( bytes[j] != 0 ) {
-                        Point point = new Point(x, y);
-                        points.add(point);
-                    }
-                }
+            val ixBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            val iyBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            JavaImageProcessing.applyFunction(
+                JavaImageFunctionsPanorama.ComputeDerivativesFunction(
+                    ixBitmap,
+                    iyBitmap,
+                    gsBitmap
+                ), null, null, 0, 0, width, height
+            )
+            if (MyDebug.LOG) {
+                Log.d(
+                    TAG,
+                    "### autoAlignmentByFeature: time after ComputeDerivativesFunction: " + (System.currentTimeMillis() - timeS)
+                )
             }
-            pointsArrays[i] = points.toArray(new Point[0]);
-            */
+            gsBitmap.recycle()
+
+            if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: $i")
+            val strengthRgbf = FloatArray(width * height)
+            JavaImageProcessing.applyFunction(
+                JavaImageFunctionsPanorama.CornerDetectorFunction(
+                    strengthRgbf,
+                    ixBitmap,
+                    iyBitmap
+                ), null, null, 0, 0, width, height
+            )
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "### autoAlignmentByFeature: time after CornerDetectorFunction: " + (System.currentTimeMillis() - timeS)
+            )
+
+            ixBitmap.recycle()
+            iyBitmap.recycle()
+
             if (MyDebug.LOG) Log.d(TAG, "find local maxima for image: $i")
-            if (HDRProcessor.USE_RENDERSCRIPT) {
-                featureDetectorScript!!.set_bitmap(strengthAllocation)
-            }
-            // --- Local Maxima Search ---
             val nYChunks = 2
             val totalMaxCorners = 200
             val maxCorners = totalMaxCorners / nYChunks
@@ -1832,25 +1110,14 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                         TAG,
                         "### attempt $count try threshold: $threshold [ $lowThreshold : $highThreshold ]"
                     )
-                    if (!HDRProcessor.USE_RENDERSCRIPT) {
-                        val function = JavaImageFunctionsPanorama.LocalMaximumFunction(
-                            strengthRgbf,
-                            bytes,
-                            width,
-                            height,
-                            threshold
-                        )
-                        JavaImageProcessing.applyFunction(function, null, null, 0, 0, width, height)
-                    } else {
-                        featureDetectorScript?.set_corner_threshold(threshold)
-                        val launchOptions = LaunchOptions().setX(0, width).setY(startY, stopY)
-                        featureDetectorScript?.forEach_local_maximum(
-                            strengthAllocation,
-                            localMaxFeaturesAllocation,
-                            launchOptions
-                        )
-                        localMaxFeaturesAllocation?.copyTo(bytes)
-                    }
+                    val function = JavaImageFunctionsPanorama.LocalMaximumFunction(
+                        strengthRgbf,
+                        bytes,
+                        width,
+                        height,
+                        threshold
+                    )
+                    JavaImageProcessing.applyFunction(function, null, null, 0, 0, width, height)
 
                     // find points
                     val chunkPoints = ArrayList<Point>()
@@ -1860,7 +1127,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     )) {
                         for (x in featureDescriptorRadius until width - featureDescriptorRadius) {
                             val j = y * width + x
-                            // remember, bytes are signed!
                             if (bytes[j] != 0.toByte()) {
                                 chunkPoints.add(Point(x, y))
                             }
@@ -1889,9 +1155,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 TAG,
                 "### image: " + i + " has " + pointsArrays[i]?.size + " points"
             )
-
-            strengthAllocation?.destroy()
-            localMaxFeaturesAllocation?.destroy()
         }
         if (MyDebug.LOG) {
             Log.d(
@@ -1907,7 +1170,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 ?: 0) < minRequiredCorners
         ) {
             if (MyDebug.LOG) Log.d(TAG, "too few points!")
-            allocations?.forEach { it?.destroy() }
             return AutoAlignmentByFeatureResult(0, 0, 0.0f, 1.0f)
         }
 
@@ -2117,7 +1379,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         }
 
         if (actualMatches.isEmpty()) {
-            allocations?.forEach { it?.destroy() }
             return AutoAlignmentByFeatureResult(0, 0, 0.0f, 1.0f)
         }
 
@@ -2220,7 +1481,6 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             offsetY += (c0.y - rotC0y).toInt()
         }
 
-        allocations?.forEach { it?.destroy() }
         return AutoAlignmentByFeatureResult(offsetX, offsetY, rotation, yScale)
     }
 
@@ -3710,48 +2970,20 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
             /*if( true )
                 throw new RuntimeException("ratioBrightnesses: " + ratioBrightnesses);*/
-            if (!HDRProcessor.USE_RENDERSCRIPT) {
-                hdrProcessor.adjustHistogram(
-                    panorama,
-                    panorama,
-                    panorama.width,
-                    panorama.height,
-                    0.25f,
-                    1,
-                    true,
-                    timeS
-                )
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
-                )
-            } else {
-                val allocation = Allocation.createFromBitmap(rs, panorama)
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after creating allocation_out: " + (System.currentTimeMillis() - timeS)
-                )
-                hdrProcessor.adjustHistogramRS(
-                    allocation,
-                    allocation,
-                    panorama.width,
-                    panorama.height,
-                    0.25f,
-                    1,
-                    true,
-                    timeS
-                )
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
-                )
-                allocation.copyTo(panorama)
-                allocation.destroy()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after copying to bitmap: " + (System.currentTimeMillis() - timeS)
-                )
-            }
+            hdrProcessor.adjustHistogram(
+                panorama,
+                panorama,
+                panorama.width,
+                panorama.height,
+                0.25f,
+                1,
+                true,
+                timeS
+            )
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
+            )
         }
 
         if (MyDebug.LOG) Log.d(TAG, "panorama complete!")

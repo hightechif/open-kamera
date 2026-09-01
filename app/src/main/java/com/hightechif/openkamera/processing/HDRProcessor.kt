@@ -20,14 +20,6 @@ import android.renderscript.Type
 import android.util.Log
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.get
-import com.hightechif.openkamera.ScriptC_align_mtb
-import com.hightechif.openkamera.ScriptC_avg_brighten
-import com.hightechif.openkamera.ScriptC_calculate_sharpness
-import com.hightechif.openkamera.ScriptC_create_mtb
-import com.hightechif.openkamera.ScriptC_histogram_adjust
-import com.hightechif.openkamera.ScriptC_histogram_compute
-import com.hightechif.openkamera.ScriptC_process_avg
-import com.hightechif.openkamera.ScriptC_process_hdr
 import com.hightechif.openkamera.audio.*
 import com.hightechif.openkamera.preferences.*
 import com.hightechif.openkamera.processing.*
@@ -55,17 +47,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         null // lazily created, so we don't take up resources if application isn't using HDR
 
     // we lazily create and cache scripts that would otherwise have to be repeatedly created in a single
-    // HDR or NR photo
-    // these should be set to null in freeScript(), to help garbage collection
-    /*private ScriptC_process_hdr processHDRScript;*/
-    private var processAvgScript: ScriptC_process_avg? = null
-    private var createMTBScript: ScriptC_create_mtb? = null
-    private var alignMTBScript: ScriptC_align_mtb? = null
-
-    /*private ScriptC_histogram_adjust histogramAdjustScript;
-    private ScriptC_histogram_compute histogramScript;
-    private ScriptC_avg_brighten avgBrightenScript;
-    private ScriptC_calculate_sharpness sharpnessScript;*/
     // public for access by testing
     var offsetsX: IntArray = IntArray(0)
     var offsetsY: IntArray = IntArray(0)
@@ -91,14 +72,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
     private fun freeScripts() {
         if (MyDebug.LOG) Log.d(TAG, "freeScripts")
-        /*processHDRScript = null;*/
-        processAvgScript = null
-        createMTBScript = null
-        alignMTBScript = null
-        /*histogramAdjustScript = null;
-        histogramScript = null;
-        avgBrightenScript = null;
-        sharpnessScript = null;*/
     }
 
     fun onDestroy() {
@@ -411,27 +384,15 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     sortOrder.add(0)
                     sortCb.sortOrder(sortOrder)
                 }
-                if (!USE_RENDERSCRIPT) {
-                    processSingleImage(
-                        mutBitmaps.filterNotNull().toMutableList(),
-                        releaseBitmaps,
-                        outputBitmap,
-                        hdrAlpha,
-                        nTiles,
-                        cePreserveBlacks,
-                        droTonemappingAlgorithm
-                    )
-                } else {
-                    processSingleImageRS(
-                        mutBitmaps,
-                        releaseBitmaps,
-                        outputBitmap,
-                        hdrAlpha,
-                        nTiles,
-                        cePreserveBlacks,
-                        droTonemappingAlgorithm
-                    )
-                }
+                processSingleImage(
+                    mutBitmaps.filterNotNull().toMutableList(),
+                    releaseBitmaps,
+                    outputBitmap,
+                    hdrAlpha,
+                    nTiles,
+                    cePreserveBlacks,
+                    droTonemappingAlgorithm
+                )
             }
 
             HDRAlgorithm.HDRALGORITHM_STANDARD -> processHDRCore(
@@ -969,189 +930,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
                 )
             }
-        } else {
-            // create RenderScript
-            /*if( processHDRScript == null ) {
-            processHDRScript = new ScriptC_process_hdr(rs);
-        }*/
-
-            val processHDRScript = ScriptC_process_hdr(rs)
-
-            // set allocations
-            processHDRScript.set_bitmap0(allocations!![0])
-            if (nBitmaps > 2) {
-                processHDRScript.set_bitmap2(allocations[2])
-            }
-
-            // set offsets
-            processHDRScript.set_offset_x0(offsetsX[0])
-            processHDRScript.set_offset_y0(offsetsY[0])
-            // no offset for middle image
-            if (nBitmaps > 2) {
-                processHDRScript.set_offset_x2(offsetsX[2])
-                processHDRScript.set_offset_y2(offsetsY[2])
-            }
-
-            // set response functions
-            processHDRScript.set_parameter_A0(responseFunctions[0]!!.parameterA)
-            processHDRScript.set_parameter_B0(responseFunctions[0]!!.parameterB)
-            // no response function for middle image
-            if (nBitmaps > 2) {
-                processHDRScript.set_parameter_A2(responseFunctions[2]!!.parameterA)
-                processHDRScript.set_parameter_B2(responseFunctions[2]!!.parameterB)
-            }
-
-            if (useHdrN) {
-                // now need to set values for image 1
-                processHDRScript.set_bitmap1(allocations[1])
-                processHDRScript.set_offset_x1(offsetsX[1])
-                processHDRScript.set_offset_y1(offsetsY[1])
-                processHDRScript.set_parameter_A1(responseFunctions[1]!!.parameterA)
-                processHDRScript.set_parameter_B1(responseFunctions[1]!!.parameterB)
-            }
-
-            if (nBitmaps > 3) {
-                processHDRScript.set_bitmap3(allocations[3])
-                processHDRScript.set_offset_x3(offsetsX[3])
-                processHDRScript.set_offset_y3(offsetsY[3])
-                processHDRScript.set_parameter_A3(responseFunctions[3]!!.parameterA)
-                processHDRScript.set_parameter_B3(responseFunctions[3]!!.parameterB)
-
-                if (nBitmaps > 4) {
-                    processHDRScript.set_bitmap4(allocations[4])
-                    processHDRScript.set_offset_x4(offsetsX[4])
-                    processHDRScript.set_offset_y4(offsetsY[4])
-                    processHDRScript.set_parameter_A4(responseFunctions[4]!!.parameterA)
-                    processHDRScript.set_parameter_B4(responseFunctions[4]!!.parameterB)
-
-                    if (nBitmaps > 5) {
-                        processHDRScript.set_bitmap5(allocations[5])
-                        processHDRScript.set_offset_x5(offsetsX[5])
-                        processHDRScript.set_offset_y5(offsetsY[5])
-                        processHDRScript.set_parameter_A5(responseFunctions[5]!!.parameterA)
-                        processHDRScript.set_parameter_B5(responseFunctions[5]!!.parameterB)
-
-                        if (nBitmaps > 6) {
-                            processHDRScript.set_bitmap6(allocations[6])
-                            processHDRScript.set_offset_x6(offsetsX[6])
-                            processHDRScript.set_offset_y6(offsetsY[6])
-                            processHDRScript.set_parameter_A6(responseFunctions[6]!!.parameterA)
-                            processHDRScript.set_parameter_B6(responseFunctions[6]!!.parameterB)
-                        }
-                    }
-                }
-            }
-
-            // set globals
-
-            // set tonemapping algorithm
-            when (tonemappingAlgorithm) {
-                TonemappingAlgorithm.TONEMAPALGORITHM_CLAMP -> {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: clamp")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_clamp_c)
-                }
-
-                TonemappingAlgorithm.TONEMAPALGORITHM_EXPONENTIAL -> {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: exponential")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_exponential_c)
-                }
-
-                TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD -> {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: reinhard")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_reinhard_c)
-                }
-
-                TonemappingAlgorithm.TONEMAPALGORITHM_FU2 -> {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: fu2")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_fu2_c)
-                }
-
-                TonemappingAlgorithm.TONEMAPALGORITHM_ACES -> {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: aces")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_aces_c)
-                }
-            }
-
-            processHDRScript.set_tonemap_scale(tonemapScaleC)
-
-            // set algorithm specific parameters
-            when (tonemappingAlgorithm) {
-                TonemappingAlgorithm.TONEMAPALGORITHM_EXPONENTIAL, TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD -> processHDRScript.set_linear_scale(
-                    linearScale
-                )
-
-                TonemappingAlgorithm.TONEMAPALGORITHM_FU2 -> {
-                    processHDRScript.set_W(w)
-                }
-
-                else -> {}
-            }
-
-            if (MyDebug.LOG) Log.d(TAG, "call processHDRScript")
-            val outputAllocation: Allocation?
-            var freeOutputAllocation = false
-            if (releaseBitmaps) {
-                // must use allocations[baseBitmap] as the output, as that's the image guaranteed to have no offset (otherwise we'll have
-                // problems due to the output being equal to one of the inputs)
-                outputAllocation = allocations[baseBitmap]
-                // similarly must be the baseBitmap we copy to
-                outputBitmap = bitmaps[baseBitmap]
-            } else {
-                outputAllocation = Allocation.createFromBitmap(rs, outputBitmap)
-                freeOutputAllocation = true
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time before processHDRScript: " + (System.currentTimeMillis() - timeS)
-            )
-            if (useHdrN) {
-                processHDRScript.set_n_bitmaps_g(nBitmaps)
-                processHDRScript.forEach_hdr_n(allocations[baseBitmap], outputAllocation)
-            } else {
-                processHDRScript.forEach_hdr(allocations[baseBitmap], outputAllocation)
-            }
-            /*processHDRScript.setNBitmapsG(nBitmaps);
-        processHDRScript.forEach_hdr_n(allocations[baseBitmap], outputAllocation);*/
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after processHDRScript: " + (System.currentTimeMillis() - timeS)
-            )
-
-            if (releaseBitmaps) {
-                if (MyDebug.LOG) Log.d(TAG, "release bitmaps")
-                // bitmaps.get(baseBitmap) will store HDR image, so free up the rest of the memory asap - we no longer need the remaining bitmaps
-                for (i in bitmaps.indices) {
-                    if (i != baseBitmap) {
-                        val bitmap = bitmaps[i]
-                        bitmap!!.recycle()
-                    }
-                }
-            }
-
-            if (hdrAlpha != 0.0f) {
-                adjustHistogramRS(
-                    outputAllocation,
-                    outputAllocation,
-                    width,
-                    height,
-                    hdrAlpha,
-                    nTiles,
-                    cePreserveBlacks,
-                    timeS
-                )
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            outputAllocation!!.copyTo(outputBitmap)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after copying to bitmap: " + (System.currentTimeMillis() - timeS)
-            )
-
-            if (freeOutputAllocation) outputAllocation.destroy()
         }
 
         if (releaseBitmaps) {
@@ -1273,135 +1051,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         )
     }
 
-    private fun processSingleImageRS(
-        bitmaps: List<Bitmap?>,
-        releaseBitmaps: Boolean,
-        outputBitmap: Bitmap?,
-        hdrAlpha: Float,
-        nTiles: Int,
-        cePreserveBlacks: Boolean,
-        droTonemappingAlgorithm: DROTonemappingAlgorithm
-    ) {
-        var outputBitmap: Bitmap? = outputBitmap
-        if (MyDebug.LOG) Log.d(TAG, "processSingleImage")
-
-        val timeS = System.currentTimeMillis()
-
-        val width = bitmaps[0]!!.width
-        val height = bitmaps[0]!!.height
-
-        initRenderscript()
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### processSingleImage: time after creating renderscript: " + (System.currentTimeMillis() - timeS)
-        )
-
-        // create allocation
-        var allocation = Allocation.createFromBitmap(rs, bitmaps[0])
-
-        val outputAllocation: Allocation
-        var freeOutputAllocation = false
-        if (releaseBitmaps) {
-            outputAllocation = allocation
-            outputBitmap = bitmaps[0]
-        } else {
-            freeOutputAllocation = true
-            outputAllocation = Allocation.createFromBitmap(rs, outputBitmap)
-        }
-
-        if (droTonemappingAlgorithm == DROTonemappingAlgorithm.DROALGORITHMGAINGAMMA) {
-            // brighten?
-            val histo = computeHistogramRS(
-                allocation, width, height,
-                avg = false,
-                floatingPoint = false
-            )
-            val histogramInfo = getHistogramInfo(histo)
-            val brightness = histogramInfo.medianBrightness
-            val maxBrightness = histogramInfo.maxBrightness
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### processSingleImage: time after computeHistogram: " + (System.currentTimeMillis() - timeS)
-            )
-            if (MyDebug.LOG) {
-                Log.d(TAG, "median brightness: $brightness")
-                Log.d(TAG, "max brightness: $maxBrightness")
-            }
-            val brightenFactors = computeBrightenFactors(false, 0, 0, brightness, maxBrightness)
-            val gain = brightenFactors.gain
-            val gamma = brightenFactors.gamma
-            val lowX = brightenFactors.lowX
-            val midX = brightenFactors.midX
-            if (MyDebug.LOG) {
-                Log.d(TAG, "gain: $gain")
-                Log.d(TAG, "gamma: $gamma")
-                Log.d(TAG, "low_x: $lowX")
-                Log.d(TAG, "mid_x: $midX")
-            }
-
-            if (abs(gain - 1.0) > 1.0e-5 || maxBrightness != 255 || abs(gamma - 1.0) > 1.0e-5) {
-                if (MyDebug.LOG) Log.d(TAG, "apply gain/gamma")
-
-                //if( true )
-                //  throw new HDRProcessorException(HDRProcessorException.UNEQUAL_SIZES); // test
-
-                /*if( !useRenderscript ) {
-                    JavaImageFunctionsHDR.DROBrightenApplyFunction function = new JavaImageFunctionsHDR.DROBrightenApplyFunction(gain, gamma, lowX, midX, maxBrightness);
-                    JavaImageProcessing.applyFunction(function, allocation, false, outputAllocation, 0, 0, width, height);
-                }
-                else*/
-                run {
-                    val script: ScriptC_avg_brighten = ScriptC_avg_brighten(rs)
-                    script.invoke_setBrightenParameters(
-                        gain,
-                        gamma,
-                        lowX,
-                        midX,
-                        maxBrightness.toFloat()
-                    )
-                    script.forEach_dro_brighten(allocation, outputAllocation)
-                }
-
-                // output is now the input for subsequent operations
-                if (freeOutputAllocation) {
-                    allocation.destroy()
-                    freeOutputAllocation = false
-                }
-                allocation = outputAllocation
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### processSingleImage: time after dro_brighten: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-        }
-
-        adjustHistogramRS(
-            allocation,
-            outputAllocation,
-            width,
-            height,
-            hdrAlpha,
-            nTiles,
-            cePreserveBlacks,
-            timeS
-        )
-
-        outputAllocation.copyTo(outputBitmap)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### processSingleImage: time after copying to bitmap: " + (System.currentTimeMillis() - timeS)
-        )
-
-        if (freeOutputAllocation) allocation.destroy()
-        outputAllocation.destroy()
-        freeScripts()
-
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time for processSingleImage: " + (System.currentTimeMillis() - timeS)
-        )
-    }
-
     fun brightenImage(
         bitmap: Bitmap,
         brightness: Int,
@@ -1437,44 +1086,23 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         if (abs(gain - 1.0) > 1.0e-5 || maxBrightness != 255 || abs(gamma - 1.0) > 1.0e-5) {
             if (MyDebug.LOG) Log.d(TAG, "apply gain/gamma")
 
-            if (!USE_RENDERSCRIPT) {
-                val function: JavaImageFunctionsHDR.DROBrightenApplyFunction =
-                    JavaImageFunctionsHDR.DROBrightenApplyFunction(
-                        gain,
-                        gamma,
-                        lowX,
-                        midX,
-                        maxBrightness.toFloat()
-                    )
-                JavaImageProcessing.applyFunction(
-                    function,
-                    bitmap,
-                    bitmap,
-                    0,
-                    0,
-                    bitmap.width,
-                    bitmap.height
-                )
-            } else {
-                initRenderscript()
-
-                val allocation = Allocation.createFromBitmap(rs, bitmap)
-                val script = ScriptC_avg_brighten(rs)
-                script.invoke_setBrightenParameters(
+            val function: JavaImageFunctionsHDR.DROBrightenApplyFunction =
+                JavaImageFunctionsHDR.DROBrightenApplyFunction(
                     gain,
                     gamma,
                     lowX,
                     midX,
                     maxBrightness.toFloat()
                 )
-
-                script.forEach_dro_brighten(allocation, allocation)
-
-                allocation.copyTo(bitmap)
-                allocation.destroy()
-
-                freeScripts()
-            }
+            JavaImageProcessing.applyFunction(
+                function,
+                bitmap,
+                bitmap,
+                0,
+                0,
+                bitmap.width,
+                bitmap.height
+            )
         }
     }
 
@@ -1895,22 +1523,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 timeS
             )
 
-            /*
-            // compute allocationDiffs
-            // if enabling this, should also:
-            // - set fullAlign above to true
-            // - set filterAlign above to true
-            if( processAvgScript == null ) {
-                processAvgScript = new ScriptC_process_avg(rs);
-            }
-            processAvgScript?.set_bitmapAlignNew(alignAllocations[1]);
-            processAvgScript?.set_offset_XNew(offsetsX[1]);
-            processAvgScript?.set_offset_YNew(offsetsY[1]);
-            allocationDiffs = Allocation.createTyped(rs, Type.createXY(rs, Element.F32(rs), alignmentWidth, alignmentHeight));
-            processAvgScript?.forEach_compute_diff(alignAllocations[0], allocationDiffs);
-            processAvgScript?.setScaleAlignSize(scaleAlignSize);
-            processAvgScript?.setAllocationDiffs(allocationDiffs);
-            */
             run {
                 for (i in offsetsX!!.indices) {
                     offsetsX!![i] *= scaleAlignSize
@@ -2021,125 +1633,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 TAG,
                 "### time after AvgApplyFunction: " + (System.currentTimeMillis() - timeS)
             )
-
-            /*RGBfToAllocation(pixelsRgbf, allocationOut, width, height);
-            if( MyDebug.LOG )
-                Log.d(TAG, "### time after RGBfToAllocation: " + (System.currentTimeMillis() - timeS));*/
-
-            /*if( allocationOrig == null ) {
-                // allocationOrig should only be null for the first pair of images, which should be when we
-                // have the avg image not in floating point format
-                if( floatingPoint ) {
-                    throw new RuntimeException("is in floating point mode, but no allocationOrig supplied");
-                }
-                if( MyDebug.LOG )
-                    Log.d(TAG, "create allocationOrig");
-                allocationOrig = Allocation.createFromBitmap(rs, bitmapAvg);
-            }*/
-        } else {
-            var allocationAvg = allocationOut
-
-            if (allocationOut == null) {
-                if (MyDebug.LOG) Log.d(TAG, "need to create allocation_out")
-                allocationOut =
-                    Allocation.createTyped(rs, Type.createXY(rs, Element.F32_3(rs), width, height))
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after create allocation_out: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            var freeAllocationAvg = false
-            if (allocationAvg == null) {
-                allocationAvg = Allocation.createFromBitmap(rs, bitmapAvg)
-                freeAllocationAvg = true
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after creating allocation_avg from bitmap: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-
-            // create RenderScript
-            if (processAvgScript == null) {
-                processAvgScript = ScriptC_process_avg(rs)
-            }
-
-            //ScriptC_process_avg processAvgScript = new ScriptC_process_avg(rs);
-
-            /*final boolean separateFirstPass = false; // whether to convert the first two images in separate passes (reduces memory)
-        if( first && separateFirstPass ) {
-            if( MyDebug.LOG )
-                Log.d(TAG, "### time before convertToF: " + (System.currentTimeMillis() - timeS));
-            processAvgScript?.forEach_convert_to_f(allocationAvg, allocationOut);
-            if( MyDebug.LOG )
-                Log.d(TAG, "### time after convertToF: " + (System.currentTimeMillis() - timeS));
-            if( freeAllocationAvg ) {
-                allocation_avg.destroy();
-                freeAllocationAvg = false;
-            }
-            if( MyDebug.LOG )
-                Log.d(TAG, "release bitmapAvg");
-            //bitmap_avg.recycle();
-            //bitmapAvg = null;
-            allocationAvg = allocationOut;
-            first = false;
-        }*/
-            val allocationNew = Allocation.createFromBitmap(rs, bitmapNew)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after creating allocation_new from bitmap: " + (System.currentTimeMillis() - timeS)
-            )
-
-            // set allocations
-            if (allocationOrig == null) {
-                // allocationOrig should only be null for the first pair of images, which should be when we
-                // have the avg image not in floating point format
-                if (floatingPoint) {
-                    throw RuntimeException("is in floating point mode, but no allocation_orig supplied")
-                }
-                if (MyDebug.LOG) Log.d(TAG, "create allocation_avg")
-                allocationOrig = Allocation.createFromBitmap(rs, bitmapAvg)
-            }
-            if (MyDebug.LOG) {
-                Log.d(TAG, "allocation_orig: $allocationOrig")
-            }
-            processAvgScript?.set_bitmap_orig(allocationOrig)
-            processAvgScript?.set_bitmap_new(allocationNew)
-
-            // set offsets
-            processAvgScript?.set_offset_x_new(offsetsX!![1])
-            processAvgScript?.set_offset_y_new(offsetsY!![1])
-
-            // set globals
-            processAvgScript?.set_avg_factor(avgFactor)
-            processAvgScript?.set_wiener_C(wienerC)
-            processAvgScript?.set_wiener_C_cutoff(wienerCCutoff)
-
-            /*final float maxWeight = 0.9375f;
-        if( MyDebug.LOG ) {
-            Log.d(TAG, "maxWeight: " + maxWeight);
-        }
-        processAvgScript?.setMaxWeight(maxWeight);*/
-            if (MyDebug.LOG) Log.d(TAG, "call processAvgScript")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time before processAvgScript: " + (System.currentTimeMillis() - timeS)
-            )
-            if (floatingPoint) processAvgScript?.forEach_avg_f(allocationAvg, allocationOut)
-            else processAvgScript?.forEach_avg(allocationAvg, allocationOut)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after processAvgScript: " + (System.currentTimeMillis() - timeS)
-            )
-
-            /*if( allocationDiffs != null ) {
-            allocation_diffs.destroy();
-            allocationDiffs = null;
-        }*/
-            allocationNew.destroy()
-            if (freeAllocationAvg) {
-                allocationAvg!!.destroy()
-            }
         }
 
         // N.B., we don't recycle bitmapAvg (if non-null), as it shares memory with allocationOrig that
@@ -2170,154 +1663,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             allocationAvgAlign,
             bitmapAvg,
             allocationOrig
-        )
-    }
-
-    /** Combines multiple images by averaging them.
-     * @param bitmaps Input bitmaps. The resultant bitmap will be stored as the first bitmap on exit,
-     * the other input bitmaps will be recycled.
-     */
-    @Throws(HDRProcessorException::class)
-    fun processAvgMulti(
-        bitmaps: List<Bitmap>,
-        hdrAlpha: Float,
-        nTiles: Int,
-        cePreserveBlacks: Boolean
-    ) {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "processAvgMulti")
-            Log.d(TAG, "hdr_alpha: $hdrAlpha")
-        }
-        val nBitmaps = bitmaps.size
-        if (nBitmaps != 8) {
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "n_bitmaps should be 8, not $nBitmaps"
-            )
-            throw HDRProcessorException(HDRProcessorException.INVALID_N_IMAGES)
-        }
-        for (i in 1..<nBitmaps) {
-            if (bitmaps[i].width != bitmaps[0].width ||
-                bitmaps[i].height != bitmaps[0].height
-            ) {
-                if (MyDebug.LOG) {
-                    Log.e(TAG, "bitmaps not of same resolution")
-                    for (j in 0..<nBitmaps) {
-                        Log.e(
-                            TAG,
-                            "bitmaps " + j + " : " + bitmaps[j].width + " x " + bitmaps[j].height
-                        )
-                    }
-                }
-                throw HDRProcessorException(HDRProcessorException.UNEQUAL_SIZES)
-            }
-        }
-
-        val timeS = System.currentTimeMillis()
-
-        val width = bitmaps[0].width
-        val height = bitmaps[0].height
-
-        initRenderscript()
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after creating renderscript: " + (System.currentTimeMillis() - timeS)
-        )
-        // create allocations
-        val allocation0 = Allocation.createFromBitmap(rs, bitmaps[0])
-        val allocation1 = Allocation.createFromBitmap(rs, bitmaps[1])
-        val allocation2 = Allocation.createFromBitmap(rs, bitmaps[2])
-        val allocation3 = Allocation.createFromBitmap(rs, bitmaps[3])
-        val allocation4 = Allocation.createFromBitmap(rs, bitmaps[4])
-        val allocation5 = Allocation.createFromBitmap(rs, bitmaps[5])
-        val allocation6 = Allocation.createFromBitmap(rs, bitmaps[6])
-        val allocation7 = Allocation.createFromBitmap(rs, bitmaps[7])
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after creating allocations from bitmaps: " + (System.currentTimeMillis() - timeS)
-        )
-
-        // perform auto-alignment
-        /*for(int i=1;i<bitmaps.size();i++) {
-        {
-            List<Bitmap> bitmaps2 = new ArrayList<>();
-            bitmaps2.add(bitmaps.get(0));
-            bitmaps2.add(bitmap.get(i));
-            Allocation [] allocations = new Allocation[2];
-            allocations[0] = allocationAvg;
-            allocations[1] = allocationNew;
-            BrightnessDetails brightnessDetails = autoAlignment(offsetsX, offsetsY, allocations, width, height, bitmaps, 0, true, null, true, timeS);
-            int medianBrightness = brightnessDetails.medianBrightness;
-            if( MyDebug.LOG ) {
-                Log.d(TAG, "### time after autoAlignment: " + (System.currentTimeMillis() - timeS));
-                Log.d(TAG, "medianBrightness: " + medianBrightness);
-            }
-        }*/
-
-        // write new avg image
-
-        // create RenderScript
-        /*if( processAvgScript == null ) {
-            processAvgScript = new ScriptC_process_avg(rs);
-        }*/
-        val processAvgScript: ScriptC_process_avg = ScriptC_process_avg(rs)
-
-        // set allocations
-        processAvgScript?.set_bitmap1(allocation1)
-        processAvgScript?.set_bitmap2(allocation2)
-        processAvgScript?.set_bitmap3(allocation3)
-        processAvgScript?.set_bitmap4(allocation4)
-        processAvgScript?.set_bitmap5(allocation5)
-        processAvgScript?.set_bitmap6(allocation6)
-        processAvgScript?.set_bitmap7(allocation7)
-
-        // set offsets
-        //processAvgScript?.set_offset_XNew(offsetsX[1]);
-        //processAvgScript?.set_offset_YNew(offsetsY[1]);
-
-        //hdrAlpha = 0.0f; // test
-
-        // set globals
-        if (MyDebug.LOG) Log.d(TAG, "call processAvgScript")
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time before processAvgScript: " + (System.currentTimeMillis() - timeS)
-        )
-        processAvgScript?.forEach_avg_multi(allocation0, allocation0)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after processAvgScript: " + (System.currentTimeMillis() - timeS)
-        )
-
-        run {
-            if (MyDebug.LOG) Log.d(TAG, "release bitmaps")
-            for (i in 1..<bitmaps.size) {
-                bitmaps[i].recycle()
-            }
-        }
-
-        if (hdrAlpha != 0.0f) {
-            adjustHistogramRS(
-                allocation0,
-                allocation0,
-                width,
-                height,
-                hdrAlpha,
-                nTiles,
-                cePreserveBlacks,
-                timeS
-            )
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
-            )
-        }
-
-        allocation0.copyTo(bitmaps[0])
-
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time for processAvgMulti: " + (System.currentTimeMillis() - timeS)
         )
     }
 
@@ -2543,28 +1888,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             )
         }
 
-        var mtbBitmaps: Array<Bitmap?>? = null // when not using renderscript
-        var mtbAllocations: Array<Allocation?>? = null // when using renderscript
-
-        if (!USE_RENDERSCRIPT) {
-            mtbBitmaps = arrayOfNulls(nImages)
-        } else {
-            mtbAllocations = arrayOfNulls(nImages) // when using renderscript
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after creating mtb_allocations: " + (System.currentTimeMillis() - timeS)
-            )
-
-            // create RenderScript
-            if (createMTBScript == null) {
-                createMTBScript = ScriptC_create_mtb(rs)
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after creating createMTBScript: " + (System.currentTimeMillis() - timeS)
-                )
-            }
-            //ScriptC_create_mtb createMTBScript = new ScriptC_create_mtb(rs);
-        }
+        val mtbBitmaps = arrayOfNulls<Bitmap>(nImages)
 
         for (i in 0..<nImages) {
             var medianValue = -1
@@ -2574,32 +1898,16 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     TAG,
                     "$i: median_value: $medianValue"
                 )
-
-                /*if( medianValue < 16 ) {
-                    // needed for testHDR2, testHDR28
-                    if( MyDebug.LOG )
-                        Log.d(TAG, "image too dark to do alignment");
-                    if( mtbBitmaps != null )
-                        mtbBitmaps[i] = null;
-                    if( mtbAllocations != null )
-                        mtbAllocations[i] = null;
-
-                    continue;
-                }*/
             }
 
             if (useMtb && luminanceInfos!![i]!!.noisy) {
                 if (MyDebug.LOG) Log.d(TAG, "unable to compute median luminance safely")
-                if (mtbBitmaps != null) mtbBitmaps[i] = null
-                if (mtbAllocations != null) mtbAllocations[i] = null
+                mtbBitmaps[i] = null
                 continue
             }
 
             // avoid too low/high medianValues, otherwise we'll detect dark or light pixels as "noisy" - needed for testHDR61
             val minDiffC = 4 // should be same value as in create_mtb.rs/createMtb()
-            /*if( medianValue < minDiffC+1 || medianValue > 255-(minDiffC+1) ) {
-                throw new RuntimeException("image " + i + " has medianValue: " + medianValue); // test
-            }*/
             medianValue = max(medianValue.toDouble(), (minDiffC + 1).toDouble()).toInt()
             medianValue = min(medianValue.toDouble(), (255 - (minDiffC + 1)).toDouble()).toInt()
             if (MyDebug.LOG) Log.d(
@@ -2607,89 +1915,29 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 "$i: median_value is now: $medianValue"
             )
 
-            if (!USE_RENDERSCRIPT) {
-                val outputMtbBitmap =
-                    Bitmap.createBitmap(mtbWidth, mtbHeight, Bitmap.Config.ALPHA_8)
-                val function: JavaImageFunctionsHDR.CreateMTBApplyFunction =
-                    JavaImageFunctionsHDR.CreateMTBApplyFunction(
-                        useMtb,
-                        medianValue
-                    )
-                JavaImageProcessing.applyFunction(
-                    function,
-                    bitmaps[i],
-                    outputMtbBitmap,
-                    mtbX,
-                    mtbY,
-                    mtbX + mtbWidth,
-                    mtbY + mtbHeight,
-                    0,
-                    0
+            val outputMtbBitmap =
+                Bitmap.createBitmap(mtbWidth, mtbHeight, Bitmap.Config.ALPHA_8)
+            val function: JavaImageFunctionsHDR.CreateMTBApplyFunction =
+                JavaImageFunctionsHDR.CreateMTBApplyFunction(
+                    useMtb,
+                    medianValue
                 )
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "### time after CreateMTBApplyFunction: " + (System.currentTimeMillis() - timeS)
-                )
-                /*mtbAllocations[i] = Allocation.createTyped(rs, Type.createXY(rs, Element.A_8(rs), mtbWidth, mtbHeight));
-                mtbAllocations[i].copyFrom(outputMtbBitmap);
-                output_mtb_bitmap.recycle();
-                if( MyDebug.LOG )
-                    Log.d(TAG, "### time after copying to mtbAllocations: " + (System.currentTimeMillis() - timeS));*/
-                mtbBitmaps!![i] = outputMtbBitmap
-            } else {
-                mtbAllocations!![i] = Allocation.createTyped(
-                    rs,
-                    Type.createXY(rs, Element.U8(rs), mtbWidth, mtbHeight)
-                )
-
-                // set parameters
-                if (useMtb) createMTBScript?.set_median_value(medianValue)
-                createMTBScript?.set_start_x(mtbX)
-                createMTBScript?.set_start_y(mtbY)
-                createMTBScript?.set_out_bitmap(mtbAllocations[i])
-
-                if (MyDebug.LOG) Log.d(TAG, "call createMTBScript")
-                val launchOptions = LaunchOptions()
-                //launch_options.setX((int)(width*0.25), (int)(width*0.75));
-                //launch_options.setY((int)(height*0.25), (int)(height*0.75));
-                //createMTBScript.forEach_create_mtb(allocations[i], mtbAllocations[i], launchOptions);
-                launchOptions.setX(mtbX, mtbX + mtbWidth)
-                launchOptions.setY(mtbY, mtbY + mtbHeight)
-                if (useMtb) createMTBScript?.forEach_create_mtb(allocations!![i], launchOptions)
-                else {
-                    createMTBScript?.forEach_create_greyscale(allocations!![i], launchOptions)
-                }
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "time after createMTBScript: " + (System.currentTimeMillis() - timeS)
-                )
-
-                /*if( MyDebug.LOG ) {
-                // debugging
-                byte [] mtbBytes = new byte[mtbWidth*mtbHeight];
-                mtbAllocations[i].copyTo(mtbBytes);
-                int [] pixels = new int[mtbWidth*mtbHeight];
-                for(int j=0;j<mtbWidth*mtbHeight;j++) {
-                    int b = mtbBytes[j];
-                    if( b < 0 )
-                        b += 255;
-                    pixels[j] = Color.argb(255, b, b, b);
-                }
-                Bitmap mtbBitmap = Bitmap.createBitmap(pixels, mtbWidth, mtbHeight, Bitmap.Config.ARGB_8888);
-                File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + "/mtbBitmap" + i + ".jpg");
-                try {
-                    OutputStream outputStream = new FileOutputStream(file);
-                    mtb_bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream);
-                    outputStream.close();
-                    MainActivity mActivity = (MainActivity) context;
-                    mActivity.storageUtils.broadcastFile(file, true, false, true);
-                }
-                catch(IOException e) {
-                    e.printStackTrace();
-                }
-                mtb_bitmap.recycle();
-            }*/
-            }
+            JavaImageProcessing.applyFunction(
+                function,
+                bitmaps[i],
+                outputMtbBitmap,
+                mtbX,
+                mtbY,
+                mtbX + mtbWidth,
+                mtbY + mtbHeight,
+                0,
+                0
+            )
+            if (MyDebug.LOG) Log.d(
+                TAG,
+                "### time after CreateMTBApplyFunction: " + (System.currentTimeMillis() - timeS)
+            )
+            mtbBitmaps[i] = outputMtbBitmap
         }
         if (MyDebug.LOG) Log.d(
             TAG,
@@ -2721,7 +1969,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             Log.d(TAG, "initial_step_size: $initialStepSize")
         }
 
-        if (mtbBitmaps != null && mtbBitmaps[baseBitmap] == null) {
+        if (mtbBitmaps[baseBitmap] == null) {
             if (MyDebug.LOG) Log.d(TAG, "base image not suitable for image alignment")
             for (i in mtbBitmaps.indices) {
                 if (mtbBitmaps[i] != null) {
@@ -2731,52 +1979,18 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }
             return BrightnessDetails(medianBrightness)
         }
-        if (mtbAllocations != null && mtbAllocations[baseBitmap] == null) {
-            if (MyDebug.LOG) Log.d(TAG, "base image not suitable for image alignment")
-            for (i in mtbAllocations.indices) {
-                if (mtbAllocations[i] != null) {
-                    mtbAllocations[i]?.destroy()
-                    mtbAllocations[i] = null
-                }
-            }
-            return BrightnessDetails(medianBrightness)
-        }
-
-        if (USE_RENDERSCRIPT) {
-            // create RenderScript
-            if (alignMTBScript == null) {
-                alignMTBScript = ScriptC_align_mtb(rs)
-            }
-
-            //ScriptC_align_mtb alignMTBScript = new ScriptC_align_mtb(rs);
-
-            // set parameters
-            alignMTBScript?.set_bitmap0(mtbAllocations!![baseBitmap])
-            // bitmap1 set below
-        }
 
         for (i in 0..<nImages) {
             if (i == baseBitmap) {
                 // don't need to align the "base" reference image
                 continue
             }
-            if (mtbBitmaps != null && mtbBitmaps[i] == null) {
+            if (mtbBitmaps[i] == null) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
                     "image $i not suitable for image alignment"
                 )
                 continue
-            }
-            if (mtbAllocations != null && mtbAllocations[i] == null) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "image $i not suitable for image alignment"
-                )
-                continue
-            }
-
-            if (USE_RENDERSCRIPT) {
-                alignMTBScript?.set_bitmap1(mtbAllocations!![i])
             }
 
             //final int pixelStep = useMtb ? 1 : 4;
@@ -2822,93 +2036,18 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     Log.d(TAG, "stop_y: $stopY")
                 }
 
-                val errors: IntArray
-
-                if (!USE_RENDERSCRIPT) {
-                    val function: JavaImageFunctionsHDR.AlignMTBApplyFunction =
-                        JavaImageFunctionsHDR.AlignMTBApplyFunction(
-                            useMtb,
-                            mtbBitmaps!![baseBitmap]!!,
-                            mtbBitmaps[i]!!, offsetsX[i], offsetsY[i], pixelStepSize
-                        )
-                    JavaImageProcessing.applyFunction(function, null, null, 0, 0, stopX, stopY)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "### time after AlignMTBApplyFunction: " + (System.currentTimeMillis() - timeS)
+                val function: JavaImageFunctionsHDR.AlignMTBApplyFunction =
+                    JavaImageFunctionsHDR.AlignMTBApplyFunction(
+                        useMtb,
+                        mtbBitmaps[baseBitmap]!!,
+                        mtbBitmaps[i]!!, offsetsX[i], offsetsY[i], pixelStepSize
                     )
-                    errors = function.getErrors()
-                } else {
-                    /*if( usePyramid ) {
-                                       // downscale by stepSize
-                                       Allocation [] scaledAllocations = new Allocation[2];
-                                       for(int j=0;j<2;j++) {
-                                           int scaledWidth = mtbWidth/stepSize;
-                                           int scaledHeight = mtbHeight/stepSize;
-                                           if( MyDebug.LOG ) {
-                                               Log.d(TAG, "create scaled image: " + j);
-                                               Log.d(TAG, "    scaledWidth: " + scaledWidth);
-                                               Log.d(TAG, "    scaledHeight: " + scaledHeight);
-                                           }
-                                           Allocation allocationToScale = mtbAllocations[(j==0) ? baseBitmap : i];
-                                           Type type = Type.createXY(rs, allocation_to_scale.getElement(), scaledWidth, scaledHeight);
-                                           scaledAllocations[j] = Allocation.createTyped(rs, type);
-                                           ScriptIntrinsicResize theIntrinsic = ScriptIntrinsicResize.create(rs);
-                                           theIntrinsic.setInput(allocationToScale);
-                                           theIntrinsic.forEach_bicubic(scaledAllocations[j]);
-                                       }
-                                       alignMTBScript.set_bitmap0(scaledAllocations[0]);
-                                       alignMTBScript.set_bitmap1(scaledAllocations[1]);
-                                       int offX = offsetsX[i]/stepSize;
-                                       int offY = offsetsY[i]/stepSize;
-                                       if( MyDebug.LOG ) {
-                                           Log.d(TAG, "offX: " + offX);
-                                           Log.d(TAG, "offY: " + offY);
-                                       }
-                                       alignMTBScript.setOffX( offX );
-                                       alignMTBScript.setOffY( offY );
-                                       alignMTBScript.setStepSize( 1 );
-                                   }
-                                   else*/
-
-                    run<Unit> {
-                        alignMTBScript?.set_off_x(offsetsX[i])
-                        alignMTBScript?.set_off_y(offsetsY[i])
-                        alignMTBScript?.set_step_size(pixelStepSize)
-                    }
-
-                    val errorsAllocation = Allocation.createSized(rs, Element.I32(rs), 9)
-                    alignMTBScript?.bind_errors(errorsAllocation)
-                    alignMTBScript?.invoke_init_errors()
-
-                    val launchOptions = LaunchOptions()
-                    //launch_options.setX((int)(stopX*0.25), (int)(stopX*0.75));
-                    //launch_options.setY((int)(stopY*0.25), (int)(stopY*0.75));
-                    launchOptions.setX(0, stopX)
-                    launchOptions.setY(0, stopY)
-
-                    val thisTimeS = System.currentTimeMillis()
-                    if (useMtb) alignMTBScript?.forEach_align_mtb(
-                        mtbAllocations!![baseBitmap],
-                        launchOptions
-                    )
-                    else alignMTBScript?.forEach_align(
-                        mtbAllocations!![baseBitmap],
-                        launchOptions
-                    )
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "time for alignMTBScript: " + (System.currentTimeMillis() - thisTimeS)
-                        )
-                        Log.d(
-                            TAG,
-                            "### time after alignMTBScript: " + (System.currentTimeMillis() - timeS)
-                        )
-                    }
-                    errors = IntArray(9)
-                    errorsAllocation.copyTo(errors)
-                    errorsAllocation.destroy()
-                }
+                JavaImageProcessing.applyFunction(function, null, null, 0, 0, stopX, stopY)
+                if (MyDebug.LOG) Log.d(
+                    TAG,
+                    "### time after AlignMTBApplyFunction: " + (System.currentTimeMillis() - timeS)
+                )
+                val errors = function.getErrors()
 
                 var bestError = -1
                 var bestId = -1
@@ -2935,29 +2074,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                         throw RuntimeException()
                     }
                 }
-                /*if( bestId != 4 ) {
-                    int thisOffX = bestId % 3;
-                    int thisOffY = bestId/3;
-                    thisOffX--;
-                    thisOffY--;
-                    for(int j=0;j<9;j++) {
-                        int thatOffX = j % 3;
-                        int thatOffY = j/3;
-                        thatOffX--;
-                        thatOffY--;
-                        if( thisOffX * thatOffX == -1 || thisOffY * thatOffY == -1 ) {
-                            float diff = ((float)(bestError - errors[j]))/(float)errors[j];
-                            if( MyDebug.LOG )
-                                Log.d(TAG, "    opposite errors[" + j + "] diff: " + diff);
-                            if( Math.abs(diff) <= 0.02f ) {
-                                if( MyDebug.LOG )
-                                    Log.d(TAG, "    reject auto-alignment");
-                                bestId = 4;
-                                break;
-                            }
-                        }
-                    }
-                }*/
                 if (bestId != -1) {
                     var thisOffX = bestId % 3
                     var thisOffY = bestId / 3
@@ -2973,9 +2089,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                         Log.d(TAG, "offsets_x is now: " + offsetsX[i])
                         Log.d(TAG, "offsets_y is now: " + offsetsY[i])
                     }
-                    /*if( wider && stepSize == initialStepSize/2 && (thisOffX != 0 || thisOffY != 0 ) ) {
-                        throw new RuntimeException(); // test
-                    }*/
                 }
             }
             if (MyDebug.LOG) {
@@ -2985,27 +2098,11 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }
         }
 
-        /*for(int i=0;i<nImages;i++) {
-            offsetsX[i] = 0;
-            offsetsY[i] = 0;
-        }*/
-        run {
-            var i = 0
-            while (mtbBitmaps != null && i < mtbBitmaps.size) {
-                if (mtbBitmaps[i] != null) {
-                    mtbBitmaps[i]!!.recycle()
-                    mtbBitmaps[i] = null
-                }
-                i++
+        for (i in mtbBitmaps.indices) {
+            if (mtbBitmaps[i] != null) {
+                mtbBitmaps[i]?.recycle()
+                mtbBitmaps[i] = null
             }
-        }
-        var i = 0
-        while (mtbAllocations != null && i < mtbAllocations.size) {
-            if (mtbAllocations[i] != null) {
-                mtbAllocations[i]!!.destroy()
-                mtbAllocations[i] = null
-            }
-            i++
         }
         return BrightnessDetails(medianBrightness)
     }
@@ -3388,228 +2485,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         }
     }
 
-    fun adjustHistogramRS(
-        allocationIn: Allocation?,
-        allocationOut: Allocation?,
-        width: Int,
-        height: Int,
-        hdrAlpha: Float,
-        nTiles: Int,
-        cePreserveBlacks: Boolean,
-        timeS: Long
-    ) {
-        if (MyDebug.LOG) Log.d(TAG, "adjustHistogram [renderscript]")
-
-        //final boolean adjustHistogramLocal = false;
-        val adjustHistogramLocal = true
-
-        if (adjustHistogramLocal) {
-            // Contrast Limited Adaptive Histogram Equalisation (CLAHE)
-            // Note we don't fully equalise the histogram, rather the resultant image is the mid-point of the non-equalised and fully-equalised images
-            // See https://en.wikipedia.org/wiki/Adaptive_histogram_equalization#Contrast_Limited_AHE
-            // Also see "Adaptive Histogram Equalization and its Variations" ( http://www.cs.unc.edu/Research/MIDAG/pubs/papers/Adaptive%20Histogram%20Equalization%20and%20Its%20Variations.pdf ),
-            // Pizer, Amburn, Austin, Cromartie, Geselowitz, Greer, ter Haar Romeny, Zimmerman, Zuiderveld (1987).
-            // Also note that if cePreserveBlacks is true, we apply a modification to this algorithm, see below.
-
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time before creating histograms: " + (System.currentTimeMillis() - timeS)
-            )
-            // create histograms
-            /*if( histogramScript == null ) {
-                if( MyDebug.LOG )
-                    Log.d(TAG, "create histogramScript");
-                histogramScript = new ScriptC_histogram_compute(rs);
-            }*/
-            val histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256)
-            if (MyDebug.LOG) Log.d(TAG, "create histogramScript")
-            val histogramScript = ScriptC_histogram_compute(rs)
-            if (MyDebug.LOG) Log.d(TAG, "bind histogram allocation")
-            histogramScript.bind_histogram(histogramAllocation)
-
-            //final int nTilesC = 8;
-            //final int nTilesC = 4;
-            //final int nTilesC = 1;
-            val cHistogram = IntArray(nTiles * nTiles * 256)
-            val tempCHistogram = IntArray(256)
-            for (i in 0..<nTiles) {
-                val a0 = (i.toDouble()) / nTiles.toDouble()
-                val a1 = (i.toDouble() + 1.0) / nTiles.toDouble()
-                val startX = (a0 * width).toInt()
-                val stopX = (a1 * width).toInt()
-                if (stopX == startX) continue
-                for (j in 0..<nTiles) {
-                    val b0 = (j.toDouble()) / nTiles.toDouble()
-                    val b1 = (j.toDouble() + 1.0) / nTiles.toDouble()
-                    val startY = (b0 * height).toInt()
-                    val stopY = (b1 * height).toInt()
-                    if (stopY == startY) continue
-
-                    /*if( MyDebug.LOG )
-                            Log.d(TAG, i + " , " + j + " : " + startX + " , " + startY + " to " + stopX + " , " + stopY);*/
-
-                    // We compute a histogram based on the max RGB value, so this matches with the scaling we do in histogram_adjust.rs.
-                    // This improves the look of the grass in testHDR24, testHDR27.
-                    val launchOptions = LaunchOptions()
-                    launchOptions.setX(startX, stopX)
-                    launchOptions.setY(startY, stopY)
-
-                    histogramScript.invoke_init_histogram()
-                    histogramScript.forEach_histogram_compute_by_value(
-                        allocationIn,
-                        launchOptions
-                    )
-
-                    val histogram = IntArray(256)
-                    histogramAllocation!!.copyTo(histogram)
-
-                    /*if( MyDebug.LOG ) {
-                            // compare/adjust
-                            allocations[0].copyTo(bm);
-                            int [] debugHistogram = new int[256];
-                            for(int k=0;k<256;k++) {
-                                debugHistogram[k] = 0;
-                            }
-                            int [] debugBuffer = new int[width];
-                            for(int y=startY;y<stopY;y++) {
-                                bm.getPixels(debugBuffer, 0, width, 0, y, width, 1);
-                                for(int x=startX;x<stopX;x++) {
-                                    int color = debugBuffer[x];
-                                    float r = (float)((color & 0xFF0000) >> 16);
-                                    float g = (float)((color & 0xFF00) >> 8);
-                                    float b = (float)(color & 0xFF);
-                                    //float value = 0.299f*r + 0.587f*g + 0.114f*b; // matches ScriptIntrinsicHistogram default behaviour
-                                    float value = Math.max(r, g);
-                                    value = Math.max(value, b);
-                                    int iValue = (int)value;
-                                    iValue = Math.min(255, iValue); // just in case
-                                    debugHistogram[iValue]++;
-                                }
-                            }
-                            for(int x=0;x<256;x++) {
-                                Log.d(TAG, "histogram[" + x + "] = " + histogram[x] + " debugHistogram: " + debugHistogram[x]);
-                                //histogram[x] = debugHistogram[x];
-                            }
-                        }*/
-                    clipHistogram(
-                        histogram,
-                        tempCHistogram,
-                        (stopX - startX),
-                        (stopY - startY),
-                        cePreserveBlacks
-                    )
-
-                    // compute cumulative histogram
-                    val histogramOffset = 256 * (i * nTiles + j)
-                    cHistogram[histogramOffset] = histogram[0]
-                    for (x in 1..255) {
-                        cHistogram[histogramOffset + x] =
-                            cHistogram[histogramOffset + x - 1] + histogram[x]
-                    }
-                    /*if( MyDebug.LOG ) {
-                        for(int x=0;x<256;x++) {
-                            Log.d(TAG, "histogram[" + x + "] = " + histogram[x] + " cumulative: " + cHistogram[histogramOffset+x]);
-                        }
-                    }*/
-                }
-            }
-
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "adjustHistogram: time after creating histograms: " + (System.currentTimeMillis() - timeS)
-            )
-
-            val cHistogramAllocation =
-                Allocation.createSized(rs, Element.I32(rs), nTiles * nTiles * 256)
-            cHistogramAllocation.copyFrom(cHistogram)
-            /*if( histogramAdjustScript == null ) {
-                histogramAdjustScript = new ScriptC_histogram_adjust(rs);
-            }*/
-            val histogramAdjustScript = ScriptC_histogram_adjust(rs)
-            histogramAdjustScript.set_c_histogram(cHistogramAllocation)
-            histogramAdjustScript.set_hdr_alpha(hdrAlpha)
-            histogramAdjustScript.set_n_tiles(nTiles)
-            histogramAdjustScript.set_width(width)
-            histogramAdjustScript.set_height(height)
-
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time before histogramAdjustScript: " + (System.currentTimeMillis() - timeS)
-            )
-            histogramAdjustScript.forEach_histogram_adjust(allocationIn, allocationOut)
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time after histogramAdjustScript: " + (System.currentTimeMillis() - timeS)
-            )
-
-            cHistogramAllocation.destroy()
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time after adjusting histogram: " + (System.currentTimeMillis() - timeS)
-            )
-
-            histogramAllocation?.destroy()
-        }
-    }
-
-    /** Only call this from computeHistogram()!
-     * @param avg If true, compute the color value as the average of the rgb values. If false,
-     * compute the color value as the maximum of the rgb values.
-     * @param floatingPoint Whether the allocationIn is in floating point (F32_3) format, or
-     * RGBA_8888 format.
-     */
-    private fun computeHistogramAllocation(
-        allocationIn: Allocation?,
-        avg: Boolean,
-        floatingPoint: Boolean,
-        timeS: Long
-    ): Allocation {
-        if (MyDebug.LOG) Log.d(TAG, "computeHistogramAllocation")
-        val histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256)
-        //final boolean useCustomHistogram = false;
-        val useCustomHistogram = true
-        if (useCustomHistogram) {
-            /*if( histogramScript == null ) {
-                if( MyDebug.LOG )
-                    Log.d(TAG, "create histogramScript");
-                histogramScript = new ScriptC_histogram_compute(rs);
-            }*/
-            if (MyDebug.LOG) Log.d(TAG, "create histogramScript")
-            val histogramScript = ScriptC_histogram_compute(rs)
-            if (MyDebug.LOG) Log.d(TAG, "bind histogram allocation")
-            histogramScript.bind_histogram(histogramAllocation)
-            histogramScript.invoke_init_histogram()
-            if (MyDebug.LOG) Log.d(TAG, "call histogramScript")
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time before histogramScript: " + (System.currentTimeMillis() - timeS)
-            )
-            if (avg) {
-                if (floatingPoint) histogramScript.forEach_histogram_compute_by_intensity_f(
-                    allocationIn
-                )
-                else histogramScript.forEach_histogram_compute_by_intensity(allocationIn)
-            } else {
-                if (floatingPoint) histogramScript.forEach_histogram_compute_by_value_f(
-                    allocationIn
-                )
-                else histogramScript.forEach_histogram_compute_by_value(allocationIn)
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "time after histogramScript: " + (System.currentTimeMillis() - timeS)
-            )
-        } else {
-            val histogramScriptIntrinsic = ScriptIntrinsicHistogram.create(rs, Element.U8_4(rs))
-            histogramScriptIntrinsic.setOutput(histogramAllocation)
-            if (MyDebug.LOG) Log.d(TAG, "call histogramScriptIntrinsic")
-            histogramScriptIntrinsic.forEach_Dot(allocationIn) // use forEach_dot(); using forEach would simply compute a histogram for red values!
-        }
-
-        //histogramAllocation.setAutoPadding(true);
-        return histogramAllocation
-    }
-
     enum class HistogramType {
         HISTOGRAM_TYPE_RGB,
         HISTOGRAM_TYPE_LUMINANCE,
@@ -3627,63 +2502,34 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             Log.d(TAG, "type: $type")
         }
         val timeS = System.currentTimeMillis()
-        if (!USE_RENDERSCRIPT) {
-            /*final int nPixels = bitmap.getWidth()*bitmap.getHeight();
-                       int [] pixels = new int[nPixels];
-                       bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-                       int [] histogram = computeHistogram(pixels);*/
-            val javaType: JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type =
-                when (type) {
-                    HistogramType.HISTOGRAM_TYPE_RGB -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_RGB
-                    HistogramType.HISTOGRAM_TYPE_LUMINANCE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LUMINANCE
-                    HistogramType.HISTOGRAM_TYPE_VALUE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_VALUE
-                    HistogramType.HISTOGRAM_TYPE_INTENSITY -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_INTENSITY
-                    HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LIGHTNESS
-                    else -> throw RuntimeException("unknown histogram type: $type")
-                }
-            val function: JavaImageFunctionsHDR.ComputeHistogramApplyFunction =
-                JavaImageFunctionsHDR.ComputeHistogramApplyFunction(javaType)
-            JavaImageProcessing.applyFunction(
-                function,
-                bitmap,
-                null,
-                0,
-                0,
-                bitmap.width,
-                bitmap.height
-            )
-            val histogram: IntArray = function.histogram
-
-            if (MyDebug.LOG) {
-                Log.d(TAG, "image size: " + bitmap.width + " x " + bitmap.height)
-                Log.d(
-                    TAG,
-                    "### time to compute histogram: " + (System.currentTimeMillis() - timeS)
-                )
+        val javaType: JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type =
+            when (type) {
+                HistogramType.HISTOGRAM_TYPE_RGB -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_RGB
+                HistogramType.HISTOGRAM_TYPE_LUMINANCE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LUMINANCE
+                HistogramType.HISTOGRAM_TYPE_VALUE -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_VALUE
+                HistogramType.HISTOGRAM_TYPE_INTENSITY -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_INTENSITY
+                HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_LIGHTNESS
+                else -> throw RuntimeException("unknown histogram type: $type")
             }
-            return histogram
-        }
-        initRenderscript()
-        val allocationIn = Allocation.createFromBitmap(rs, bitmap)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "time after createFromBitmap: " + (System.currentTimeMillis() - timeS)
+        val function: JavaImageFunctionsHDR.ComputeHistogramApplyFunction =
+            JavaImageFunctionsHDR.ComputeHistogramApplyFunction(javaType)
+        JavaImageProcessing.applyFunction(
+            function,
+            bitmap,
+            null,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height
         )
-        val avg = when (type) {
-            HistogramType.HISTOGRAM_TYPE_RGB, HistogramType.HISTOGRAM_TYPE_LUMINANCE, HistogramType.HISTOGRAM_TYPE_LIGHTNESS -> throw RuntimeException(
-                "histogram type not supported by this function: $type"
-            )
+        val histogram: IntArray = function.histogram
 
-            HistogramType.HISTOGRAM_TYPE_VALUE -> false
-            HistogramType.HISTOGRAM_TYPE_INTENSITY -> true
-            else -> throw RuntimeException("unknown histogram type: $type")
-        }
-        val histogram = computeHistogramRS(allocationIn, bitmap.width, bitmap.height, avg, false)
-        allocationIn.destroy()
-        freeScripts()
         if (MyDebug.LOG) {
             Log.d(TAG, "image size: " + bitmap.width + " x " + bitmap.height)
-            Log.d(TAG, "### time to compute histogram: " + (System.currentTimeMillis() - timeS))
+            Log.d(
+                TAG,
+                "### time to compute histogram: " + (System.currentTimeMillis() - timeS)
+            )
         }
         return histogram
     }
@@ -3718,45 +2564,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         return histogram
     }
 
-    /**
-     * @param width Width of the allocation.
-     * @param height Height of the allocation.
-     */
-    private fun computeHistogramRS(
-        allocation: Allocation?,
-        width: Int,
-        height: Int,
-        avg: Boolean,
-        floatingPoint: Boolean
-    ): IntArray {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "computeHistogram [renderscript/allocation]")
-            Log.d(TAG, "avg: $avg")
-            Log.d(TAG, "floating_point: $floatingPoint")
-        }
-        val timeS = System.currentTimeMillis()
-        /*if( !useRenderscript && !avg ) {
-            JavaImageFunctionsHDR.ComputeHistogramApplyFunction function = new JavaImageFunctionsHDR.ComputeHistogramApplyFunction(JavaImageFunctionsHDR.ComputeHistogramApplyFunction.Type.TYPE_VALUE);
-            JavaImageProcessing.applyFunction(function, allocation, floatingPoint, null, 0, 0, width, height);
-            int [] histogram = function.getHistogram();
-
-            if( MyDebug.LOG ) {
-                Log.d(TAG, "allocation size: " + width + " x " + height);
-                Log.d(TAG, "### time to compute histogram: " + (System.currentTimeMillis() - timeS));
-            }
-            return histogram;
-        }*/
-        val histogram = IntArray(256)
-        val histogramAllocation =
-            computeHistogramAllocation(allocation, avg, floatingPoint, timeS)
-        histogramAllocation.copyTo(histogram)
-        histogramAllocation.destroy()
-        if (MyDebug.LOG) {
-            Log.d(TAG, "allocation size: $width x $height")
-            Log.d(TAG, "### time to compute histogram: " + (System.currentTimeMillis() - timeS))
-        }
-        return histogram
-    }
 
     data class HistogramInfo(
         val total: Int,
@@ -3970,159 +2777,6 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
      * @param exposureTime Exposure time used for the original images.
      * @return              Resultant bitmap.
      */
-    private fun avgBrightenRS(
-        input: Allocation?,
-        width: Int,
-        height: Int,
-        iso: Int,
-        exposureTime: Long
-    ): Bitmap {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "avgBrightenRS")
-            Log.d(TAG, "iso: $iso")
-            Log.d(TAG, "exposure_time: $exposureTime")
-        }
-        initRenderscript()
-
-        val timeS = System.currentTimeMillis()
-
-        val histo = computeHistogramRS(input, width, height, avg = false, floatingPoint = true)
-
-        val histogramInfo = getHistogramInfo(histo)
-        val brightness = histogramInfo.medianBrightness
-        val maxBrightness = histogramInfo.maxBrightness
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after computeHistogram: " + (System.currentTimeMillis() - timeS)
-        )
-
-        if (MyDebug.LOG) {
-            Log.d(TAG, "median brightness: " + histogramInfo.medianBrightness)
-            Log.d(TAG, "mean brightness: " + histogramInfo.meanBrightness)
-            Log.d(TAG, "max brightness: $maxBrightness")
-            /*for(int i=0;i<256;i++) {
-                Log.d(TAG, "histogram[" + i + "]: " + histo[i]);
-            }*/
-        }
-
-        val brightenFactors =
-            computeBrightenFactors(true, iso, exposureTime, brightness, maxBrightness)
-        val gain = brightenFactors.gain
-        val lowX = brightenFactors.lowX
-        val midX = brightenFactors.midX
-        val gamma = brightenFactors.gamma
-
-        //float gain = brightnessTarget / (float)brightness;
-        /*float gamma = (float)(Math.log(maxTarget/(float)brightnessTarget) / Math.log(maxBrightness/(float)brightness));
-        float gain = brightnessTarget / ((float)Math.pow(brightness/255.0f, gamma) * 255.0f);
-        if( MyDebug.LOG ) {
-            Log.d(TAG, "gamma " + gamma);
-            Log.d(TAG, "gain " + gain);
-            Log.d(TAG, "gain2 " + maxTarget / ((float)Math.pow(maxBrightness/255.0f, gamma) * 255.0f));
-        }*/
-        /*float gain = brightnessTarget / (float)brightness;
-        if( MyDebug.LOG ) {
-            Log.d(TAG, "gain: " + gain);
-        }
-        if( gain < 1.0f ) {
-            gain = 1.0f;
-            if( MyDebug.LOG ) {
-                Log.d(TAG, "clamped gain to : " + gain);
-            }
-        }*/
-        val blackLevel = computeBlackLevel(histogramInfo, histo, iso)
-
-        // use a lower medial filter strength for pixel binned images, so that we don't blur testAvg46 so much (especially sign text)
-        val medianFilterStrength = if (avgSampleSize >= 2) 0.5f else 1.0f
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "median_filter_strength: $medianFilterStrength"
-        )
-
-        /*if( avgBrightenScript == null ) {
-            avgBrightenScript = new ScriptC_avg_brighten(rs);
-        }*/
-        val avgBrightenScript = ScriptC_avg_brighten(rs)
-        avgBrightenScript.set_bitmap(input)
-        avgBrightenScript.invoke_setBlackLevel(blackLevel)
-
-        avgBrightenScript.set_median_filter_strength(medianFilterStrength)
-        avgBrightenScript.invoke_setBrightenParameters(
-            gain,
-            gamma,
-            lowX,
-            midX,
-            maxBrightness.toFloat()
-        )
-
-        val outputBitmap = createBitmap(width, height)
-        val allocationOut = Allocation.createFromBitmap(rs, outputBitmap)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after creating allocation_out: " + (System.currentTimeMillis() - timeS)
-        )
-
-        avgBrightenScript.forEach_avg_brighten_f(input, allocationOut)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after avg_brighten: " + (System.currentTimeMillis() - timeS)
-        )
-
-        //if( iso <= 150 ) {
-        if (iso < 1100 && exposureTime < 1000000000L / 59) {
-            // for bright scenes, contrast enhancement helps improve the quality of images (especially where we may have both
-            // dark and bright regions, e.g., testAvg12); but for dark scenes, it just blows up the noise too much
-            // keep nTiles==1 - get too much contrast enhancement with nTiles==4 e.g. for testAvg34
-            // tests that are better at 25% (median brightness in brackets): testAvg16 (90), testAvg26 (117), testAvg30 (79),
-            //     testAvg43 (55), testAvg44 (82)
-            // tests that are better at 50%: testAvg12 (8), testAvg13 (38), testAvg15 (10), testAvg18 (39), testAvg19 (37)
-            // other tests improved by doing contrast enhancement: testAvg32, testAvg40
-            //adjustHistogram(allocationOut, allocationOut, width, height, 0.5f, 4, timeS);
-            //adjustHistogram(allocationOut, allocationOut, width, height, 0.25f, 4, timeS);
-            //adjustHistogram(allocationOut, allocationOut, width, height, 0.25f, 1, timeS);
-            //adjustHistogram(allocationOut, allocationOut, width, height, 0.5f, 1, timeS);
-            val medianLo = 60
-            val medianHi = 35
-            var alpha =
-                (histogramInfo.medianBrightness - medianLo) / (medianHi - medianLo).toFloat()
-            alpha = max(alpha.toDouble(), 0.0).toFloat()
-            alpha = min(alpha.toDouble(), 1.0).toFloat()
-            val amount = (1.0f - alpha) * 0.25f + alpha * 0.5f
-            if (MyDebug.LOG) {
-                Log.d(TAG, "dro alpha: $alpha")
-                Log.d(TAG, "dro amount: $amount")
-            }
-            adjustHistogramRS(
-                allocationOut,
-                allocationOut,
-                width,
-                height,
-                amount,
-                1,
-                true,
-                timeS
-            )
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "### time after adjustHistogram: " + (System.currentTimeMillis() - timeS)
-            )
-        }
-
-        allocationOut.copyTo(outputBitmap)
-        allocationOut.destroy()
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after copying to bitmap: " + (System.currentTimeMillis() - timeS)
-        )
-
-        freeScripts()
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### total time for avgBrighten: " + (System.currentTimeMillis() - timeS)
-        )
-        return outputBitmap
-    }
-
     /** Final stage of the noise reduction algorithm.
      * @param avgData       AvgData returned from call to processAvg().
      * @param width          Width of the input.
@@ -4138,66 +2792,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         iso: Int,
         exposureTime: Long
     ): Bitmap {
-        return if (!USE_RENDERSCRIPT) {
-            //float [] pixelsRgbf = HDRProcessor.AllocationToRGBf(avg_data.allocationOut, width, height);
-            //return avgBrightenRGBf(pixelsRgbf, width, height, iso, exposureTime);
-            avgBrightenRGBf(avgData.pixelsRgbfOut, width, height, iso, exposureTime)
-        } else {
-            avgBrightenRS(avgData.allocationOut, width, height, iso, exposureTime)
-        }
-    }
-
-    /**
-     * Computes a value for how sharp the image is perceived to be. The higher the value, the
-     * sharper the image.
-     * @param allocationIn The input allocation.
-     * @param width         The width of the allocation.
-     */
-    private fun computeSharpness(allocationIn: Allocation, width: Int, timeS: Long): Float {
-        if (MyDebug.LOG) Log.d(TAG, "computeSharpness")
-        if (MyDebug.LOG) Log.d(TAG, "### time: " + (System.currentTimeMillis() - timeS))
-        val sumsAllocation = Allocation.createSized(rs, Element.I32(rs), width)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after createSized: " + (System.currentTimeMillis() - timeS)
-        )
-        /*if( sharpnessScript == null ) {
-            sharpnessScript = new ScriptC_calculate_sharpness(rs);
-            if( MyDebug.LOG )
-                Log.d(TAG, "### time after create sharpnessScript: " + (System.currentTimeMillis() - timeS));
-        }*/
-        val sharpnessScript = ScriptC_calculate_sharpness(rs)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after create sharpnessScript: " + (System.currentTimeMillis() - timeS)
-        )
-        if (MyDebug.LOG) Log.d(TAG, "bind sums allocation")
-        sharpnessScript.bind_sums(sumsAllocation)
-        sharpnessScript.set_bitmap(allocationIn)
-        sharpnessScript.set_width(width)
-        sharpnessScript.invoke_init_sums()
-        if (MyDebug.LOG) Log.d(TAG, "call sharpnessScript")
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time before sharpnessScript: " + (System.currentTimeMillis() - timeS)
-        )
-        sharpnessScript.forEach_calculate_sharpness(allocationIn)
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "### time after sharpnessScript: " + (System.currentTimeMillis() - timeS)
-        )
-
-        val sums = IntArray(width)
-        sumsAllocation.copyTo(sums)
-        sumsAllocation.destroy()
-        var totalSum = 0.0f
-        for (i in 0..<width) {
-            /*if( MyDebug.LOG )
-                Log.d(TAG, "sums[" + i + "] = " + sums[i]);*/
-            totalSum += sums[i].toFloat()
-        }
-        if (MyDebug.LOG) Log.d(TAG, "total_sum: $totalSum")
-        return totalSum
+        return avgBrightenRGBf(avgData.pixelsRgbfOut, width, height, iso, exposureTime)
     }
 
     companion object {

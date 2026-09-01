@@ -59,7 +59,6 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
-import com.hightechif.openkamera.ScriptC_histogram_compute
 import com.hightechif.openkamera.TakePhoto
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
@@ -169,7 +168,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     private var rs: RenderScript? =
         null // lazily created, so we don't take up resources if application isn't using renderscript
-    private var histogramScript: ScriptC_histogram_compute? = null // lazily create for performance
     var isPreviewBitmapEnabled: Boolean =
         false // whether application has requested we generate bitmap for the preview
         private set
@@ -8062,7 +8060,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         isPreviewBitmapEnabled = false
         usePreviewBitmapSmall = false
         usePreviewBitmapFull = false
-        histogramScript = null // to help garbage collection
     }
 
     fun usePreviewBitmapSmall(): Boolean {

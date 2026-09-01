@@ -9,11 +9,7 @@ package com.hightechif.openkamera.preview.analysis
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.renderscript.Allocation
-import android.renderscript.RenderScript
 import android.util.Log
-import com.hightechif.openkamera.ScriptC_histogram_compute
-import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -42,9 +38,6 @@ class PreviewFrameAnalyzer(
 
     private val _analysisResultFlow = MutableStateFlow<FrameAnalysisResult?>(null)
     val analysisResultFlow: StateFlow<FrameAnalysisResult?> = _analysisResultFlow.asStateFlow()
-
-    private var rs: RenderScript? = null
-    private var histogramScript: ScriptC_histogram_compute? = null
 
     private data class AnalysisFrameTask(
         val previewBitmap: Bitmap,
@@ -114,36 +107,16 @@ class PreviewFrameAnalyzer(
         )
     }
 
-    private fun ensureRenderScript() {
-        if (HDRProcessor.USE_RENDERSCRIPT && rs == null) {
-            try {
-                rs = RenderScript.create(context)
-                histogramScript = ScriptC_histogram_compute(rs)
-            } catch (e: Exception) {
-                if (MyDebug.LOG) Log.e(TAG, "failed to initialize RenderScript: ${e.message}")
-            }
-        }
-    }
-
     private fun processFrameInternal(task: AnalysisFrameTask): FrameAnalysisResult? {
         val bitmap = task.previewBitmap
         if (bitmap.isRecycled) return null
 
-        var allocationIn: Allocation? = null
         try {
-            ensureRenderScript()
-            if (HDRProcessor.USE_RENDERSCRIPT && rs != null) {
-                allocationIn = Allocation.createFromBitmap(rs, bitmap)
-            }
-
             var histogram: IntArray? = null
             if (task.config.wantHistogram) {
                 histogram = HistogramProcessor.computeHistogram(
                     bitmap = bitmap,
-                    type = task.config.histogramType,
-                    rs = rs,
-                    histogramScript = histogramScript,
-                    allocationIn = allocationIn
+                    type = task.config.histogramType
                 )
             }
 
@@ -155,10 +128,7 @@ class PreviewFrameAnalyzer(
                     threshold = task.config.zebraStripesThreshold,
                     colorForeground = task.config.zebraStripesColorForeground,
                     colorBackground = task.config.zebraStripesColorBackground,
-                    rotationDegrees = task.config.rotationDegrees,
-                    rs = rs,
-                    histogramScript = histogramScript,
-                    allocationIn = allocationIn
+                    rotationDegrees = task.config.rotationDegrees
                 )
             }
 
@@ -170,10 +140,7 @@ class PreviewFrameAnalyzer(
                     previewBitmap = bitmap,
                     outputBuffer = task.focusPeakingBuffer,
                     tempBuffer = task.focusPeakingBufferTemp,
-                    rotationDegrees = task.config.rotationDegrees,
-                    rs = rs,
-                    histogramScript = histogramScript,
-                    allocationIn = allocationIn
+                    rotationDegrees = task.config.rotationDegrees
                 )
             }
 
@@ -187,28 +154,14 @@ class PreviewFrameAnalyzer(
         } catch (e: Exception) {
             if (MyDebug.LOG) Log.e(TAG, "error during frame analysis: ${e.message}")
             return null
-        } finally {
-            try {
-                allocationIn?.destroy()
-            } catch (_: Exception) {
-                // ignore
-            }
         }
     }
 
     /**
-     * Releases allocations and cancels background worker.
+     * Releases resources and cancels background worker.
      */
     fun destroy() {
         processingJob?.cancel()
         frameChannel.close()
-        try {
-            histogramScript?.destroy()
-            rs?.destroy()
-        } catch (_: Exception) {
-            // ignore
-        }
-        histogramScript = null
-        rs = null
     }
 }

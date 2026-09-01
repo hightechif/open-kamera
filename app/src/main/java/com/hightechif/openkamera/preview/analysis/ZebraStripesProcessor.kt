@@ -8,14 +8,10 @@
 package com.hightechif.openkamera.preview.analysis
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Matrix
-import android.renderscript.Allocation
-import android.renderscript.RenderScript
-import com.hightechif.openkamera.ScriptC_histogram_compute
-import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.JavaImageFunctionsPreview
 import com.hightechif.openkamera.processing.JavaImageProcessing
+import com.hightechif.openkamera.processing.NativeImageProcessorBridge
 
 /**
  * Encapsulates overexposure zebra stripes highlight overlay generation.
@@ -28,14 +24,25 @@ object ZebraStripesProcessor {
         threshold: Int,
         colorForeground: Int,
         colorBackground: Int,
-        rotationDegrees: Int,
-        rs: RenderScript? = null,
-        histogramScript: ScriptC_histogram_compute? = null,
-        allocationIn: Allocation? = null
+        rotationDegrees: Int
     ): Bitmap {
         val zebraStripesWidth = outputBuffer.width / 20
 
-        if (!HDRProcessor.USE_RENDERSCRIPT || rs == null || histogramScript == null || allocationIn == null) {
+        // 1. Try Native C++17 NEON Engine
+        var processed = false
+        if (NativeImageProcessorBridge.isAvailable()) {
+            processed = NativeImageProcessorBridge.computeZebraStripes(
+                previewBitmap,
+                outputBuffer,
+                threshold,
+                colorForeground,
+                colorBackground,
+                zebraStripesWidth
+            )
+        }
+
+        if (!processed) {
+            // 2. Fallback to CPU Kotlin/Java
             val function = JavaImageFunctionsPreview.ZebraStripesApplyFunction(
                 threshold,
                 colorForeground,
@@ -51,22 +58,6 @@ object ZebraStripesProcessor {
                 previewBitmap.width,
                 previewBitmap.height
             )
-        } else {
-            val outputAllocation = Allocation.createFromBitmap(rs, outputBuffer)
-            histogramScript.set_zebra_stripes_threshold(threshold)
-            histogramScript.set_zebra_stripes_foreground_r(Color.red(colorForeground))
-            histogramScript.set_zebra_stripes_foreground_g(Color.green(colorForeground))
-            histogramScript.set_zebra_stripes_foreground_b(Color.blue(colorForeground))
-            histogramScript.set_zebra_stripes_foreground_a(Color.alpha(colorForeground))
-            histogramScript.set_zebra_stripes_background_r(Color.red(colorBackground))
-            histogramScript.set_zebra_stripes_background_g(Color.green(colorBackground))
-            histogramScript.set_zebra_stripes_background_b(Color.blue(colorBackground))
-            histogramScript.set_zebra_stripes_background_a(Color.alpha(colorBackground))
-            histogramScript.set_zebra_stripes_width(zebraStripesWidth)
-
-            histogramScript.forEach_generate_zebra_stripes(allocationIn, outputAllocation)
-            outputAllocation.copyTo(outputBuffer)
-            outputAllocation.destroy()
         }
 
         val matrix = Matrix()
