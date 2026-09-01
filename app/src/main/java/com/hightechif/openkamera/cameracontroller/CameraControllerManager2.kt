@@ -14,8 +14,8 @@ import android.hardware.camera2.CameraMetadata
 import android.util.Log
 import android.util.SizeF
 import com.hightechif.openkamera.R
+import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
 import com.hightechif.openkamera.utils.MyDebug
-import kotlin.math.atan2
 
 /** Provides support using Android 5's Camera 2 API
  * android.hardware.camera2.*.
@@ -172,118 +172,12 @@ class CameraControllerManager2(private val context: Context) : CameraControllerM
     companion object {
         private const val TAG = "CControllerManager2"
 
-        /** Helper class to compute view angles from the CameraCharacteristics.
-         * @return The width and height of the returned size represent the x and y view angles in
-         * degrees.
-         */
         fun computeViewAngles(characteristics: CameraCharacteristics): SizeF {
-            // Note this is an approximation (see http://stackoverflow.com/questions/39965408/what-is-the-android-camera2-api-equivalent-of-camera-parameters-gethorizontalvie ).
-            // This does not take into account the aspect ratio of the preview or camera, it's up to the caller to do this (e.g., see Preview.getViewAngleX(), getViewAngleY()).
-            val activeSize =
-                characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
-            val physicalSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
-            val pixelSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
-            val focalLengths =
-                characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-            if (activeSize == null || physicalSize == null || pixelSize == null || focalLengths == null || focalLengths.isEmpty()) {
-                // in theory this should never happen according to the documentation, but I've had a report of physicalSize (SENSOR_INFO_PHYSICAL_SIZE)
-                // being null on an EXTERNAL Camera2 device, see https://sourceforge.net/p/OpenKamera/tickets/754/
-                if (MyDebug.LOG) {
-                    Log.e(TAG, "can't get camera view angles")
-                }
-                // fall back to a default
-                return SizeF(55.0f, 43.0f)
-            }
-            //camera_features.viewAngleX = (float)Math.toDegrees(2.0 * Math.atan2(physical_size.getWidth(), (2.0 * focalLengths[0])));
-            //camera_features.viewAngleY = (float)Math.toDegrees(2.0 * Math.atan2(physical_size.getHeight(), (2.0 * focalLengths[0])));
-            val fracX = (activeSize.width().toFloat()) / pixelSize.width.toFloat()
-            val fracY = (activeSize.height().toFloat()) / pixelSize.height.toFloat()
-            val viewAngleX = Math.toDegrees(
-                2.0 * atan2(
-                    (physicalSize.width * fracX).toDouble(),
-                    (2.0 * focalLengths[0])
-                )
-            ).toFloat()
-            val viewAngleY = Math.toDegrees(
-                2.0 * atan2(
-                    (physicalSize.height * fracY).toDouble(),
-                    (2.0 * focalLengths[0])
-                )
-            ).toFloat()
-            if (MyDebug.LOG) {
-                Log.d(TAG, "frac_x: $fracX")
-                Log.d(TAG, "frac_y: $fracY")
-                Log.d(
-                    TAG,
-                    "view_angle_x: $viewAngleX"
-                )
-                Log.d(
-                    TAG,
-                    "view_angle_y: $viewAngleY"
-                )
-            }
-            return SizeF(viewAngleX, viewAngleY)
+            return Camera2CapabilitiesResolver.computeViewAngles(characteristics)
         }
 
-        /* Returns true if the device supports the required hardware level, or better.
-     * See https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL .
-     * From Android N, higher levels than "FULL" are possible, that will have higher integer values.
-     * Also see https://sourceforge.net/p/OpenKamera/tickets/141/ .
-     */
         fun isHardwareLevelSupported(c: CameraCharacteristics?, rl: Int): Boolean {
-            if (c == null) return false
-            var requiredLevel = rl
-            var deviceLevel = c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-            if (deviceLevel == null) {
-                if (MyDebug.LOG) Log.e(TAG, "INFO_SUPPORTED_HARDWARE_LEVEL is null")
-                return false
-            }
-            if (MyDebug.LOG) {
-                when (deviceLevel) {
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY -> Log.d(
-                        TAG, "Camera has LEGACY Camera2 support"
-                    )
-
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL -> Log.d(
-                        TAG,
-                        "Camera has EXTERNAL Camera2 support"
-                    )
-
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED -> Log.d(
-                        TAG,
-                        "Camera has LIMITED Camera2 support"
-                    )
-
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_FULL -> Log.d(
-                        TAG,
-                        "Camera has FULL Camera2 support"
-                    )
-
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_3 -> Log.d(
-                        TAG,
-                        "Camera has Level 3 Camera2 support"
-                    )
-
-                    else -> Log.d(
-                        TAG,
-                        "Camera has unknown Camera2 support: $deviceLevel"
-                    )
-                }
-            }
-
-            // need to treat legacy and external as special cases; otherwise can then use numerical comparison
-            if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
-                return requiredLevel == deviceLevel
-            }
-
-            if (deviceLevel == CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL) {
-                deviceLevel = CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
-            }
-            if (requiredLevel == CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL) {
-                requiredLevel = CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
-            }
-
-            return requiredLevel <= deviceLevel
+            return Camera2CapabilitiesResolver.isHardwareLevelSupported(c, rl)
         }
     }
 }

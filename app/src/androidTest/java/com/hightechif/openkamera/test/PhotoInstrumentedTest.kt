@@ -36,7 +36,7 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         focusValueUi: String?
     ) {
         Thread.sleep(2000)
-        val savedCount = getActivityValue { it.preview.count_cameraAutoFocus }
+        val savedCount = getActivityValue { it.preview.countCameraAutoFocus }
         Log.d(TAG, "saved count_cameraAutoFocus: $savedCount")
 
         onView(
@@ -116,14 +116,14 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
             )
         }
 
-        val savedCountCameraTakePicture = getActivityValue { it.preview.count_cameraTakePicture }
+        val savedCountCameraTakePicture = getActivityValue { it.preview.countCameraTakePicture }
 
         val files = getActivityValue { activity -> TestUtils.filesInSaveFolder(activity) }
         val nFiles = files?.size ?: 0
         Log.d(TAG, "n_files at start: $nFiles")
 
         val savedThumbnailCount =
-            getActivityValue { it.applicationInterface.drawPreview.test_thumbnail_anim_count }
+            getActivityValue { it.applicationInterface.drawPreview.testThumbnailAnimCount }
 
         if (touchToFocus) {
             subTestTouchToFocus(
@@ -147,14 +147,14 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
 
         waitForTakePhoto()
 
-        val newCountCameraTakePicture = getActivityValue { it.preview.count_cameraTakePicture }
+        val newCountCameraTakePicture = getActivityValue { it.preview.countCameraTakePicture }
         assertEquals(newCountCameraTakePicture, savedCountCameraTakePicture + 1)
 
         if (info.hasThumbnailAnim) {
             val timeS = System.currentTimeMillis()
             while (true) {
                 val waiting =
-                    getActivityValue { activity -> activity.applicationInterface.drawPreview.test_thumbnail_anim_count <= savedThumbnailCount }
+                    getActivityValue { activity -> activity.applicationInterface.drawPreview.testThumbnailAnimCount <= savedThumbnailCount }
                 if (!waiting) break
                 Thread.sleep(10)
                 val allowedTimeMs =
@@ -214,7 +214,7 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         }
         updateForSettings()
 
-        val savedCount = getActivityValue { it.preview.count_cameraTakePicture }
+        val savedCount = getActivityValue { it.preview.countCameraTakePicture }
 
         onActivity { activity ->
             val takePhotoButton = activity.findViewById<View>(R.id.take_photo)
@@ -225,7 +225,7 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         waitUntilTimer()
 
         waitForTakePhoto()
-        assertEquals(savedCount + 1, getActivityValue { it.preview.count_cameraTakePicture })
+        assertEquals(savedCount + 1, getActivityValue { it.preview.countCameraTakePicture })
     }
 
     @Test

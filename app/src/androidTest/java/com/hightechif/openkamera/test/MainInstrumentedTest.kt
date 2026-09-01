@@ -106,7 +106,7 @@ class MainInstrumentedTest : BaseInstrumentedTest() {
     fun testStartCameraPreviewCount() {
         Log.d(TAG, "testStartCameraPreviewCount")
         setToDefault()
-        val count = getActivityValue { it.preview.count_cameraStartPreview }
+        val count = getActivityValue { it.preview.countCameraStartPreview }
         assertTrue(count >= 1)
     }
 

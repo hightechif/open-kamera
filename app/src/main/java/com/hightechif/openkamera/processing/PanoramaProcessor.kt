@@ -25,6 +25,8 @@ import android.renderscript.RenderScript
 import android.renderscript.Script.LaunchOptions
 import android.renderscript.Type
 import android.util.Log
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.withSave
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.ScriptC_feature_detector
 import com.hightechif.openkamera.ScriptC_pyramid_blending
@@ -46,7 +48,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.ByteBuffer
-import java.util.Collections
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -95,7 +96,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
     private fun initRenderscript() {
         if (MyDebug.LOG) Log.d(TAG, "initRenderscript")
-        if (!HDRProcessor.useRenderscript) {
+        if (!HDRProcessor.USE_RENDERSCRIPT) {
             throw RuntimeException("shouldn't be using renderscript")
         }
         if (rs == null) {
@@ -132,7 +133,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         val width = bitmap.width
         val height = bitmap.height
 
-        val reducedBitmap = Bitmap.createBitmap(width / 2, height / 2, Bitmap.Config.ARGB_8888)
+        val reducedBitmap = createBitmap(width / 2, height / 2)
 
         //final boolean useReduce2d = true;
         val useReduce2d =
@@ -413,9 +414,9 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             expanded_bitmap.recycle();
         }*/
         var tempBitmapArgb: ByteArray = ByteArray(4 * (2 * width) * (2 * height))
-        val function_blur1dX: Blur1dXFullFunction =
+        val functionBlur1dX: Blur1dXFullFunction =
             Blur1dXFullFunction(expandedBitmapArgb, tempBitmapArgb, 2 * width, 2 * height)
-        JavaImageProcessing.applyFunction(function_blur1dX, null, null, 0, 0, 2 * width, 2 * height)
+        JavaImageProcessing.applyFunction(functionBlur1dX, null, null, 0, 0, 2 * width, 2 * height)
         if (MyDebug.LOG) Log.d(
             TAG,
             "### expandBitmap: time after blur1dX: " + (System.currentTimeMillis() - timeS)
@@ -448,9 +449,9 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         // now re-use expandedBitmap for the resultBitmap
         val resultBitmapArgb = expandedBitmapArgb
 
-        val function_blur1dY: Blur1dYFullFunction =
+        val functionBlur1dY: Blur1dYFullFunction =
             Blur1dYFullFunction(tempBitmapArgb, resultBitmapArgb, 2 * width, 2 * height)
-        JavaImageProcessing.applyFunction(function_blur1dY, null, null, 0, 0, 2 * width, 2 * height)
+        JavaImageProcessing.applyFunction(functionBlur1dY, null, null, 0, 0, 2 * width, 2 * height)
         if (MyDebug.LOG) Log.d(
             TAG,
             "### expandBitmap: time after blur1dY: " + (System.currentTimeMillis() - timeS)
@@ -1108,19 +1109,19 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
             // when using bestPath, we have a narrower region to blend across
             val blendWindowWidth = width / 2
-            val blendWidth = blendWindowWidth
 
             // compute interpolatedBestPath
             computeInterpolatedBestPath(
                 interpolatedBestPath,
                 width,
                 height,
-                blendWidth,
+                blendWindowWidth,
                 bestPath,
                 bestPathNX
             )
 
-            val function = MergeFunction(pyramid1.topLevel!!, blendWidth, interpolatedBestPath)
+            val function =
+                MergeFunction(pyramid1.topLevel!!, blendWindowWidth, interpolatedBestPath)
             JavaImageProcessing.applyFunction(
                 function,
                 pyramid0.topLevel,
@@ -1148,7 +1149,14 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             else bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
             outputStream.close()
             val mActivity = context as MainActivity
-            mActivity.storageUtils.broadcastFile(file, true, false, true, false, null)
+            mActivity.storageUtils.broadcastFile(
+                file = file,
+                isNewPicture = true,
+                isNewVideo = false,
+                setLastScanned = true,
+                hasnoexifdatetime = false,
+                safUri = null
+            )
         } catch (e: IOException) {
             e.printStackTrace()
             throw RuntimeException()
@@ -1161,37 +1169,43 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         val height = allocation.type.y
         Log.d(TAG, "count: " + allocation.type.count)
         Log.d(TAG, "byte size: " + allocation.type.element.bytesSize)
-        if (allocation.type.element.dataType == Element.DataType.FLOAT_32) {
-            val bytes = FloatArray(width * height * 4)
-            allocation.copyTo(bytes)
-            val pixels = IntArray(width * height)
-            for (j in 0..<width * height) {
-                val r = bytes[4 * j]
-                val g = bytes[4 * j + 1]
-                val b = bytes[4 * j + 2]
-                // each value should be from -255 to +255, we compress to be in the range [0, 255]
-                var ir = (255.0f * ((r / 510.0f) + 0.5f) + 0.5f).toInt()
-                var ig = (255.0f * ((g / 510.0f) + 0.5f) + 0.5f).toInt()
-                var ib = (255.0f * ((b / 510.0f) + 0.5f) + 0.5f).toInt()
-                ir = max(min(ir.toDouble(), 255.0), 0.0).toInt()
-                ig = max(min(ig.toDouble(), 255.0), 0.0).toInt()
-                ib = max(min(ib.toDouble(), 255.0), 0.0).toInt()
-                pixels[j] = Color.argb(255, ir, ig, ib)
+        when (allocation.type.element.dataType) {
+            Element.DataType.FLOAT_32 -> {
+                val bytes = FloatArray(width * height * 4)
+                allocation.copyTo(bytes)
+                val pixels = IntArray(width * height)
+                for (j in 0..<width * height) {
+                    val r = bytes[4 * j]
+                    val g = bytes[4 * j + 1]
+                    val b = bytes[4 * j + 2]
+                    // each value should be from -255 to +255, we compress to be in the range [0, 255]
+                    var ir = (255.0f * ((r / 510.0f) + 0.5f) + 0.5f).toInt()
+                    var ig = (255.0f * ((g / 510.0f) + 0.5f) + 0.5f).toInt()
+                    var ib = (255.0f * ((b / 510.0f) + 0.5f) + 0.5f).toInt()
+                    ir = max(min(ir.toDouble(), 255.0), 0.0).toInt()
+                    ig = max(min(ig.toDouble(), 255.0), 0.0).toInt()
+                    ib = max(min(ib.toDouble(), 255.0), 0.0).toInt()
+                    pixels[j] = Color.argb(255, ir, ig, ib)
+                }
+                bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
             }
-            bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-        } else if (allocation.type.element.dataType == Element.DataType.UNSIGNED_8) {
-            val bytes = ByteArray(width * height)
-            allocation.copyTo(bytes)
-            val pixels = IntArray(width * height)
-            for (j in 0..<width * height) {
-                var b = bytes[j].toInt()
-                if (b < 0) b += 255
-                pixels[j] = Color.argb(255, b, b, b)
+
+            Element.DataType.UNSIGNED_8 -> {
+                val bytes = ByteArray(width * height)
+                allocation.copyTo(bytes)
+                val pixels = IntArray(width * height)
+                for (j in 0..<width * height) {
+                    var b = bytes[j].toInt()
+                    if (b < 0) b += 255
+                    pixels[j] = Color.argb(255, b, b, b)
+                }
+                bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
             }
-            bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-        } else {
-            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            allocation.copyTo(bitmap)
+
+            else -> {
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                allocation.copyTo(bitmap)
+            }
         }
         saveBitmap(bitmap, name)
         bitmap.recycle()
@@ -1205,7 +1219,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         var timeS: Long = 0
         if (MyDebug.LOG) timeS = System.currentTimeMillis()
 
-        if (!HDRProcessor.useRenderscript) {
+        if (!HDRProcessor.USE_RENDERSCRIPT) {
         } else {
             if (pyramidBlendingScript == null) {
                 pyramidBlendingScript = ScriptC_pyramid_blending(rs)
@@ -1288,7 +1302,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             var errors: IntArray? = null
             var errorsAllocation: Allocation? = null
             var launchOptions: LaunchOptions? = null
-            if (!HDRProcessor.useRenderscript) {
+            if (!HDRProcessor.USE_RENDERSCRIPT) {
                 computeErrorFunction = PyramidBlendingComputeErrorFunction(bestPathRhs)
             } else {
                 lhsAllocation = Allocation.createFromBitmap(rs, bestPathLhs)
@@ -1315,7 +1329,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 var bestError = -1
 
                 stopY = ((y + 1) * bestPathLhs.height) / bestPathNY
-                if (!HDRProcessor.useRenderscript) {
+                if (!HDRProcessor.USE_RENDERSCRIPT) {
                 } else {
                     launchOptions!!.setY(startY, stopY)
                 }
@@ -1331,7 +1345,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
                     //stopX = ((x+1) * best_path_lhs.getWidth()) / bestPathNX;
                     val thisError: Int
-                    if (!HDRProcessor.useRenderscript) {
+                    if (!HDRProcessor.USE_RENDERSCRIPT) {
                         JavaImageProcessing.applyFunction(
                             computeErrorFunction!!,
                             bestPathLhs,
@@ -1368,7 +1382,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 if (MyDebug.LOG) Log.d(TAG, "best_path [" + y + "]: " + bestPath[y])
             }
 
-            if (!HDRProcessor.useRenderscript) {
+            if (!HDRProcessor.USE_RENDERSCRIPT) {
             } else {
                 lhsAllocation!!.destroy()
                 rhsAllocation!!.destroy()
@@ -1389,13 +1403,13 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         }
 
         val mergedBitmap: Bitmap?
-        if (!HDRProcessor.useRenderscript) {
-            val lhsPyramid = createLaplacianPyramid(lhs, blendNLevels, "lhs")
+        if (!HDRProcessor.USE_RENDERSCRIPT) {
+            val lhsPyramid = createLaplacianPyramid(lhs, BLEND_N_LEVELS, "lhs")
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "### blendPyramids: time after createLaplacianPyramid 1st call: " + (System.currentTimeMillis() - timeS)
             )
-            val rhsPyramid = createLaplacianPyramid(rhs, blendNLevels, "rhs")
+            val rhsPyramid = createLaplacianPyramid(rhs, BLEND_N_LEVELS, "rhs")
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "### blendPyramids: time after createLaplacianPyramid 2nd call: " + (System.currentTimeMillis() - timeS)
@@ -1456,13 +1470,13 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             rhsPyramid.topLevel!!.recycle()
         } else {
             val lhsPyramidRs =
-                createLaplacianPyramidRS(pyramidBlendingScript!!, lhs, blendNLevels, "lhs")
+                createLaplacianPyramidRS(pyramidBlendingScript!!, lhs, BLEND_N_LEVELS, "lhs")
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "### blendPyramids: time after createLaplacianPyramid 1st call: " + (System.currentTimeMillis() - timeS)
             )
             val rhsPyramidRs =
-                createLaplacianPyramidRS(pyramidBlendingScript!!, rhs, blendNLevels, "rhs")
+                createLaplacianPyramidRS(pyramidBlendingScript!!, rhs, BLEND_N_LEVELS, "rhs")
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "### blendPyramids: time after createLaplacianPyramid 2nd call: " + (System.currentTimeMillis() - timeS)
@@ -1538,8 +1552,8 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             return this.distance.compareTo(other.distance)
         }
 
-        override fun equals(that: Any?): Boolean {
-            return (that is FeatureMatch) && compareTo(that) == 0
+        override fun equals(other: Any?): Boolean {
+            return (other is FeatureMatch) && compareTo(other) == 0
         }
     }
 
@@ -1594,7 +1608,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         }
 
         var allocations: Array<Allocation?>? = null
-        if (HDRProcessor.useRenderscript) {
+        if (HDRProcessor.USE_RENDERSCRIPT) {
             initRenderscript()
             if (MyDebug.LOG) {
                 Log.d(
@@ -1635,10 +1649,10 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             var strengthAllocation: Allocation? = null
             var localMaxFeaturesAllocation: Allocation? = null
 
-            if (!HDRProcessor.useRenderscript) {
+            if (!HDRProcessor.USE_RENDERSCRIPT) {
                 if (MyDebug.LOG) Log.d(TAG, "convert to greyscale")
 
-                val gsBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+                val gsBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
                 JavaImageProcessing.applyFunction(
                     JavaImageFunctionsPanorama.ConvertToGreyscaleFunction(),
                     bitmaps[i],
@@ -1658,8 +1672,8 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
                 if (MyDebug.LOG) Log.d(TAG, "compute derivatives")
 
-                val ixBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
-                val iyBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+                val ixBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
+                val iyBitmap = createBitmap(width, height, Bitmap.Config.ALPHA_8)
                 JavaImageProcessing.applyFunction(
                     JavaImageFunctionsPanorama.ComputeDerivativesFunction(
                         ixBitmap,
@@ -1675,7 +1689,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 }
                 gsBitmap.recycle()
 
-                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: " + i)
+                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: $i")
                 strengthRgbf = FloatArray(width * height)
                 JavaImageProcessing.applyFunction(
                     JavaImageFunctionsPanorama.CornerDetectorFunction(
@@ -1709,7 +1723,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     forEach_compute_derivatives(gsAllocation)
                 }
 
-                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: " + i)
+                if (MyDebug.LOG) Log.d(TAG, "call corner detector script for image: $i")
                 strengthAllocation =
                     Allocation.createTyped(rs, Type.createXY(rs, Element.F32(rs), width, height))
                 featureDetectorScript?.apply {
@@ -1789,7 +1803,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             pointsArrays[i] = points.toArray(new Point[0]);
             */
             if (MyDebug.LOG) Log.d(TAG, "find local maxima for image: $i")
-            if (HDRProcessor.useRenderscript) {
+            if (HDRProcessor.USE_RENDERSCRIPT) {
                 featureDetectorScript!!.set_bitmap(strengthAllocation)
             }
             // --- Local Maxima Search ---
@@ -1818,7 +1832,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                         TAG,
                         "### attempt $count try threshold: $threshold [ $lowThreshold : $highThreshold ]"
                     )
-                    if (!HDRProcessor.useRenderscript) {
+                    if (!HDRProcessor.USE_RENDERSCRIPT) {
                         val function = JavaImageFunctionsPanorama.LocalMaximumFunction(
                             strengthRgbf,
                             bytes,
@@ -2009,14 +2023,14 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             "### autoAlignmentByFeature: time after computing match distances: " + (System.currentTimeMillis() - timeS)
         )
         // sort
-        Collections.sort(matches)
+        matches.sort()
         if (MyDebug.LOG) Log.d(
             TAG,
             "### autoAlignmentByFeature: time after sorting matches: " + (System.currentTimeMillis() - timeS)
         )
         if (MyDebug.LOG) {
-            val bestMatch = matches.get(0)
-            val worstMatch = matches.get(matches.size - 1)
+            val bestMatch = matches[0]
+            val worstMatch = matches[matches.size - 1]
             Log.d(
                 TAG,
                 "best match between " + bestMatch.index0 + " and " + bestMatch.index1 + " distance: " + bestMatch.distance
@@ -2064,7 +2078,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     // matches in the grass region
                     if (ratio + 1.0e-5 > 0.8f) {
                         if (MyDebug.LOG) {
-                            Log.d(TAG, "        reject due to Lowe's test, ratio: " + ratio)
+                            Log.d(TAG, "        reject due to Lowe's test, ratio: $ratio")
                         }
                         reject = true
                     }
@@ -2222,9 +2236,9 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         }
         val p = Paint()
         val rect = Rect()
-        val blendedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val blendedBitmap = createBitmap(width, height)
         val blendedCanvas = Canvas(blendedBitmap)
-        p.setXfermode(PorterDuffXfermode(PorterDuff.Mode.ADD))
+        p.xfermode = PorterDuffXfermode(PorterDuff.Mode.ADD)
         for (x in 0..<width) {
             rect[x, 0, x + 1] = height
 
@@ -2255,8 +2269,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         cameraAngle: Double,
         centreShiftX: Int
     ): Bitmap {
-        val projectedBitmap =
-            Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+        val projectedBitmap = createBitmap(bitmapWidth, bitmapHeight)
         run {
             // project
             val projectedCanvas = Canvas(projectedBitmap)
@@ -2374,7 +2387,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             // For the y crop, there isn't any advantage to shifting.
 
             //Bitmap lhs = Bitmap.createBitmap(panorama, offsetX + dstOffsetX - blendHwidth, 0, 2*blendHwidth, bitmapHeight);
-            val lhs = Bitmap.createBitmap(blendWidth, blendHeight, Bitmap.Config.ARGB_8888)
+            val lhs = createBitmap(blendWidth, blendHeight)
             run {
                 val lhsCanvas = Canvas(lhs)
                 srcRectWorkspace[offsetX + dstOffsetX - blendHwidth, 0, offsetX + dstOffsetX + blendHwidth] =
@@ -2386,11 +2399,10 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             }
 
             //Bitmap rhs = Bitmap.createBitmap(projectedBitmap, offsetX - blendHwidth, 0, 2*blendHwidth, bitmapHeight);
-            val rhs = Bitmap.createBitmap(blendWidth, blendHeight, Bitmap.Config.ARGB_8888)
+            val rhs = createBitmap(blendWidth, blendHeight)
             run {
                 val rhsCanvas = Canvas(rhs)
-                srcRectWorkspace[offsetX - blendHwidth, 0, offsetX + blendHwidth] =
-                    bitmapHeight
+                srcRectWorkspace[offsetX - blendHwidth, 0, offsetX + blendHwidth] = bitmapHeight
                 srcRectWorkspace.offset(alignX, alignY)
                 dstRectWorkspace[0, -cropY0, blendWidth] = blendHeight - cropY0
                 rhsCanvas.drawBitmap(projectedBitmap, srcRectWorkspace, dstRectWorkspace, p)
@@ -2659,22 +2671,22 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 bitmapL,
                 HDRProcessor.HistogramType.HISTOGRAM_TYPE_VALUE
             )
-            val histogramInfo_l: HistogramInfo = hdrProcessor.getHistogramInfo(histoL)
+            val histogramInfoL: HistogramInfo = hdrProcessor.getHistogramInfo(histoL)
             val histoR = hdrProcessor.computeHistogram(
                 bitmapR,
                 HDRProcessor.HistogramType.HISTOGRAM_TYPE_VALUE
             )
-            val histogramInfo_r: HistogramInfo = hdrProcessor.getHistogramInfo(histoR)
+            val histogramInfoR: HistogramInfo = hdrProcessor.getHistogramInfo(histoR)
 
-            val brightnessScale = Math.max(
-                histogramInfo_r.medianBrightness,
+            val brightnessScale = histogramInfoR.medianBrightness.coerceAtLeast(1)
+                .toFloat() / histogramInfoL.medianBrightness.coerceAtLeast(
                 1
-            ).toFloat() / Math.max(histogramInfo_l.medianBrightness, 1).toFloat()
+            ).toFloat()
             currentRelativeBrightness *= brightnessScale
             if (MyDebug.LOG) {
                 Log.d(TAG, "compare brightnesses from images " + i + " to " + (i + 1) + ":")
-                Log.d(TAG, "    left median: " + histogramInfo_l.medianBrightness)
-                Log.d(TAG, "    right median: " + histogramInfo_r.medianBrightness)
+                Log.d(TAG, "    left median: " + histogramInfoL.medianBrightness)
+                Log.d(TAG, "    right median: " + histogramInfoR.medianBrightness)
                 Log.d(
                     TAG,
                     "    brightness_scale: $brightnessScale"
@@ -2731,7 +2743,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             "### time after computing brightnesses: " + (System.currentTimeMillis() - timeS)
         )
 
-        val histogramInfos: MutableList<HistogramInfo> = ArrayList<HistogramInfo>()
+        val histogramInfos: MutableList<HistogramInfo> = ArrayList()
         var meanMedianBrightness = 0.0f // mean of the global median brightnesse
         var meanEqualisedBrightness =
             0.0f // mean of the brightnesses if all adjusted to match exposure of the first image
@@ -3009,7 +3021,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     var power = 1
                     while (k <= 4) {
                         val ratio = (power / alignDownsample).toDouble()
-                        if (ratio >= 0.95f && ratio <= 1.05f) {
+                        if (ratio in 0.95f..1.05f) {
                             alignDownsample = power.toFloat()
                             if (MyDebug.LOG) Log.d(
                                 TAG,
@@ -3391,15 +3403,12 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     alignX += bakeTransX
                 }
                 run {
-                    val rotatedBitmap =
-                        Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+                    val rotatedBitmap = createBitmap(bitmapWidth, bitmapHeight)
                     val rotatedCanvas = Canvas(rotatedBitmap)
-                    rotatedCanvas.save()
-
-                    rotatedCanvas.setMatrix(cumulativeTransforms[i])
-
-                    rotatedCanvas.drawBitmap(bitmap, 0f, 0f, p)
-                    rotatedCanvas.restore()
+                    rotatedCanvas.withSave {
+                        setMatrix(cumulativeTransforms[i])
+                        drawBitmap(bitmap, 0f, 0f, p)
+                    }
 
                     bitmap = rotatedBitmap
                     /*if( MyDebug.LOG ) {
@@ -3451,9 +3460,9 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             Log.d(TAG, "bitmap_height: $bitmapHeight")
         }
 
-        for (i in 1..<(bitmaps?.size ?: 0)) {
-            val bitmap = bitmaps?.get(i)
-            if (bitmap?.width != bitmapWidth || bitmap?.height != bitmapHeight) {
+        for (i in 1..<bitmaps.size) {
+            val bitmap = bitmaps[i]
+            if (bitmap.width != bitmapWidth || bitmap.height != bitmapHeight) {
                 Log.e(TAG, "bitmaps not of equal sizes")
                 throw PanoramaProcessorException(PanoramaProcessorException.UNEQUAL_SIZES)
             }
@@ -3661,7 +3670,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             }
         }
 
-        val panorama = Bitmap.createBitmap(panoramaWidth, panoramaHeight, Bitmap.Config.ARGB_8888)
+        val panorama = createBitmap(panoramaWidth, panoramaHeight)
 
         if (MyDebug.LOG) Log.d(
             TAG,
@@ -3689,7 +3698,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
         )
 
         for (bitmap in bitmaps) {
-            bitmap?.recycle()
+            bitmap.recycle()
         }
         bitmaps.clear()
 
@@ -3701,7 +3710,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
 
             /*if( true )
                 throw new RuntimeException("ratioBrightnesses: " + ratioBrightnesses);*/
-            if (!HDRProcessor.useRenderscript) {
+            if (!HDRProcessor.USE_RENDERSCRIPT) {
                 hdrProcessor.adjustHistogram(
                     panorama,
                     panorama,
@@ -3766,13 +3775,13 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
             saveAllocation(name + "_" + i + ".jpg", allocation);
         }
     }*/
-        private const val blendNLevels = 4 // number of levels used for pyramid blending
+        private const val BLEND_N_LEVELS = 4 // number of levels used for pyramid blending
 
         private val blendDimension: Int
             /** Bitmaps passed to blendPyramids must have width and height each a multiple of the value
              * returned by this function.
              */
-            get() = (2.0.pow(blendNLevels.toDouble()) + 0.5).toInt()
+            get() = (2.0.pow(BLEND_N_LEVELS.toDouble()) + 0.5).toInt()
 
         private fun computeDistancesBetweenMatches(
             matches: List<FeatureMatch>,

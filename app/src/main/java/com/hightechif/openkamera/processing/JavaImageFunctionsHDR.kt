@@ -25,6 +25,7 @@ import kotlin.math.pow
 //import android.util.Log;
 object JavaImageFunctionsHDR {
     private const val TAG = "JavaImageFunctionsHDR"
+
     internal class CreateMTBApplyFunction(
         private val useMtb: Boolean,
         private val medianValue: Int
@@ -504,8 +505,8 @@ c++;
         val midX: Float,
         internal val maxX: Float
     ) : JavaImageProcessing.ApplyFunctionInterface {
-        var gain_A: Float = 0f
-        var gain_B: Float = 0f // see comments below
+        var gainA: Float = 0f
+        var gainB: Float = 0f // see comments below
         private val valueToGammaScaleLut = FloatArray(256) // look up table for performance
 
         init {
@@ -524,11 +525,11 @@ c++;
              */
 
             if (midX > lowX) {
-                this.gain_A = (gain * midX - lowX) / (midX - lowX)
-                this.gain_B = lowX * midX * (1.0f - gain) / (midX - lowX)
+                this.gainA = (gain * midX - lowX) / (midX - lowX)
+                this.gainB = lowX * midX * (1.0f - gain) / (midX - lowX)
             } else {
-                this.gain_A = 1.0f
-                this.gain_B = 0.0f
+                this.gainA = 1.0f
+                this.gainB = 0.0f
             }
 
             for (value in 0..255) {
@@ -588,9 +589,9 @@ c++;
                         // gain_A and gain_B should be set so that newValue meets the commented out code above
                         // This code is critical for performance!
 
-                        fr *= (gain_A + gain_B / value)
-                        fg *= (gain_A + gain_B / value)
-                        fb *= (gain_A + gain_B / value)
+                        fr *= (gainA + gainB / value)
+                        fg *= (gainA + gainB / value)
+                        fb *= (gainA + gainB / value)
                     } else {
                         // use LUT for performance
                         /*float newValue =  (float)Math.pow(value/maxX, gamma) * 255.0f;
@@ -657,9 +658,9 @@ c++;
                         // gain_A and gain_B should be set so that newValue meets the commented out code above
                         // This code is critical for performance!
 
-                        fr *= (gain_A + gain_B / value)
-                        fg *= (gain_A + gain_B / value)
-                        fb *= (gain_A + gain_B / value)
+                        fr *= (gainA + gainB / value)
+                        fg *= (gainA + gainB / value)
+                        fb *= (gainA + gainB / value)
                     } else {
                         val newValue =
                             (value / maxX).toDouble().pow(gamma.toDouble()).toFloat() * 255.0f
@@ -692,7 +693,7 @@ c++;
 
     /** Class to store floating point rgb values, along with luminance.
      */
-    private class RGBf_luminance {
+    private class RGBfLuminance {
         var fr: Float = 0f
         var fg: Float = 0f
         var fb: Float = 0f
@@ -727,8 +728,8 @@ c++;
         offsetXNew: Int,
         offsetYNew: Int,
         avgFactor: Float,
-        wiener_C: Float,
-        wiener_C_cutoff: Float
+        wienerC: Float,
+        wienerCCutoff: Float
     ) : JavaImageProcessing.ApplyFunctionInterface {
         private lateinit var fastBitmapNew: Array<FastAccessBitmap?>
         private val bitmapOrig: Bitmap // original bitmap (first image)
@@ -738,8 +739,8 @@ c++;
         private val offsetXNew: Int
         private val offsetYNew: Int
         private val avgFactor: Float
-        private val wiener_C: Float
-        private val wiener_C_cutoff: Float
+        private val wienerC: Float
+        private val wienerCCutoff: Float
 
         val radius: Int = 2 // must be less than the radius we actually read from below
 
@@ -757,8 +758,8 @@ c++;
             this.offsetXNew = offsetXNew
             this.offsetYNew = offsetYNew
             this.avgFactor = avgFactor
-            this.wiener_C = wiener_C
-            this.wiener_C_cutoff = wiener_C_cutoff
+            this.wienerC = wienerC
+            this.wienerCCutoff = wienerCCutoff
             /*this.pixelsAvgFr = new float[width];
             this.pixelsAvgFg = new float[width];
             this.pixelsAvgFb = new float[width];*/
@@ -801,7 +802,7 @@ c++;
                 /*if( MyDebug.LOG )
                                    Log.d(TAG, "y = " + y);*/
                 var pixelsRgbfIndx = 3 * y * width
-                if (y + offsetYNew < 0 || y + offsetYNew >= height) {
+                if (y + offsetYNew !in 0..<height) {
                     if (pixels.isNotEmpty()) {
                         var x = offX
                         while (x < offX + thisWidth) {
@@ -902,7 +903,7 @@ c++;
                     float pixelAvgFg = pixelsAvgFg[x];
                     float pixelAvgFb = pixelsAvgFb[x];*/
                     val xNew = x + offsetXNew
-                    if (xNew >= 0 && xNew < width) {
+                    if (xNew in 0..<width) {
                         //if( xNew < width ) {
                         //{
                         //int pixelNew = bitmap_new.getPixel(x+offsetXNew, y+offsetYNew);
@@ -926,7 +927,7 @@ c++;
 
                         // diff based on neighbourhood [sampling a subset of pixels]
                         // this helps testAvg24, testAvg28, testAvg31, testAvg33, testAvg39
-                        var L = 0.0f
+                        var varL = 0.0f
                         if (x - radius >= 0 && x + radius < width && y - radius >= 0 && y + radius < height && xNew - radius >= 0 && xNew + radius < width && yNew - radius >= 0 && yNew + radius < height) {
                             val nPixelsC = 5 // number of pixels we read from
                             var pixelOrigFr: Float
@@ -986,7 +987,7 @@ c++;
                             var diffR = pixelOrigFr - pixelNewSampleFr
                             var diffG = pixelOrigFg - pixelNewSampleFg
                             var diffB = pixelOrigFb - pixelNewSampleFb
-                            L += diffR * diffR + diffG * diffG + diffB * diffB
+                            varL += diffR * diffR + diffG * diffG + diffB * diffB
 
                             pixelOrig =
                                 bitmapOrigCachePixels[(yRelBitmapOrigCache - 2) * width + (x + 2)]
@@ -1001,7 +1002,7 @@ c++;
                             diffR = pixelOrigFr - pixelNewSampleFr
                             diffG = pixelOrigFg - pixelNewSampleFg
                             diffB = pixelOrigFb - pixelNewSampleFb
-                            L += diffR * diffR + diffG * diffG + diffB * diffB
+                            varL += diffR * diffR + diffG * diffG + diffB * diffB
 
                             pixelOrig =
                                 bitmapOrigCachePixels[(yRelBitmapOrigCache) * width + (x)]
@@ -1014,7 +1015,7 @@ c++;
                             diffR = pixelOrigFr - pixelNewSampleFr
                             diffG = pixelOrigFg - pixelNewSampleFg
                             diffB = pixelOrigFb - pixelNewSampleFb
-                            L += diffR * diffR + diffG * diffG + diffB * diffB
+                            varL += diffR * diffR + diffG * diffG + diffB * diffB
 
                             pixelOrig =
                                 bitmapOrigCachePixels[(yRelBitmapOrigCache + 2) * width + (x - 2)]
@@ -1029,7 +1030,7 @@ c++;
                             diffR = pixelOrigFr - pixelNewSampleFr
                             diffG = pixelOrigFg - pixelNewSampleFg
                             diffB = pixelOrigFb - pixelNewSampleFb
-                            L += diffR * diffR + diffG * diffG + diffB * diffB
+                            varL += diffR * diffR + diffG * diffG + diffB * diffB
 
                             pixelOrig =
                                 bitmapOrigCachePixels[(yRelBitmapOrigCache + 2) * width + (x + 2)]
@@ -1044,14 +1045,14 @@ c++;
                             diffR = pixelOrigFr - pixelNewSampleFr
                             diffG = pixelOrigFg - pixelNewSampleFg
                             diffB = pixelOrigFb - pixelNewSampleFb
-                            L += diffR * diffR + diffG * diffG + diffB * diffB
+                            varL += diffR * diffR + diffG * diffG + diffB * diffB
 
-                            L /= nPixelsC.toFloat()
+                            varL /= nPixelsC.toFloat()
                         } else {
                             val diffR = pixelAvgFr - pixelNewFr
                             val diffG = pixelAvgFg - pixelNewFg
                             val diffB = pixelAvgFb - pixelNewFb
-                            L = diffR * diffR + diffG * diffG + diffB * diffB
+                            varL = diffR * diffR + diffG * diffG + diffB * diffB
                         }
 
                         // diff based on computeDiff (separate pass on scaled down alignment bitmaps)
@@ -1101,12 +1102,13 @@ c++;
                         */
 
                         //L = 0.0f; // test no deghosting
-                        if (L > wiener_C_cutoff) {
+                        if (varL > wienerCCutoff) {
                             // error too large, so no contribution for new image pixel
                             // stick with pixelAvg
                             // reduces ghosting in: testAvg13, testAvg25, testAvg26, testAvg29, testAvg31
                         } else {
-                            val weight = L / (L + wiener_C) // lower weight means more averaging
+                            val weight =
+                                varL / (varL + wienerC) // lower weight means more averaging
                             val weight1 = 1.0f - weight
                             pixelNewFr = weight * pixelAvgFr + weight1 * pixelNewFr
                             pixelNewFg = weight * pixelAvgFg + weight1 * pixelNewFg
@@ -1193,9 +1195,9 @@ c++;
             thisHeight: Int
         ) {
             val pixelsOut = output?.cachedPixelsI
-            val rgbfLuminances: Array<RGBf_luminance?> = arrayOfNulls(5)
+            val rgbfLuminances: Array<RGBfLuminance?> = arrayOfNulls(5)
             for (i in rgbfLuminances.indices) {
-                rgbfLuminances[i] = RGBf_luminance()
+                rgbfLuminances[i] = RGBfLuminance()
             }
             var y = offY
             var c = 0
@@ -1423,15 +1425,15 @@ c++;
                                         //final float C = 64.0f*64.0f/8.0f;
                                         //final float C = 512.0f;
                                         //final float C = 16.0f*16.0f/8.0f;
-                                        val C = 32.0f
+                                        val varC = 32.0f
 
                                         val diffR = fr - thisFr
                                         val diffG = fg - thisFg
                                         val diffB = fb - thisFb
 
-                                        val L = diffR * diffR + diffG * diffG + diffB * diffB
+                                        val varL = diffR * diffR + diffG * diffG + diffB * diffB
                                         //L = 0.0f; // test no wiener filter
-                                        val weight = L / (L + C)
+                                        val weight = varL / (varL + varC)
 
                                         /*float weight1 = 1.0f-weight;
                                         thisFr = weight * fr + weight1 * thisFr;
@@ -1439,9 +1441,9 @@ c++;
                                         thisFb = weight * fb + weight1 * thisFb;*/
 
                                         // faster version:
-                                        thisFr = thisFr + weight * diffR
-                                        thisFg = thisFg + weight * diffG
-                                        thisFb = thisFb + weight * diffB
+                                        thisFr += weight * diffR
+                                        thisFg += weight * diffG
+                                        thisFb += weight * diffB
                                     }
                                     sumFr += thisFr
                                     sumFg += thisFg
@@ -1558,9 +1560,9 @@ c++;
                         }
                     }
 
-                    fr = fr - blackLevel
-                    fg = fg - blackLevel
-                    fb = fb - blackLevel
+                    fr -= blackLevel
+                    fg -= blackLevel
+                    fb -= blackLevel
                     fr *= whiteLevel
                     fg *= whiteLevel
                     fb *= whiteLevel
@@ -1580,7 +1582,7 @@ c++;
                         // gain_A and gain_B should be set so that newValue meets the commented out code above
                         // This code is critical for performance!
 
-                        val scale = (brighten.gain_A + brighten.gain_B / value)
+                        val scale = (brighten.gainA + brighten.gainB / value)
                         fr *= scale
                         fg *= scale
                         fb *= scale
@@ -1653,9 +1655,9 @@ c++;
     }
 
     internal open class HDRApplyFunction(
-        tonemapAlgorithm: TonemappingAlgorithm, // for Reinhard
+        private val tonemapAlgorithm: TonemappingAlgorithm, // for Reinhard
         private val tonemapScale: Float, // for FU2
-        private val W: Float,
+        private val valW: Float,
         private val linearScale: Float,
         private val bitmap0: Bitmap?,
         private val bitmap2: Bitmap?,
@@ -1664,28 +1666,27 @@ c++;
         val offsetX2: Int,
         val offsetY2: Int,
         val width: Int,
-        val height: Int, parameter_A: FloatArray, parameter_B: FloatArray
+        val height: Int, parameterA: FloatArray, parameterB: FloatArray
     ) : JavaImageProcessing.ApplyFunctionInterface {
-        private val tonemapAlgorithm: TonemappingAlgorithm = tonemapAlgorithm
         lateinit var fastBitmap0: Array<FastAccessBitmap?>
         lateinit var fastBitmap2: Array<FastAccessBitmap?>
-        var parameter_A: FloatArray
-        var parameter_B: FloatArray
+        var parameterA: FloatArray
+        var parameterB: FloatArray
 
         init {
-            if (parameter_A.size != parameter_B.size) {
+            if (parameterA.size != parameterB.size) {
                 throw RuntimeException("unequal parameter lengths")
             }
-            this.parameter_A = FloatArray(parameter_A.size)
-            System.arraycopy(parameter_A, 0, this.parameter_A, 0, parameter_A.size)
-            this.parameter_B = FloatArray(parameter_B.size)
-            System.arraycopy(parameter_B, 0, this.parameter_B, 0, parameter_B.size)
+            this.parameterA = FloatArray(parameterA.size)
+            System.arraycopy(parameterA, 0, this.parameterA, 0, parameterA.size)
+            this.parameterB = FloatArray(parameterB.size)
+            System.arraycopy(parameterB, 0, this.parameterB, 0, parameterB.size)
         }
 
         override fun init(nThreads: Int) {
-            fastBitmap0 = arrayOfNulls<FastAccessBitmap>(nThreads)
+            fastBitmap0 = arrayOfNulls(nThreads)
             if (bitmap2 != null) fastBitmap2 =
-                arrayOfNulls<FastAccessBitmap>(nThreads)
+                arrayOfNulls(nThreads)
             for (i in 0..<nThreads) {
                 if (bitmap0 != null) fastBitmap0[i] = FastAccessBitmap(bitmap0)
                 if (bitmap2 != null) fastBitmap2[i] = FastAccessBitmap(bitmap2)
@@ -1749,10 +1750,10 @@ c++;
                     // FU2 (Filmic)
                     // for FU2; should match setting in HDRProcessor.java:
                     val fu2ExposureBias = 2.0f / 255.0f
-                    val whiteScale = 255.0f / FU2Tonemap(W)
-                    var currR = FU2Tonemap(fu2ExposureBias * hdrR)
-                    var currG = FU2Tonemap(fu2ExposureBias * hdrG)
-                    var currB = FU2Tonemap(fu2ExposureBias * hdrB)
+                    val whiteScale = 255.0f / convertFU2Tonemap(valW)
+                    var currR = convertFU2Tonemap(fu2ExposureBias * hdrR)
+                    var currG = convertFU2Tonemap(fu2ExposureBias * hdrG)
+                    var currB = convertFU2Tonemap(fu2ExposureBias * hdrB)
                     currR *= whiteScale
                     currG *= whiteScale
                     currB *= whiteScale
@@ -1849,12 +1850,12 @@ c++;
 
                 var x = offX
                 while (x < offX + thisWidth) {
-                    var this_parameter_A0 = parameter_A[0]
-                    var this_parameter_B0 = parameter_B[0]
-                    val this_parameter_A1 = parameter_A[1]
-                    val this_parameter_B1 = parameter_B[1]
-                    var this_parameter_A2 = parameter_A[2]
-                    var this_parameter_B2 = parameter_B[2]
+                    var thisParameterA0 = parameterA[0]
+                    var thisParameterB0 = parameterB[0]
+                    val thisParameterA1 = parameterA[1]
+                    val thisParameterB1 = parameterB[1]
+                    var thisParameterA2 = parameterA[2]
+                    var thisParameterB2 = parameterB[2]
 
                     // middle image is not offset
                     val pixel1 = pixels[c]
@@ -1873,8 +1874,8 @@ c++;
                         pixel0R = pixel1R
                         pixel0G = pixel1G
                         pixel0B = pixel1B
-                        this_parameter_A0 = this_parameter_A1
-                        this_parameter_B0 = this_parameter_B1
+                        thisParameterA0 = thisParameterA1
+                        thisParameterB0 = thisParameterB1
                     }
 
                     if (x + offsetX2 >= 0 && y + offsetY2 >= 0 && x + offsetX2 < width && y + offsetY2 < height) {
@@ -1888,8 +1889,8 @@ c++;
                         pixel2R = pixel1R
                         pixel2G = pixel1G
                         pixel2B = pixel1B
-                        this_parameter_A2 = this_parameter_A1
-                        this_parameter_B2 = this_parameter_B1
+                        thisParameterA2 = thisParameterA1
+                        thisParameterB2 = thisParameterB1
                     }
 
                     var hdrR = 0.0f
@@ -1930,9 +1931,9 @@ c++;
                         }
 
                         // response function
-                        rgbR = this_parameter_A1 * rgbR + this_parameter_B1
-                        rgbG = this_parameter_A1 * rgbG + this_parameter_B1
-                        rgbB = this_parameter_A1 * rgbB + this_parameter_B1
+                        rgbR = thisParameterA1 * rgbR + thisParameterB1
+                        rgbG = thisParameterA1 * rgbG + thisParameterB1
+                        rgbB = thisParameterA1 * rgbB + thisParameterB1
 
                         hdrR += weight * rgbR
                         hdrG += weight * rgbG
@@ -1965,9 +1966,9 @@ c++;
                                     // scaling chosen so that 0 and 255 map to a non-zero weight of 0.01
                                     weight *= 1.0f - 0.99f * (diff - safeRangeC) / (127.5f - safeRangeC);
                                 }*/
-                                rgbR = this_parameter_A2 * rgbR + this_parameter_B2
-                                rgbG = this_parameter_A2 * rgbG + this_parameter_B2
-                                rgbB = this_parameter_A2 * rgbB + this_parameter_B2
+                                rgbR = thisParameterA2 * rgbR + thisParameterB2
+                                rgbG = thisParameterA2 * rgbG + thisParameterB2
+                                rgbB = thisParameterA2 * rgbB + thisParameterB2
                             } else {
                                 rgbR = pixel0R.toFloat()
                                 rgbG = pixel0G.toFloat()
@@ -1980,9 +1981,9 @@ c++;
                                     // scaling chosen so that 0 and 255 map to a non-zero weight of 0.01
                                     weight *= 1.0f - 0.99f * (diff - safeRangeC) / (127.5f - safeRangeC);
                                 }*/
-                                rgbR = this_parameter_A0 * rgbR + this_parameter_B0
-                                rgbG = this_parameter_A0 * rgbG + this_parameter_B0
-                                rgbB = this_parameter_A0 * rgbB + this_parameter_B0
+                                rgbR = thisParameterA0 * rgbR + thisParameterB0
+                                rgbG = thisParameterA0 * rgbG + thisParameterB0
+                                rgbB = thisParameterA0 * rgbB + thisParameterB0
                             }
 
                             var value = max(rgbR.toDouble(), rgbG.toDouble()).toFloat()
@@ -1996,20 +1997,20 @@ c++;
                                 // tests that benefit from deghosting for bright pixels: testHDR2, testHDR41, testHDR42
                                 // for 127.5-avg = 96.0, we want wiener_C = wiener_C_lo
                                 // for 127.5-avg = 127.5f, we want wiener_C = wiener_C_hi
-                                val wiener_C_lo = 2000.0f
-                                val wiener_C_hi = 8000.0f
-                                var wiener_C =
-                                    wiener_C_lo // higher value means more HDR but less ghosting
+                                val wienerCLo = 2000.0f
+                                val wienerCHi = 8000.0f
+                                // higher value means more HDR but less ghosting
+                                var wienerC = wienerCLo
                                 val xx = (abs((value - 127.5f).toDouble()) - 96.0f).toFloat()
                                 if (xx > 0.0f) {
-                                    val scale = (wiener_C_hi - wiener_C_lo) / (127.5f - 96.0f)
-                                    wiener_C = wiener_C_lo + xx * scale
+                                    val scale = (wienerCHi - wienerCLo) / (127.5f - 96.0f)
+                                    wienerC = wienerCLo + xx * scale
                                 }
                                 val diffR = baseRgbR - rgbR
                                 val diffG = baseRgbG - rgbG
                                 val diffB = baseRgbB - rgbB
-                                val L = (diffR * diffR) + (diffG * diffG) + (diffB * diffB)
-                                val ghostWeight = L / (L + wiener_C)
+                                val valL = (diffR * diffR) + (diffG * diffG) + (diffB * diffB)
+                                val ghostWeight = valL / (valL + wienerC)
                                 rgbR = ghostWeight * baseRgbR + (1.0f - ghostWeight) * rgbR
                                 rgbG = ghostWeight * baseRgbG + (1.0f - ghostWeight) * rgbG
                                 rgbB = ghostWeight * baseRgbB + (1.0f - ghostWeight) * rgbB
@@ -2070,14 +2071,14 @@ c++;
         }
 
         companion object {
-            private fun FU2Tonemap(x: Float): Float {
-                val A = 0.15f
-                val B = 0.50f
-                val C = 0.10f
-                val D = 0.20f
-                val E = 0.02f
-                val F = 0.30f
-                return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F
+            private fun convertFU2Tonemap(x: Float): Float {
+                val vA = 0.15f
+                val vB = 0.50f
+                val vC = 0.10f
+                val vD = 0.20f
+                val vE = 0.02f
+                val vF = 0.30f
+                return ((x * (vA * x + vC * vB) + vD * vE) / (x * (vA * x + vB) + vD * vF)) - vE / vF
             }
         }
     }
@@ -2085,19 +2086,19 @@ c++;
     internal class HDRNApplyFunction(
         tonemapAlgorithm: TonemappingAlgorithm,
         tonemapScale: Float,
-        W: Float,
+        valW: Float,
         linearScale: Float,
         bitmaps: List<Bitmap>,
         offsetsX: IntArray,
         offsetsY: IntArray,
         width: Int,
         height: Int,
-        parameter_A: FloatArray,
-        parameter_B: FloatArray
+        parameterA: FloatArray,
+        parameterB: FloatArray
     ) : HDRApplyFunction(
         tonemapAlgorithm,
         tonemapScale,
-        W,
+        valW,
         linearScale,
         bitmaps[0],
         if (bitmaps.size > 2) bitmaps[2] else null,
@@ -2107,8 +2108,8 @@ c++;
         if (offsetsY.size > 2) offsetsY[2] else 0,
         width,
         height,
-        parameter_A,
-        parameter_B
+        parameterA,
+        parameterB
     ) {
         private val nBitmaps = bitmaps.size
         private val bitmap1: Bitmap?
@@ -2133,7 +2134,7 @@ c++;
         val offsetY6: Int
 
         init {
-            if (nBitmaps < 2 || nBitmaps > 7) {
+            if (nBitmaps !in 2..7) {
                 throw RuntimeException("n_bitmaps not supported: $nBitmaps")
             } else if (offsetsX.size != nBitmaps) {
                 throw RuntimeException("offsets_x unexpected length: " + offsetsX.size)
@@ -2158,7 +2159,7 @@ c++;
             this.offsetX6 = if (nBitmaps > 6) offsetsX[6] else 0
             this.offsetY6 = if (nBitmaps > 6) offsetsY[6] else 0
 
-            if (parameter_A.size != nBitmaps || parameter_B.size != nBitmaps) {
+            if (parameterA.size != nBitmaps || parameterB.size != nBitmaps) {
                 throw RuntimeException("unexpected parameter lengths")
             }
         }
@@ -2204,8 +2205,8 @@ c++;
             val pixelsR = IntArray(nBitmaps)
             val pixelsG = IntArray(nBitmaps)
             val pixelsB = IntArray(nBitmaps)
-            val this_parameter_A = FloatArray(nBitmaps)
-            val this_parameter_B = FloatArray(nBitmaps)
+            val thisParameterA = FloatArray(nBitmaps)
+            val thisParameterB = FloatArray(nBitmaps)
             val tempRgb = IntArray(3)
 
             var basePixelR: Int
@@ -2215,14 +2216,14 @@ c++;
             var y = offY
             var c = 0
             while (y < offY + thisHeight) {
-                fastBitmap0.get(threadIndex)?.ensureCache(
+                fastBitmap0[threadIndex]?.ensureCache(
                     y + offsetY0,
                     y + offsetY0
                 ) // force cache to cover rows needed by this row
-                val bitmap0CacheY: Int = fastBitmap0.get(threadIndex)!!.cacheY
+                val bitmap0CacheY: Int = fastBitmap0[threadIndex]!!.cacheY
                 val yRelBitmap0Cache = y - bitmap0CacheY
                 val bitmap0CachePixels: IntArray =
-                    fastBitmap0.get(threadIndex)!!.cachedPixelsI
+                    fastBitmap0[threadIndex]!!.cachedPixelsI
 
                 fastBitmap1[threadIndex]?.ensureCache(
                     y + offsetY1,
@@ -2244,13 +2245,13 @@ c++;
                 var bitmap6CachePixels: IntArray? = null
 
                 if (nBitmaps > 2) {
-                    fastBitmap2.get(threadIndex)?.ensureCache(
+                    fastBitmap2[threadIndex]?.ensureCache(
                         y + offsetY2,
                         y + offsetY2
                     ) // force cache to cover rows needed by this row
-                    val bitmap2CacheY: Int = fastBitmap2.get(threadIndex)!!.cacheY
+                    val bitmap2CacheY: Int = fastBitmap2[threadIndex]!!.cacheY
                     yRelBitmap2Cache = y - bitmap2CacheY
-                    bitmap2CachePixels = fastBitmap2.get(threadIndex)!!.cachedPixelsI
+                    bitmap2CachePixels = fastBitmap2[threadIndex]!!.cachedPixelsI
 
                     if (nBitmaps > 3) {
                         fastBitmap3[threadIndex]?.ensureCache(
@@ -2297,8 +2298,20 @@ c++;
 
                 var x = offX
                 while (x < offX + thisWidth) {
-                    System.arraycopy(parameter_A, 0, this_parameter_A, 0, parameter_A.size)
-                    System.arraycopy(parameter_B, 0, this_parameter_B, 0, parameter_B.size)
+                    System.arraycopy(
+                        this@HDRNApplyFunction.parameterA,
+                        0,
+                        thisParameterA,
+                        0,
+                        this@HDRNApplyFunction.parameterA.size
+                    )
+                    System.arraycopy(
+                        this@HDRNApplyFunction.parameterB,
+                        0,
+                        thisParameterB,
+                        0,
+                        this@HDRNApplyFunction.parameterB.size
+                    )
 
                     val basePixel = pixels[c]
                     basePixelR = (basePixel shr 16) and 0xFF
@@ -2316,8 +2329,8 @@ c++;
                         pixelsR[0] = basePixelR
                         pixelsG[0] = basePixelG
                         pixelsB[0] = basePixelB
-                        this_parameter_A[0] = this_parameter_A[midIndx]
-                        this_parameter_B[0] = this_parameter_B[midIndx]
+                        thisParameterA[0] = thisParameterA[midIndx]
+                        thisParameterB[0] = thisParameterB[midIndx]
                     }
 
                     if (x + offsetX1 >= 0 && y + offsetY1 >= 0 && x + offsetX1 < width && y + offsetY1 < height) {
@@ -2331,8 +2344,8 @@ c++;
                         pixelsR[1] = basePixelR
                         pixelsG[1] = basePixelG
                         pixelsB[1] = basePixelB
-                        this_parameter_A[1] = this_parameter_A[midIndx]
-                        this_parameter_B[1] = this_parameter_B[midIndx]
+                        thisParameterA[1] = thisParameterA[midIndx]
+                        thisParameterB[1] = thisParameterB[midIndx]
                     }
 
                     if (nBitmaps > 2) {
@@ -2347,8 +2360,8 @@ c++;
                             pixelsR[2] = basePixelR
                             pixelsG[2] = basePixelG
                             pixelsB[2] = basePixelB
-                            this_parameter_A[2] = this_parameter_A[midIndx]
-                            this_parameter_B[2] = this_parameter_B[midIndx]
+                            thisParameterA[2] = thisParameterA[midIndx]
+                            thisParameterB[2] = thisParameterB[midIndx]
                         }
 
                         if (nBitmaps > 3) {
@@ -2363,8 +2376,8 @@ c++;
                                 pixelsR[3] = basePixelR
                                 pixelsG[3] = basePixelG
                                 pixelsB[3] = basePixelB
-                                this_parameter_A[3] = this_parameter_A[midIndx]
-                                this_parameter_B[3] = this_parameter_B[midIndx]
+                                thisParameterA[3] = thisParameterA[midIndx]
+                                thisParameterB[3] = thisParameterB[midIndx]
                             }
 
                             if (nBitmaps > 4) {
@@ -2379,8 +2392,8 @@ c++;
                                     pixelsR[4] = basePixelR
                                     pixelsG[4] = basePixelG
                                     pixelsB[4] = basePixelB
-                                    this_parameter_A[4] = this_parameter_A[midIndx]
-                                    this_parameter_B[4] = this_parameter_B[midIndx]
+                                    thisParameterA[4] = thisParameterA[midIndx]
+                                    thisParameterB[4] = thisParameterB[midIndx]
                                 }
 
                                 if (nBitmaps > 5) {
@@ -2395,8 +2408,8 @@ c++;
                                         pixelsR[5] = basePixelR
                                         pixelsG[5] = basePixelG
                                         pixelsB[5] = basePixelB
-                                        this_parameter_A[5] = this_parameter_A[midIndx]
-                                        this_parameter_B[5] = this_parameter_B[midIndx]
+                                        thisParameterA[5] = thisParameterA[midIndx]
+                                        thisParameterB[5] = thisParameterB[midIndx]
                                     }
 
                                     if (nBitmaps > 6) {
@@ -2411,8 +2424,8 @@ c++;
                                             pixelsR[6] = basePixelR
                                             pixelsG[6] = basePixelG
                                             pixelsB[6] = basePixelB
-                                            this_parameter_A[6] = this_parameter_A[midIndx]
-                                            this_parameter_B[6] = this_parameter_B[midIndx]
+                                            thisParameterA[6] = thisParameterA[midIndx]
+                                            thisParameterB[6] = thisParameterB[midIndx]
                                         }
                                     }
                                 }
@@ -2451,9 +2464,9 @@ c++;
                         }
 
                         // response function
-                        rgbR = this_parameter_A[midIndx] * rgbR + this_parameter_B[midIndx]
-                        rgbG = this_parameter_A[midIndx] * rgbG + this_parameter_B[midIndx]
-                        rgbB = this_parameter_A[midIndx] * rgbB + this_parameter_B[midIndx]
+                        rgbR = thisParameterA[midIndx] * rgbR + thisParameterB[midIndx]
+                        rgbG = thisParameterA[midIndx] * rgbG + thisParameterB[midIndx]
+                        rgbB = thisParameterA[midIndx] * rgbB + thisParameterB[midIndx]
 
                         hdrR += weight * rgbR
                         hdrG += weight * rgbG
@@ -2473,11 +2486,11 @@ c++;
                                     1.0f - 0.99f * (diff1 - safeRangeC) / (127.5f - safeRangeC)
                             }
                             rgb1R =
-                                this_parameter_A[midIndx + 1] * rgb1R + this_parameter_B[midIndx + 1]
+                                thisParameterA[midIndx + 1] * rgb1R + thisParameterB[midIndx + 1]
                             rgb1G =
-                                this_parameter_A[midIndx + 1] * rgb1G + this_parameter_B[midIndx + 1]
+                                thisParameterA[midIndx + 1] * rgb1G + thisParameterB[midIndx + 1]
                             rgb1B =
-                                this_parameter_A[midIndx + 1] * rgb1B + this_parameter_B[midIndx + 1]
+                                thisParameterA[midIndx + 1] * rgb1B + thisParameterB[midIndx + 1]
 
                             hdrR += weight1 * rgb1R
                             hdrG += weight1 * rgb1G
@@ -2524,11 +2537,11 @@ c++;
                                 }
 
                                 rgbR =
-                                    this_parameter_A[adjIndx] * rgbR + this_parameter_B[adjIndx]
+                                    thisParameterA[adjIndx] * rgbR + thisParameterB[adjIndx]
                                 rgbG =
-                                    this_parameter_A[adjIndx] * rgbG + this_parameter_B[adjIndx]
+                                    thisParameterA[adjIndx] * rgbG + thisParameterB[adjIndx]
                                 rgbB =
-                                    this_parameter_A[adjIndx] * rgbB + this_parameter_B[adjIndx]
+                                    thisParameterA[adjIndx] * rgbB + thisParameterB[adjIndx]
 
                                 var value = max(rgbR.toDouble(), rgbG.toDouble()).toFloat()
                                 value = max(value.toDouble(), rgbB.toDouble()).toFloat()
@@ -2541,21 +2554,20 @@ c++;
                                     // tests that benefit from deghosting for bright pixels: testHDR2, testHDR41, testHDR42
                                     // for 127.5-avg = 96.0, we want wiener_C = wiener_C_lo
                                     // for 127.5-avg = 127.5f, we want wiener_C = wiener_C_hi
-                                    val wiener_C_lo = 2000.0f
-                                    val wiener_C_hi = 8000.0f
-                                    var wiener_C =
-                                        wiener_C_lo // higher value means more HDR but less ghosting
+                                    val wienerCLo = 2000.0f
+                                    val wienerCHi = 8000.0f
+                                    // higher value means more HDR but less ghosting
+                                    var wienerC = wienerCLo
                                     val xx = (abs((value - 127.5f).toDouble()) - 96.0f).toFloat()
                                     if (xx > 0.0f) {
-                                        val scale = (wiener_C_hi - wiener_C_lo) / (127.5f - 96.0f)
-                                        wiener_C = wiener_C_lo + xx * scale
+                                        val scale = (wienerCHi - wienerCLo) / (127.5f - 96.0f)
+                                        wienerC = wienerCLo + xx * scale
                                     }
                                     val diffR = baseRgbR - rgbR
                                     val diffG = baseRgbG - rgbG
                                     val diffB = baseRgbB - rgbB
-                                    val L =
-                                        (diffR * diffR) + (diffG * diffG) + (diffB * diffB)
-                                    val ghostWeight = L / (L + wiener_C)
+                                    val valL = (diffR * diffR) + (diffG * diffG) + (diffB * diffB)
+                                    val ghostWeight = valL / (valL + wienerC)
                                     rgbR =
                                         ghostWeight * baseRgbR + (1.0f - ghostWeight) * rgbR
                                     rgbG =
@@ -2834,7 +2846,7 @@ c++;
         }
     }
 
-    class ComputeHistogramApplyFunction(type: Type) :
+    class ComputeHistogramApplyFunction(private val type: Type) :
         JavaImageProcessing.ApplyFunctionInterface {
         private lateinit var histograms: Array<IntArray?>
         private lateinit var pixelsRgbF: FloatArray
@@ -2847,8 +2859,6 @@ c++;
             TYPE_INTENSITY,  // mean(r, g, b)
             TYPE_LIGHTNESS // mean( min(r,g,b), max(r,g,b) )
         }
-
-        private val type: Type = type
 
         /** For use when we want to operate over a full pixel array, instead of an input supplied to applyFunction().
          */

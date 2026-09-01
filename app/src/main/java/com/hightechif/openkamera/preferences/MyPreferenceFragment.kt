@@ -45,15 +45,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
-import com.hightechif.openkamera.audio.*
-import com.hightechif.openkamera.preferences.*
-import com.hightechif.openkamera.processing.*
-import com.hightechif.openkamera.sensors.*
-import com.hightechif.openkamera.storage.*
-import com.hightechif.openkamera.system.*
 import com.hightechif.openkamera.ui.FolderChooserDialog
 import com.hightechif.openkamera.ui.MyEditTextPreference
-import com.hightechif.openkamera.utils.*
+import com.hightechif.openkamera.utils.MyDebug
 
 /** Fragment to handle the Settings UI. Note that originally this was a
  * PreferenceActivity rather than a PreferenceFragment which required all
@@ -80,7 +74,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
      * Normally this shouldn't be needed - the settings is usually only closed by the user pressing Back,
      * which can only be done once any opened dialogs are also closed. But this is required if we want to
      * programmatically close the settings - this is done in MainActivity.onNewIntent(), so that if Open Kamera
-     * is launched from the homescreen again when the settings was opened, we close the settings.
+     * is launched from the homescreen again when the settings were opened, we close the settings.
      * UPDATE: At the time of writing, we don't set android:launchMode="singleTask", so onNewIntent() is not called,
      * so this code isn't necessary - but there shouldn't be harm to leave it here for future use.
      */
@@ -154,10 +148,10 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
             "supports_face_detection: $supportsFaceDetection"
         )
 
-        if (!supportsFaceDetection && (cameraOpen || sharedPreferences.getBoolean(
+        if (!supportsFaceDetection && (cameraOpen || !sharedPreferences.getBoolean(
                 PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY,
                 false
-            ) == false)
+            ))
         ) {
             // if camera not open, we'll think this setting isn't supported - but should only remove
             // this preference if it's set to the default (otherwise if user sets to a non-default
@@ -533,9 +527,8 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
                         aboutString.append("\nPhoto mode: ")
                         aboutString.append(photoModeString ?: "UNKNOWN")
                         run {
-                            val lastVideoError =
-                                sharedPreferences.getString("last_video_error", "")
-                            if (lastVideoError!!.length > 0) {
+                            val lastVideoError = sharedPreferences.getString("last_video_error", "")
+                            if (lastVideoError!!.isNotEmpty()) {
                                 aboutString.append("\nLast video error: ")
                                 aboutString.append(lastVideoError)
                             }
@@ -876,7 +869,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
     }
 
     /** Programmatically set up dependencies for preference types (e.g., ListPreference) that don't
-     * support this in xml (such as SwitchPreference and CheckBoxPreference), or where this depends
+     * support this in XML (such as SwitchPreference and CheckBoxPreference), or where this depends
      * on the device (e.g., Android version).
      */
     private fun setupDependencies() {
@@ -937,7 +930,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
             if (MyDebug.LOG) Log.d(TAG, "FolderChooserDialog dismissed")
             // n.b., fragments have to be static (as they might be inserted into a new Activity - see http://stackoverflow.com/questions/15571010/fragment-inner-class-should-be-static),
             // so we access the MainActivity via the fragment's getActivity().
-            val mainActivity = this.getActivity() as MainActivity?
+            val mainActivity = this.activity as MainActivity?
             if (mainActivity != null) { // mainActivity may be null if this is being closed via MainActivity.onNewIntent()
                 val newSaveLocation: String? = this.chosenFolder
                 mainActivity.updateSaveFolder(newSaveLocation)
@@ -972,10 +965,6 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
         sharedPreferences.registerOnSharedPreferenceChangeListener(this)
     }
 
-    override fun onPause() {
-        super.onPause()
-    }
-
     override fun onDestroy() {
         if (MyDebug.LOG) Log.d(TAG, "on_destroy")
         super.onDestroy()
@@ -986,7 +975,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
         )
 
         if (isRemoving) {
-            // if isRemoving()==true, then it means the fragment is being removed and we are returning to the activity
+            // if isRemoving()==true, then it means the fragment is being removed, and we are returning to the activity
             // if isRemoving()==false, then it may be that the activity is being destroyed
             (activity as MainActivity).settingsClosing()
         }
@@ -997,7 +986,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
     /* So that manual changes to the checkbox/switch preferences, while the preferences are showing, show up;
      * in particular, needed for preferenceUsingSaf, when the user cancels the SAF dialog (see
      * MainActivity.onActivityResult).
-     * Also programmatically sets summary (see setSummary).
+     * Also, programmatically sets summary (see setSummary).
      */
     override fun onSharedPreferenceChanged(prefs: SharedPreferences, key: String?) {
         if (MyDebug.LOG) Log.d(
@@ -1021,7 +1010,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
 
         fun handleEdgeToEdge(view: View) {
             ViewCompat.setOnApplyWindowInsetsListener(view) { v: View, windowInsets: WindowInsetsCompat ->
-                //androidx.core.graphics.Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                // val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
                 // don't need to avoid WindowInsetsCompat.Type.displayCutout(), as we already do this for the entire activity (see MainActivity's setOnApplyWindowInsetsListener)
                 val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
                 v.setPadding(insets.left, insets.top, insets.right, insets.bottom)
@@ -1061,7 +1050,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
             if (MyDebug.LOG) {
                 Log.d(TAG, "readFromBundle")
             }
-            if (values != null && values.size > 0) {
+            if (!values.isNullOrEmpty()) {
                 if (MyDebug.LOG) {
                     Log.d(TAG, "values:")
                     for (value in values) {
@@ -1091,7 +1080,7 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
         fun setBackground(fragment: Fragment) {
             // prevent fragment being transparent
             // note, setting color here only seems to affect the "main" preference fragment screen, and not sub-screens
-            // note, on Galaxy Nexus Android 4.3 this sets to black rather than the dark grey that the background theme should be (and what the sub-screens use); works okay on Nexus 7 Android 5
+            // note, on Galaxy Nexus Android 4.3 this sets to black rather than the dark gray that the background theme should be (and what the sub-screens use); works okay on Nexus 7 Android 5
             // we used to use a light theme for the PreferenceFragment, but mixing themes in same activity seems to cause problems (e.g., for EditTextPreference colors)
             val array = fragment.activity.theme.obtainStyledAttributes(
                 intArrayOf(
@@ -1158,18 +1147,18 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
         }
 
         /** Programmatically sets summaries as required.
-         * Remember to call setSummary() from the constructor for any keys we set, to initialise the
+         * Remember to call setSummary() from the constructor for any keys we set, to initialize the
          * summary.
          */
         fun setSummary(pref: Preference) {
             if (pref is EditTextPreference) {
                 /* We have a runtime check for using EditTextPreference - we don't want these due to importance of
              * supporting the Google Play emoji policy (see comment in MyEditTextPreference.java) - and this
-             * helps guard against the risk of accidentally adding more EditTextPreferences in future.
+             * helps guard against the risk of accidentally adding more EditTextPreferences in the future.
              * Once we've switched to using Android X Preference library, and hence safe to use EditTextPreference
              * again, this code can be removed.
              */
-                throw RuntimeException("detected an EditTextPreference: " + pref.getKey() + " pref: " + pref)
+                throw RuntimeException("detected an EditTextPreference: " + pref.key + " pref: " + pref)
             }
 
             if (pref is EditTextPreference || pref is MyEditTextPreference) {

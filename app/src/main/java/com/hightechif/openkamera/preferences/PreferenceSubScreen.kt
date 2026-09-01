@@ -29,7 +29,7 @@ open class PreferenceSubScreen : PreferenceFragment(), OnSharedPreferenceChangeL
         if (MyDebug.LOG) Log.d(TAG, "onCreate")
         super.onCreate(savedInstanceState)
 
-        val bundle = getArguments()
+        val bundle = arguments
         this.edgeToEdgeMode = bundle.getBoolean("edge_to_edge_mode")
 
         if (MyDebug.LOG) Log.d(TAG, "onCreate done")
@@ -47,7 +47,7 @@ open class PreferenceSubScreen : PreferenceFragment(), OnSharedPreferenceChangeL
         if (MyDebug.LOG) Log.d(TAG, "on_destroy")
         super.onDestroy()
 
-        MyPreferenceFragment.dismissDialogs(getFragmentManager(), dialogs)
+        MyPreferenceFragment.dismissDialogs(fragmentManager, dialogs)
     }
 
     override fun onResume() {
@@ -55,14 +55,14 @@ open class PreferenceSubScreen : PreferenceFragment(), OnSharedPreferenceChangeL
 
         MyPreferenceFragment.setBackground(this)
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this.getActivity())
+        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this.activity)
         sharedPreferences.registerOnSharedPreferenceChangeListener(this)
     }
 
     /* See comment for MyPreferenceFragment.onSharedPreferenceChanged().
      */
     override fun onSharedPreferenceChanged(prefs: SharedPreferences, key: String?) {
-        if (MyDebug.LOG) Log.d(TAG, "onSharedPreferenceChanged: " + key)
+        if (MyDebug.LOG) Log.d(TAG, "onSharedPreferenceChanged: $key")
 
         if (key == null) {
             // On Android 11+, when targetting Android 11+, this method is called with key==null

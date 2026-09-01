@@ -31,6 +31,7 @@ import android.provider.OpenableColumns
 import android.system.Os
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.preferences.PreferenceKeys
@@ -84,14 +85,14 @@ class StorageUtils internal constructor(
         lastMediaScanned = uri
         lastMediaScannedIsRaw = isRaw
         lastMediaScannedHasNoExifDateTime = hasnoexifdatetime
-        if (hasnoexifdatetime) lastMediaScannedCheckUri = checkUri
-        else lastMediaScannedCheckUri = null
+        lastMediaScannedCheckUri = if (hasnoexifdatetime) checkUri
+        else null
         if (MyDebug.LOG) {
-            Log.d(TAG, "set last_media_scanned to " + lastMediaScanned)
-            Log.d(TAG, "    last_media_scanned_is_raw: " + lastMediaScannedIsRaw)
+            Log.d(TAG, "set last_media_scanned to $lastMediaScanned")
+            Log.d(TAG, "    last_media_scanned_is_raw: $lastMediaScannedIsRaw")
             Log.d(
                 TAG,
-                "    last_media_scanned_hasnoexifdatetime: " + lastMediaScannedHasNoExifDateTime
+                "    last_media_scanned_hasnoexifdatetime: $lastMediaScannedHasNoExifDateTime"
             )
             Log.d(
                 TAG,
@@ -399,14 +400,17 @@ class StorageUtils internal constructor(
         // only valid if isUsingSAF()
         get() {
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
-            return sharedPreferences.getString(PreferenceKeys.SAVE_LOCATION_SAF_PREFERENCE_KEY, "")!!
+            return sharedPreferences.getString(
+                PreferenceKeys.SAVE_LOCATION_SAF_PREFERENCE_KEY,
+                ""
+            )!!
         }
 
     val treeUriSAF: Uri
         // only valid if isUsingSAF()
         get() {
             val folderName = saveLocationSAF
-            return Uri.parse(folderName)
+            return folderName.toUri()
         }
 
     val settingsFolder: File
@@ -422,7 +426,7 @@ class StorageUtils internal constructor(
          */
         get() {
             val file = imageFolder
-            return file?.absolutePath
+            return file.absolutePath
         }
 
     val imageFolder: File
@@ -494,7 +498,7 @@ class StorageUtils internal constructor(
                 )
             if (MyDebug.LOG) Log.d(TAG, "id: $id")
             val split = id.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-            if (split.size >= 1) {
+            if (split.isNotEmpty()) {
                 val type = split[0]
                 val path = if (split.size >= 2) split[1] else ""
                 /*if( MyDebug.LOG ) {
@@ -532,7 +536,7 @@ class StorageUtils internal constructor(
                 } else {
                     try {
                         val contentUri = ContentUris.withAppendedId(
-                            Uri.parse("content://downloads/public_downloads"),
+                            "content://downloads/public_downloads".toUri(),
                             id.toLong()
                         )
 
@@ -669,9 +673,15 @@ class StorageUtils internal constructor(
         }
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
         val useZuluTime =
-            sharedPreferences.getString(PreferenceKeys.SAVE_ZULU_TIME_PREFERENCE_KEY, "local") == "zulu"
+            sharedPreferences.getString(
+                PreferenceKeys.SAVE_ZULU_TIME_PREFERENCE_KEY,
+                "local"
+            ) == "zulu"
         val includeMilliseconds =
-            sharedPreferences.getBoolean(PreferenceKeys.SAVE_INCLUDE_MILLISECONDS_PREFERENCE_KEY, false)
+            sharedPreferences.getBoolean(
+                PreferenceKeys.SAVE_INCLUDE_MILLISECONDS_PREFERENCE_KEY,
+                false
+            )
         var dateFormatPattern = "yyyyMMdd_HHmmss"
         if (includeMilliseconds) {
             dateFormatPattern += ".SSS"
@@ -732,7 +742,7 @@ class StorageUtils internal constructor(
         currentDate: Date?
     ): File {
         val mediaStorageDir = imageFolder
-        return createOutputMediaFile(mediaStorageDir!!, type, suffix, extension, currentDate)
+        return createOutputMediaFile(mediaStorageDir, type, suffix, extension, currentDate)
     }
 
     /** Create the folder if it does not exist.
@@ -748,7 +758,14 @@ class StorageUtils internal constructor(
                 Log.e(TAG, "failed to create directory")
                 throw IOException()
             }
-            broadcastFile(folder, false, false, false, false, null)
+            broadcastFile(
+                file = folder,
+                isNewPicture = false,
+                isNewVideo = false,
+                setLastScanned = false,
+                hasnoexifdatetime = false,
+                safUri = null
+            )
         }
     }
 
@@ -804,7 +821,7 @@ class StorageUtils internal constructor(
             Log.d(TAG, "getOutputMediaFile returns: $mediaFile")
         }
         if (mediaFile == null) throw IOException()
-        return mediaFile!!
+        return mediaFile
     }
 
     // only valid if isUsingSAF()
@@ -990,7 +1007,7 @@ class StorageUtils internal constructor(
         when (uriType) {
             UriType.MEDIASTORE_IMAGES -> {
                 if (bucketId != null) selection = ImageColumns.BUCKET_ID + " = " + bucketId
-                val and = selection.length > 0
+                val and = selection.isNotEmpty()
                 if (and) selection += " AND ( "
                 selection += ImageColumns.MIME_TYPE + "='image/jpeg' OR " +
                         ImageColumns.MIME_TYPE + "='image/webp' OR " +
@@ -1281,7 +1298,7 @@ class StorageUtils internal constructor(
         try {
             val parentDocUri = DocumentsContract.getTreeDocumentId(treeUri)
             baseUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocUri)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // DocumentsContract.getTreeDocumentId throws IllegalArgumentException if the uri is
             // invalid. Unclear if this can happen in practice - this happens in test
             // testSaveFolderHistorySAF() but only because we test a dummy invalid SAF uri. But
@@ -1360,7 +1377,7 @@ class StorageUtils internal constructor(
                     }
 
                     val thisFilename = cursor.getString(columnNameC)
-                    if (thisFilename != null && thisFilename.length > 0 && thisFilename[0] == '.') {
+                    if (thisFilename != null && thisFilename.isNotEmpty() && thisFilename[0] == '.') {
                         // skip hidden file
                         continue
                     }
@@ -1631,12 +1648,11 @@ class StorageUtils internal constructor(
         // n.b., StatFs still seems to work with Android 10's scoped storage... (and there doesn't seem to be an official non-File based equivalent)
         try {
             val folder = imageFolder
-            requireNotNull(folder)
             val statFs = StatFs(folder.absolutePath)
             val blocks = statFs.availableBlocksLong
             val size = statFs.blockSizeLong
             return (blocks * size) / 1048576
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // this can happen if folder doesn't exist, or don't have read access
             // if the save folder is a subfolder of DCIM, we can just use that instead
             try {
@@ -1651,7 +1667,7 @@ class StorageUtils internal constructor(
                         return (blocks * size) / 1048576
                     }
                 }
-            } catch (e2: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 // just in case
             }
         }
@@ -1680,7 +1696,7 @@ class StorageUtils internal constructor(
         // returns a form for use with RELATIVE_PATH (scoped storage)
         private fun getSaveRelativeFolder(folderName: String): String {
             var folderName = folderName
-            if (folderName.length > 0 && folderName.lastIndexOf('/') == folderName.length - 1) {
+            if (folderName.isNotEmpty() && folderName.lastIndexOf('/') == folderName.length - 1) {
                 // ignore final '/' character
                 folderName = folderName.substring(0, folderName.length - 1)
             }
@@ -1704,7 +1720,7 @@ class StorageUtils internal constructor(
         // only valid if !isUsingSAF()
         private fun getImageFolder(folderName: String): File {
             var folderName = folderName
-            if (folderName.length > 0 && folderName.lastIndexOf('/') == folderName.length - 1) {
+            if (folderName.isNotEmpty() && folderName.lastIndexOf('/') == folderName.length - 1) {
                 // ignore final '/' character
                 folderName = folderName.substring(0, folderName.length - 1)
             }

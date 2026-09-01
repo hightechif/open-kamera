@@ -10,18 +10,20 @@ package com.hightechif.openkamera.cameracontroller
 import android.graphics.Rect
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
-import android.hardware.camera2.params.ColorSpaceTransform
 import android.hardware.camera2.params.MeteringRectangle
-import android.hardware.camera2.params.TonemapCurve
 import android.location.Location
 import android.os.Build
 import android.util.Log
 import android.util.Range
 import androidx.exifinterface.media.ExifInterface
+import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
+import com.hightechif.openkamera.cameracontroller.request.ColorCorrectionConfiguration
+import com.hightechif.openkamera.cameracontroller.request.EdgeModeConfiguration
+import com.hightechif.openkamera.cameracontroller.request.NoiseReductionConfiguration
+import com.hightechif.openkamera.cameracontroller.request.StabilizationConfiguration
+import com.hightechif.openkamera.cameracontroller.request.TonemapConfiguration
 import com.hightechif.openkamera.utils.MyDebug
 import java.util.Locale
-import kotlin.math.ln1p
-import kotlin.math.pow
 
 /** Keeps track of the settings (keys) that we wish to set for the various CaptureRequests, along
  *  with methods to actually set these keys.
@@ -248,62 +250,19 @@ class Camera2Settings internal constructor(private val cameraController: CameraC
 
     fun setWhiteBalance(builder: CaptureRequest.Builder?): Boolean {
         if (builder == null) return false
-        var changed = false
-        if (cameraController.isExtensionSession) {
-            // don't set for extensions
-        } else if (builder.get(CaptureRequest.CONTROL_AWB_MODE) == null || builder.get(
-                CaptureRequest.CONTROL_AWB_MODE
-            ) != whiteBalance
-        ) {
-            if (MyDebug.LOG) Log.d(TAG, "setting white balance: $whiteBalance")
+        if (cameraController.isExtensionSession) return false
 
-            if (hasDefaultColorCorrection) {
-                if (builder.get(CaptureRequest.COLOR_CORRECTION_MODE) != null && builder.get(
-                        CaptureRequest.COLOR_CORRECTION_MODE
-                    ) != defaultColorCorrection
-                ) {
-                    builder.set(CaptureRequest.COLOR_CORRECTION_MODE, defaultColorCorrection)
-                }
-                hasDefaultColorCorrection = false
-            }
-
-            builder.set(CaptureRequest.CONTROL_AWB_MODE, whiteBalance)
-            changed = true
-        }
-        if (whiteBalance == CameraMetadata.CONTROL_AWB_MODE_OFF) {
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "setting white balance temperature: $whiteBalanceTemperature"
-            )
-
-            if (!hasDefaultColorCorrection) {
-                hasDefaultColorCorrection = true
-                defaultColorCorrection = builder.get(CaptureRequest.COLOR_CORRECTION_MODE)
-                if (MyDebug.LOG) Log.d(TAG, "default_color_correction: $defaultColorCorrection")
-            }
-
-            val rggbChannelVector =
-                CameraController2.convertTemperatureToRggbVector(whiteBalanceTemperature)
-            builder.set(
-                CaptureRequest.COLOR_CORRECTION_MODE,
-                CameraMetadata.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX
-            )
-            builder.set(CaptureRequest.COLOR_CORRECTION_GAINS, rggbChannelVector)
-            if (MyDebug.LOG) {
-                Log.d(
-                    TAG,
-                    "original color_correction_transform: " + builder.get(CaptureRequest.COLOR_CORRECTION_TRANSFORM)
-                )
-            }
-            val colorSpaceTransform = ColorSpaceTransform(
-                intArrayOf(
-                    1, 1, 0, 1, 0, 1,
-                    0, 1, 1, 1, 0, 1,
-                    0, 1, 0, 1, 1, 1
-                )
-            )
-            builder.set(CaptureRequest.COLOR_CORRECTION_TRANSFORM, colorSpaceTransform)
-            changed = true
+        val config = ColorCorrectionConfiguration(
+            whiteBalance = whiteBalance,
+            whiteBalanceTemperature = whiteBalanceTemperature,
+            defaultColorCorrection = if (hasDefaultColorCorrection) defaultColorCorrection else null
+        )
+        val (changed, newDefault) = Camera2RequestBuilderHelper.applyColorCorrection(builder, config)
+        if (newDefault != null) {
+            hasDefaultColorCorrection = true
+            defaultColorCorrection = newDefault
+        } else {
+            hasDefaultColorCorrection = false
         }
         return changed
     }
@@ -328,85 +287,36 @@ class Camera2Settings internal constructor(private val cameraController: CameraC
 
     fun setEdgeMode(builder: CaptureRequest.Builder?): Boolean {
         if (builder == null) return false
-        if (MyDebug.LOG) {
-            Log.d(TAG, "setEdgeMode")
-            Log.d(TAG, "has_default_edge_mode: $hasDefaultEdgeMode")
-            Log.d(TAG, "default_edge_mode: $defaultEdgeMode")
-        }
-        var changed = false
-        if (cameraController.isExtensionSession) {
-            // don't set for extensions
-        } else if (hasEdgeMode) {
-            if (!hasDefaultEdgeMode) {
-                hasDefaultEdgeMode = true
-                defaultEdgeMode = builder.get(CaptureRequest.EDGE_MODE)
-                if (MyDebug.LOG) Log.d(TAG, "default_edge_mode: $defaultEdgeMode")
-            }
-            if (builder.get(CaptureRequest.EDGE_MODE) == null || builder.get(CaptureRequest.EDGE_MODE) != edgeMode) {
-                if (MyDebug.LOG) Log.d(TAG, "setting edge_mode: $edgeMode")
-                builder.set(CaptureRequest.EDGE_MODE, edgeMode)
-                changed = true
-            } else {
-                if (MyDebug.LOG) Log.d(TAG, "edge_mode was already set: $edgeMode")
-            }
-        } else if (isSamsungS7) {
-            if (MyDebug.LOG) Log.d(TAG, "set EDGE_MODE_OFF")
-            builder.set(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_OFF)
-        } else if (hasDefaultEdgeMode) {
-            if (builder.get(CaptureRequest.EDGE_MODE) != null && builder.get(CaptureRequest.EDGE_MODE) != defaultEdgeMode) {
-                builder.set(CaptureRequest.EDGE_MODE, defaultEdgeMode)
-                changed = true
-            }
+        if (cameraController.isExtensionSession) return false
+
+        val config = EdgeModeConfiguration(
+            hasEdgeMode = hasEdgeMode,
+            edgeMode = edgeMode,
+            defaultEdgeMode = if (hasDefaultEdgeMode) defaultEdgeMode else null,
+            isSamsungS7 = isSamsungS7
+        )
+        val (changed, newDefault) = Camera2RequestBuilderHelper.applyEdgeMode(builder, config)
+        if (newDefault != null) {
+            hasDefaultEdgeMode = true
+            defaultEdgeMode = newDefault
         }
         return changed
     }
 
     fun setNoiseReductionMode(builder: CaptureRequest.Builder?): Boolean {
         if (builder == null) return false
-        if (MyDebug.LOG) {
-            Log.d(TAG, "setNoiseReductionMode")
-            Log.d(TAG, "has_default_noise_reduction_mode: $hasDefaultNoiseReductionMode")
-            Log.d(TAG, "default_noise_reduction_mode: $defaultNoiseReductionMode")
-        }
-        var changed = false
-        if (cameraController.isExtensionSession) {
-            // don't set for extensions
-        } else if (hasNoiseReductionMode) {
-            if (!hasDefaultNoiseReductionMode) {
-                hasDefaultNoiseReductionMode = true
-                defaultNoiseReductionMode = builder.get(CaptureRequest.NOISE_REDUCTION_MODE)
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "default_noise_reduction_mode: $defaultNoiseReductionMode"
-                )
-            }
-            if (builder.get(CaptureRequest.NOISE_REDUCTION_MODE) == null || builder.get(
-                    CaptureRequest.NOISE_REDUCTION_MODE
-                ) != noiseReductionMode
-            ) {
-                if (MyDebug.LOG) Log.d(TAG, "setting noise_reduction_mode: $noiseReductionMode")
-                builder.set(CaptureRequest.NOISE_REDUCTION_MODE, noiseReductionMode)
-                changed = true
-            } else {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "noise_reduction_mode was already set: $noiseReductionMode"
-                )
-            }
-        } else if (isSamsungS7) {
-            if (MyDebug.LOG) Log.d(TAG, "set NOISE_REDUCTION_MODE_OFF")
-            builder.set(
-                CaptureRequest.NOISE_REDUCTION_MODE,
-                CaptureRequest.NOISE_REDUCTION_MODE_OFF
-            )
-        } else if (hasDefaultNoiseReductionMode) {
-            if (builder.get(CaptureRequest.NOISE_REDUCTION_MODE) != null && builder.get(
-                    CaptureRequest.NOISE_REDUCTION_MODE
-                ) != defaultNoiseReductionMode
-            ) {
-                builder.set(CaptureRequest.NOISE_REDUCTION_MODE, defaultNoiseReductionMode)
-                changed = true
-            }
+        if (cameraController.isExtensionSession) return false
+
+        val config = NoiseReductionConfiguration(
+            hasNoiseReductionMode = hasNoiseReductionMode,
+            noiseReductionMode = noiseReductionMode,
+            defaultNoiseReductionMode = if (hasDefaultNoiseReductionMode) defaultNoiseReductionMode else null,
+            isSamsungS7 = isSamsungS7
+        )
+        val (changed, newDefault) = Camera2RequestBuilderHelper.applyNoiseReduction(builder, config)
+        if (newDefault != null) {
+            hasDefaultNoiseReductionMode = true
+            defaultNoiseReductionMode = newDefault
         }
         return changed
     }
@@ -638,184 +548,41 @@ class Camera2Settings internal constructor(private val cameraController: CameraC
 
     fun setStabilization(builder: CaptureRequest.Builder?) {
         if (builder == null) return
-        if (MyDebug.LOG) Log.d(TAG, "setStabilization: $videoStabilization")
+        if (cameraController.isExtensionSession) return
 
-        if (cameraController.isExtensionSession) {
-            return
-        }
-
-        builder.set(
-            CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-            if (videoStabilization) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+        val config = StabilizationConfiguration(
+            videoStabilization = videoStabilization,
+            defaultOpticalStabilization = defaultOpticalStabilization,
+            supportsOpticalStabilization = cameraController.supportsOpticalStabilization()
         )
-        if (cameraController.supportsOpticalStabilization()) {
-            if (videoStabilization) {
-                if (defaultOpticalStabilization == null) {
-                    defaultOpticalStabilization =
-                        builder.get(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "default_optical_stabilization: $defaultOpticalStabilization"
-                    )
-                }
-                builder.set(
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                    CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
-                )
-            } else if (defaultOpticalStabilization != null) {
-                if (builder.get(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE) != null && builder.get(
-                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE
-                    ) != defaultOpticalStabilization
-                ) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "set optical stabilization back to: $defaultOpticalStabilization"
-                    )
-                    builder.set(
-                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                        defaultOpticalStabilization
-                    )
-                }
-            }
-        }
-    }
-
-    private fun getLogProfile(inVal: Float): Float {
-        val logA = logProfileStrength
-        return (ln1p(logA * inVal) / ln1p(logA))
-    }
-
-    private fun getGammaProfile(inVal: Float): Float {
-        return inVal.toDouble().pow(1.0 / gammaProfile.toDouble()).toFloat()
+        defaultOpticalStabilization = Camera2RequestBuilderHelper.applyStabilization(builder, config)
     }
 
     fun setTonemapProfile(builder: CaptureRequest.Builder?) {
         if (builder == null) return
-        if (MyDebug.LOG) {
-            Log.d(TAG, "setTonemapProfile")
-            Log.d(TAG, "tonemap_profile: $tonemapProfile")
-            Log.d(TAG, "log_profile_strength: $logProfileStrength")
-            Log.d(TAG, "gamma_profile: $gammaProfile")
-            Log.d(TAG, "default_tonemap_mode: $defaultTonemapMode")
-        }
-        var haveTonemapProfile =
-            tonemapProfile != CameraController.TonemapProfile.TONEMAPPROFILE_OFF
-        if (tonemapProfile == CameraController.TonemapProfile.TONEMAPPROFILE_LOG && logProfileStrength == 0.0f) {
-            haveTonemapProfile = false
-        } else if (tonemapProfile == CameraController.TonemapProfile.TONEMAPPROFILE_GAMMA && gammaProfile == 0.0f) {
-            haveTonemapProfile = false
+        if (cameraController.isExtensionSession) return
+
+        val customCurve = when (tonemapProfile) {
+            CameraController.TonemapProfile.TONEMAPPROFILE_JTVIDEO -> cameraController.jtvideoValues
+            CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG -> cameraController.jtlogValues
+            CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG2 -> cameraController.jtlog2Values
+            else -> null
         }
 
-        if (cameraController.isExtensionSession) {
-            // don't set for extensions
-        } else if (haveTonemapProfile) {
-            if (defaultTonemapMode == null) {
-                defaultTonemapMode = builder.get(CaptureRequest.TONEMAP_MODE)
-                if (MyDebug.LOG) Log.d(TAG, "default_tonemap_mode: $defaultTonemapMode")
-            }
-
-            val usePresetCurve = cameraController.supportsTonemapPresetCurve()
-            if (usePresetCurve && tonemapProfile == CameraController.TonemapProfile.TONEMAPPROFILE_REC709) {
-                if (MyDebug.LOG) Log.d(TAG, "set TONEMAP_PRESET_CURVE_REC709")
-                builder.set(CaptureRequest.TONEMAP_MODE, CaptureRequest.TONEMAP_MODE_PRESET_CURVE)
-                builder.set(
-                    CaptureRequest.TONEMAP_PRESET_CURVE,
-                    CaptureRequest.TONEMAP_PRESET_CURVE_REC709
-                )
-            } else if (usePresetCurve && tonemapProfile == CameraController.TonemapProfile.TONEMAPPROFILE_SRGB) {
-                if (MyDebug.LOG) Log.d(TAG, "set TONEMAP_PRESET_CURVE_SRGB")
-                builder.set(CaptureRequest.TONEMAP_MODE, CaptureRequest.TONEMAP_MODE_PRESET_CURVE)
-                builder.set(
-                    CaptureRequest.TONEMAP_PRESET_CURVE,
-                    CaptureRequest.TONEMAP_PRESET_CURVE_SRGB
-                )
-            } else {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "handle via TONEMAP_MODE_CONTRAST_CURVE / TONEMAP_CURVE"
-                )
-                var values: FloatArray? = null
-                when (tonemapProfile) {
-                    CameraController.TonemapProfile.TONEMAPPROFILE_REC709 -> {
-                        val xValues = floatArrayOf(
-                            0.0000f, 0.0667f, 0.1333f, 0.2000f,
-                            0.2667f, 0.3333f, 0.4000f, 0.4667f,
-                            0.5333f, 0.6000f, 0.6667f, 0.7333f,
-                            0.8000f, 0.8667f, 0.9333f, 1.0000f
-                        )
-                        values = FloatArray(2 * xValues.size)
-                        var c = 0
-                        for (xValue in xValues) {
-                            val out = if (xValue < 0.018f) {
-                                4.5f * xValue
-                            } else {
-                                (1.099 * xValue.toDouble().pow(0.45) - 0.099).toFloat()
-                            }
-                            values[c++] = xValue
-                            values[c++] = out
-                        }
-                    }
-
-                    CameraController.TonemapProfile.TONEMAPPROFILE_SRGB -> {
-                        values = floatArrayOf(
-                            0.0000f, 0.0000f, 0.0667f, 0.2864f, 0.1333f, 0.4007f, 0.2000f, 0.4845f,
-                            0.2667f, 0.5532f, 0.3333f, 0.6125f, 0.4000f, 0.6652f, 0.4667f, 0.7130f,
-                            0.5333f, 0.7569f, 0.6000f, 0.7977f, 0.6667f, 0.8360f, 0.7333f, 0.8721f,
-                            0.8000f, 0.9063f, 0.8667f, 0.9389f, 0.9333f, 0.9701f, 1.0000f, 1.0000f
-                        )
-                    }
-
-                    CameraController.TonemapProfile.TONEMAPPROFILE_LOG,
-                    CameraController.TonemapProfile.TONEMAPPROFILE_GAMMA -> {
-                        val nValues =
-                            if (isSamsung) 32 else CameraController2.TONEMAP_LOG_MAX_CURVE_POINTS_C
-                        if (MyDebug.LOG) Log.d(TAG, "n_values: $nValues")
-
-                        values = FloatArray(2 * nValues)
-                        for (i in 0 until nValues) {
-                            val inVal = i.toFloat() / (nValues - 1.0f)
-                            val outVal =
-                                if (tonemapProfile == CameraController.TonemapProfile.TONEMAPPROFILE_LOG) getLogProfile(
-                                    inVal
-                                ) else getGammaProfile(inVal)
-                            values[2 * i] = inVal
-                            values[2 * i + 1] = outVal
-                        }
-                    }
-
-                    CameraController.TonemapProfile.TONEMAPPROFILE_JTVIDEO -> {
-                        values = cameraController.jtvideoValues
-                        if (MyDebug.LOG) Log.d(TAG, "setting JTVideo profile")
-                    }
-
-                    CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG -> {
-                        values = cameraController.jtlogValues
-                        if (MyDebug.LOG) Log.d(TAG, "setting JTLog profile")
-                    }
-
-                    CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG2 -> {
-                        values = cameraController.jtlog2Values
-                        if (MyDebug.LOG) Log.d(TAG, "setting JTLog2 profile")
-                    }
-
-                    else -> {}
-                }
-
-                if (MyDebug.LOG) Log.d(TAG, "values: ${values?.contentToString()}")
-                if (values != null) {
-                    builder.set(
-                        CaptureRequest.TONEMAP_MODE,
-                        CaptureRequest.TONEMAP_MODE_CONTRAST_CURVE
-                    )
-                    val tonemapCurve = TonemapCurve(values, values, values)
-                    builder.set(CaptureRequest.TONEMAP_CURVE, tonemapCurve)
-                    cameraController.testUsedTonemapCurve = true
-                } else {
-                    Log.e(TAG, "unknown log type: $tonemapProfile")
-                }
-            }
-        } else if (defaultTonemapMode != null) {
-            builder.set(CaptureRequest.TONEMAP_MODE, defaultTonemapMode)
-        }
+        val config = TonemapConfiguration(
+            profile = tonemapProfile,
+            logProfileStrength = logProfileStrength,
+            gammaProfile = gammaProfile,
+            defaultTonemapMode = defaultTonemapMode,
+            customCurveValues = customCurve
+        )
+        defaultTonemapMode = Camera2RequestBuilderHelper.applyTonemapProfile(
+            builder = builder,
+            config = config,
+            supportsPresetCurve = cameraController.supportsTonemapPresetCurve(),
+            isSamsung = isSamsung,
+            maxPoints = CameraController2.TONEMAP_LOG_MAX_CURVE_POINTS_C,
+            onCurveApplied = { cameraController.testUsedTonemapCurve = true }
+        )
     }
 }

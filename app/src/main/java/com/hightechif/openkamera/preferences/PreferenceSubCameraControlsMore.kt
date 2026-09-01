@@ -18,6 +18,7 @@ import android.widget.Toast
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.utils.MyDebug
+import androidx.core.content.edit
 
 class PreferenceSubCameraControlsMore : PreferenceSubScreen() {
 
@@ -100,12 +101,12 @@ class PreferenceSubCameraControlsMore : PreferenceSubScreen() {
                         val mainActivity = this.activity as MainActivity
                         if (mainActivity.preview.hasLevelAngleStable()) {
                             val currentLevelAngle = mainActivity.preview.levelAngleUncalibrated
-                            val editor = sharedPreferences.edit()
-                            editor.putFloat(
-                                PreferenceKeys.CALIBRATED_LEVEL_ANGLE_PREFERENCE_KEY,
-                                currentLevelAngle.toFloat()
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putFloat(
+                                    PreferenceKeys.CALIBRATED_LEVEL_ANGLE_PREFERENCE_KEY,
+                                    currentLevelAngle.toFloat()
+                                )
+                            }
                             mainActivity.preview.updateLevelAngles()
                             Toast.makeText(
                                 mainActivity,
@@ -117,9 +118,9 @@ class PreferenceSubCameraControlsMore : PreferenceSubScreen() {
                     alertDialog.setNegativeButton(R.string.preference_calibrate_level_reset) { _, _ ->
                         if (MyDebug.LOG) Log.d(TAG, "user clicked reset calibration level")
                         val mainActivity = this.activity as MainActivity
-                        val editor = sharedPreferences.edit()
-                        editor.putFloat(PreferenceKeys.CALIBRATED_LEVEL_ANGLE_PREFERENCE_KEY, 0.0f)
-                        editor.apply()
+                        sharedPreferences.edit {
+                            putFloat(PreferenceKeys.CALIBRATED_LEVEL_ANGLE_PREFERENCE_KEY, 0.0f)
+                        }
                         mainActivity.preview.updateLevelAngles()
                         Toast.makeText(
                             mainActivity,

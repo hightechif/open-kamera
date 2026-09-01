@@ -36,9 +36,14 @@ import android.util.Pair
 import android.view.Surface
 import android.view.View
 import android.widget.RelativeLayout
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withSave
+import androidx.core.net.toUri
+import androidx.core.view.isVisible
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MainActivity.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
+import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
 import com.hightechif.openkamera.MyApplicationInterface.Shadow
@@ -68,6 +73,7 @@ import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -89,7 +95,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private var coverPreview = false // whether to cover the preview for Camera2 API
 
     // if != -1, the time when the camera became inactive
-    private var cameraInactiveTimeMs: Long = -1 
+    private var cameraInactiveTimeMs: Long = -1
 
     // store to avoid calling PreferenceManager.getDefaultSharedPreferences() repeatedly
     private val sharedPreferences: SharedPreferences
@@ -130,7 +136,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private var ghostSelectedImageBitmap: Bitmap? = null
     private var ghostImageAlpha = 0
     private var wantHistogram = false
-    private lateinit var histogramType: Preview.HistogramType
+    private lateinit var histogramType: HistogramType
     private var wantZebraStripes = false
     private var zebraStripesThreshold = 0
     private var zebraStripesColorForeground = 0
@@ -214,8 +220,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             if (hasNewFreeMemory && abs((newFreeMemoryGb - freeMemoryGb).toDouble()) > 0.001f) {
                 freeMemoryGb = newFreeMemoryGb
                 freeMemoryGbString =
-                    decimalFormat.format(freeMemoryGb.toDouble()) + this@DrawPreview.context.getResources()
-                        .getString(R.string.gb_abbreviation)
+                    decimalFormat.format(freeMemoryGb.toDouble()) + this@DrawPreview.context.resources.getString(
+                        R.string.gb_abbreviation
+                    )
             }
 
             freeMemoryFuture = null
@@ -287,7 +294,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
     @JvmField
     @Volatile
-    var test_thumbnail_anim_count: Int = 0
+    var testThumbnailAnimCount: Int = 0
     private val thumbnailAnimSrcRect = RectF()
     private val thumbnailAnimDstRect = RectF()
     private val thumbnailAnimMatrix = Matrix()
@@ -305,7 +312,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         false // true iff camera is in process of capturing a picture (including any necessary prior steps such as autofocus, flash/precapture)
     private var captureStarted = false // true iff the camera is capturing
     private var frontScreenFlash =
-        false // true iff the front screen display should maximise to simulate flash
+        false // true iff the front screen display should maximize to simulate flash
     private var imageQueueFull =
         false // whether we can no longer take new photos due to image queue being full (or rather, would become full if a new photo taken)
 
@@ -337,8 +344,8 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     private var lastUpdateFocusSeekbarAutoTime: Long = 0
 
     // OSD extra lines
-    private lateinit var OSDLine1: String
-    private lateinit var OSDLine2: String
+    private lateinit var varOSDLine1: String
+    private lateinit var varOSDLine2: String
 
     init {
         if (MyDebug.LOG) Log.d(TAG, "DrawPreview")
@@ -346,10 +353,10 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         this.applicationInterface = applicationInterface
 
-        // n.b., don't call updateSettings() here, as it may rely on things that aren't yet initialise (e.g., the preview)
+        // n.b., don't call updateSettings() here, as it may rely on things that aren't yet initialize (e.g., the preview)
         // see testHDRRestart
         p.isAntiAlias = true
-        p.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD))
+        p.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         p.strokeCap = Paint.Cap.ROUND
         scaleDp = context.resources.displayMetrics.density
         scaleFont = context.resources.displayMetrics.scaledDensity
@@ -546,15 +553,15 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val systemOrientationPortrait =
-            systemOrientation === MainActivity.SystemOrientation.PORTRAIT
+            systemOrientation === SystemOrientation.PORTRAIT
         var xpos = guiLocation[if (systemOrientationPortrait) 1 else 0]
-        var rotation = Math.round(view.rotation)
+        var rotation = view.rotation.roundToInt()
         // rotation can be outside [0, 359] if the user repeatedly rotates in same direction!
         rotation =
             (rotation % 360 + 360) % 360 // version of (rotation % 360) that work if rotation is -ve
         /*if( MyDebug.LOG )
             Log.d(TAG, "    mod rotation: " + rotation);*/
-        // undo annoying behaviour that getLocationOnScreen takes the rotation into account
+        // undo annoying behavior that getLocationOnScreen takes the rotation into account
         if (systemOrientationPortrait) {
             if (rotation == 180 || rotation == 270) {
                 xpos -= view.height
@@ -576,10 +583,10 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             if (MyDebug.LOG) Log.d(TAG, "thumbnail_anim started")
             thumbnailAnim = true
             thumbnailAnimStartMs = System.currentTimeMillis()
-            test_thumbnail_anim_count++
+            testThumbnailAnimCount++
             if (MyDebug.LOG) Log.d(
                 TAG,
-                "test_thumbnail_anim_count is now: $test_thumbnail_anim_count"
+                "test_thumbnail_anim_count is now: $testThumbnailAnimCount"
             )
         }
         val oldThumbnail = this.lastThumbnail
@@ -689,8 +696,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         if (MyDebug.LOG) Log.d(TAG, "photoMode: $photoMode")
 
         val settingsRepo = applicationInterface.settingsRepository
-        showTimePref = settingsRepo?.getBooleanPreference(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
-            ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+        showTimePref =
+            settingsRepo?.getBooleanPreference(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
+                ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, true)
         // reset in case user changes the preference:
         dateFormatTimeInstance = DateFormat.getTimeInstance()
         currentTimeString = null
@@ -737,7 +745,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
             "#14e715"
         )!!
-        angleHighlightColorPref = Color.parseColor(angleHighlightColor)
+        angleHighlightColorPref = angleHighlightColor.toColorInt()
         showGeoDirectionPref = settingsRepo?.getBooleanPreference(
             PreferenceKeys.SHOW_GEO_DIRECTION_PREFERENCE_KEY,
             false
@@ -771,7 +779,10 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         showGeoDirectionLinesPref = settingsRepo?.getBooleanPreference(
             PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
             false
-        ) ?: sharedPreferences.getBoolean(PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY, false)
+        ) ?: sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
+            false
+        )
 
         val immersiveMode = settingsRepo?.getStringPreference(
             PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
@@ -782,7 +793,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         )!!
         immersiveModeEverythingPref = immersiveMode == "immersive_mode_everything"
 
-        storedHasStampPref = applicationInterface.stampPref.equals("preference_stamp_yes")
+        storedHasStampPref = applicationInterface.stampPref == "preference_stamp_yes"
         isRawPref =
             applicationInterface.getRawPref() !== ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY
         isRawOnlyPref = applicationInterface.isRawOnly
@@ -805,7 +816,10 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         )
         if (ghostImagePref == "preference_ghost_image_selected") {
             val newGhostSelectedImagePref =
-                sharedPreferences.getString(PreferenceKeys.GHOST_SELECTED_IMAGE_SAF_PREFERENCE_KEY, "")!!
+                sharedPreferences.getString(
+                    PreferenceKeys.GHOST_SELECTED_IMAGE_SAF_PREFERENCE_KEY,
+                    ""
+                )!!
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "new_ghost_selected_image_pref: $newGhostSelectedImagePref"
@@ -831,7 +845,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     ghostSelectedImageBitmap!!.recycle()
                     ghostSelectedImageBitmap = null
                 }
-                val uri = Uri.parse(ghostSelectedImagePref)
+                val uri = ghostSelectedImagePref.toUri()
                 try {
                     ghostSelectedImageBitmap = loadBitmap(uri)
                 } catch (e: IOException) {
@@ -860,23 +874,23 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             )!!
         wantHistogram =
             histogramPref != "preference_histogram_off" && mainActivity.supportsPreviewBitmaps()
-        histogramType = Preview.HistogramType.HISTOGRAM_TYPE_VALUE
+        histogramType = HistogramType.HISTOGRAM_TYPE_VALUE
         if (wantHistogram) {
             when (histogramPref) {
                 "preference_histogram_rgb" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_RGB
+                    HistogramType.HISTOGRAM_TYPE_RGB
 
                 "preference_histogram_luminance" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_LUMINANCE
+                    HistogramType.HISTOGRAM_TYPE_LUMINANCE
 
                 "preference_histogram_value" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_VALUE
+                    HistogramType.HISTOGRAM_TYPE_VALUE
 
                 "preference_histogram_intensity" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_INTENSITY
+                    HistogramType.HISTOGRAM_TYPE_INTENSITY
 
                 "preference_histogram_lightness" -> histogramType =
-                    Preview.HistogramType.HISTOGRAM_TYPE_LIGHTNESS
+                    HistogramType.HISTOGRAM_TYPE_LIGHTNESS
             }
         }
 
@@ -900,18 +914,21 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 PreferenceKeys.ZEBRA_STRIPES_FOREGROUND_COLOR_PREFERENCE_KEY,
                 "#ff000000"
             )!!
-        zebraStripesColorForeground = Color.parseColor(zebraStripesColorForegroundValue)
+        zebraStripesColorForeground = zebraStripesColorForegroundValue.toColorInt()
         val zebraStripesColorBackgroundValue =
             sharedPreferences.getString(
                 PreferenceKeys.ZEBRA_STRIPES_BACKGROUND_COLOR_PREFERENCE_KEY,
                 "#ffffffff"
             )!!
-        zebraStripesColorBackground = Color.parseColor(zebraStripesColorBackgroundValue)
+        zebraStripesColorBackground = zebraStripesColorBackgroundValue.toColorInt()
 
         wantFocusPeaking = applicationInterface.focusPeakingPref
         val focusPeakingColor =
-            sharedPreferences.getString(PreferenceKeys.FOCUS_PEAKING_COLOR_PREFERENCE_KEY, "#ffffff")!!
-        focusPeakingColorPref = Color.parseColor(focusPeakingColor)
+            sharedPreferences.getString(
+                PreferenceKeys.FOCUS_PEAKING_COLOR_PREFERENCE_KEY,
+                "#ffffff"
+            )!!
+        focusPeakingColorPref = focusPeakingColor.toColorInt()
 
         wantPreShots = applicationInterface.getPreShotsPref(photoMode)
 
@@ -950,7 +967,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
      * The image will be downscaled if required to be comparable to the preview width.
      */
     @Throws(IOException::class)
-    private fun loadBitmap(uri: Uri): Bitmap? {
+    private fun loadBitmap(uri: Uri): Bitmap {
         if (MyDebug.LOG) Log.d(TAG, "loadBitmap: $uri")
         var bitmap: Bitmap?
         try {
@@ -961,9 +978,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 // attempt to compute appropriate scaling
                 val bounds = BitmapFactory.Options()
                 bounds.inJustDecodeBounds = true
-                val input: InputStream? = mainActivity.getContentResolver().openInputStream(uri)
+                val input: InputStream? = mainActivity.contentResolver.openInputStream(uri)
                 BitmapFactory.decodeStream(input, null, bounds)
-                if (input != null) input.close()
+                input?.close()
                 if (bounds.outWidth != -1 && bounds.outHeight != -1) {
                     // compute appropriate scaling
                     val imageSize =
@@ -989,9 +1006,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             val options = BitmapFactory.Options()
             options.inMutable = false
             options.inSampleSize = sampleSize
-            val input: InputStream? = mainActivity.getContentResolver().openInputStream(uri)
+            val input: InputStream? = mainActivity.contentResolver.openInputStream(uri)
             bitmap = BitmapFactory.decodeStream(input, null, options)
-            if (input != null) input.close()
+            input?.close()
             if (MyDebug.LOG && bitmap != null) {
                 Log.d(TAG, "bitmap width: " + bitmap.width)
                 Log.d(TAG, "bitmap height: " + bitmap.height)
@@ -1024,7 +1041,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val mins = (time % 60).toInt()
         time /= 60
         val hours = time
-        return hours.toString() + ":" + String.format(
+        return "$hours:" + String.format(
             Locale.getDefault(),
             "%02d",
             mins
@@ -1035,7 +1052,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
     private fun drawGrids(canvas: Canvas) {
         val preview: Preview = mainActivity.preview
-        val cameraController: CameraController? = preview.cameraController ?: return
+        val cameraController: CameraController = preview.cameraController ?: return
         val gridKey = try {
             mainActivity.cameraViewModel.uiState.value.gridType.key
         } catch (_: Exception) {
@@ -1254,80 +1271,80 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
                 var count = 0
                 while (count < 2) {
-                    canvas.save()
-                    drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.clipRect(drawRect)
-                    canvas.drawRect(drawRect, p)
-                    drawRect[left.toFloat(), top.toFloat(), (left + 2 * width).toFloat()] =
-                        (top + 2 * height).toFloat()
-                    canvas.drawOval(drawRect, p)
-                    canvas.restore()
+                    canvas.withSave {
+                        drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
+                            (top + height).toFloat()
+                        clipRect(drawRect)
+                        drawRect(drawRect, p)
+                        drawRect[left.toFloat(), top.toFloat(), (left + 2 * width).toFloat()] =
+                            (top + 2 * height).toFloat()
+                        drawOval(drawRect, p)
+                    }
 
                     var oldFibb = fibb
                     fibb = fibbN
                     fibbN = oldFibb - fibb
 
                     left += width
-                    fullWidth = fullWidth - width
+                    fullWidth -= width
                     width = fullWidth
                     height = (height * (fibbN.toDouble()) / (fibb).toDouble()).toInt()
 
-                    canvas.save()
-                    drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.clipRect(drawRect)
-                    canvas.drawRect(drawRect, p)
-                    drawRect[(left - width).toFloat(), top.toFloat(), (left + width).toFloat()] =
-                        (top + 2 * height).toFloat()
-                    canvas.drawOval(drawRect, p)
-                    canvas.restore()
+                    canvas.withSave {
+                        drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
+                            (top + height).toFloat()
+                        clipRect(drawRect)
+                        drawRect(drawRect, p)
+                        drawRect[(left - width).toFloat(), top.toFloat(), (left + width).toFloat()] =
+                            (top + 2 * height).toFloat()
+                        drawOval(drawRect, p)
+                    }
 
                     oldFibb = fibb
                     fibb = fibbN
                     fibbN = oldFibb - fibb
 
                     top += height
-                    fullHeight = fullHeight - height
+                    fullHeight -= height
                     height = fullHeight
                     width = (width * (fibbN.toDouble()) / (fibb).toDouble()).toInt()
                     left += fullWidth - width
 
-                    canvas.save()
-                    drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.clipRect(drawRect)
-                    canvas.drawRect(drawRect, p)
-                    drawRect[(left - width).toFloat(), (top - height).toFloat(), (left + width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.drawOval(drawRect, p)
-                    canvas.restore()
+                    canvas.withSave {
+                        drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
+                            (top + height).toFloat()
+                        clipRect(drawRect)
+                        drawRect(drawRect, p)
+                        drawRect[(left - width).toFloat(), (top - height).toFloat(), (left + width).toFloat()] =
+                            (top + height).toFloat()
+                        drawOval(drawRect, p)
+                    }
 
                     oldFibb = fibb
                     fibb = fibbN
                     fibbN = oldFibb - fibb
 
-                    fullWidth = fullWidth - width
+                    fullWidth -= width
                     width = fullWidth
                     left -= width
                     height = (height * (fibbN.toDouble()) / (fibb).toDouble()).toInt()
                     top += fullHeight - height
 
-                    canvas.save()
-                    drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.clipRect(drawRect)
-                    canvas.drawRect(drawRect, p)
-                    drawRect[left.toFloat(), (top - height).toFloat(), (left + 2 * width).toFloat()] =
-                        (top + height).toFloat()
-                    canvas.drawOval(drawRect, p)
-                    canvas.restore()
+                    canvas.withSave {
+                        drawRect[left.toFloat(), top.toFloat(), (left + width).toFloat()] =
+                            (top + height).toFloat()
+                        clipRect(drawRect)
+                        drawRect(drawRect, p)
+                        drawRect[left.toFloat(), (top - height).toFloat(), (left + 2 * width).toFloat()] =
+                            (top + height).toFloat()
+                        drawOval(drawRect, p)
+                    }
 
                     oldFibb = fibb
                     fibb = fibbN
                     fibbN = oldFibb - fibb
 
-                    fullHeight = fullHeight - height
+                    fullHeight -= height
                     height = fullHeight
                     top -= height
                     width = (width * (fibbN.toDouble()) / (fibb).toDouble()).toInt()
@@ -1426,7 +1443,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     var previewAspectRatio: Double = preview.currentPreviewAspectRatio
                     val systemOrientation: SystemOrientation = mainActivity.systemOrientation
                     val systemOrientationPortrait =
-                        systemOrientation === MainActivity.SystemOrientation.PORTRAIT
+                        systemOrientation === SystemOrientation.PORTRAIT
                     if (systemOrientationPortrait) {
                         // crop ratios are always drawn as if in landscape
                         cropRatio = 1.0 / cropRatio
@@ -1505,7 +1522,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val cameraController: CameraController? = preview.cameraController
         val uiRotation: Int = preview.uIRotation
 
-        // set up text etc for the multiple lines of "info" (time, free mem, etc)
+        // set up text etc. for the multiple lines of "info" (time, free mem, etc.)
         p.textSize = 16 * scaleFont + 0.5f // convert dps to pixels
         p.textAlign = Paint.Align.LEFT
         var locationX = topX
@@ -1552,7 +1569,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             if (textBoundsTime == null) {
                 if (MyDebug.LOG) Log.d(TAG, "compute text_bounds_time")
                 textBoundsTime = Rect()
-                // better to not use a fixed string like "00:00:00" as don't want to make assumptions - e.g., in 12 hour format we'll have the appended am/pm to account for!
+                // better to not use a fixed string like "00:00:00" as don't want to make assumptions - e.g., in 12-hour format we'll have the appended am/pm to account for!
                 val calendar = Calendar.getInstance()
                 calendar[100, 0, 1, 10, 59] = 59
                 val boundsTimeString = dateFormatTimeInstance!!.format(calendar.time)
@@ -1594,7 +1611,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 p.getTextBounds(
                     cameraIdString,
                     0,
-                    cameraIdString!!.length,
+                    cameraIdString.length,
                     textBoundsCameraId
                 )
             }
@@ -1642,7 +1659,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     p.getTextBounds(
                         freeMemoryGbString,
                         0,
-                        freeMemoryGbString!!.length,
+                        freeMemoryGbString.length,
                         textBoundsFreeMemory
                     )
                 }
@@ -1668,14 +1685,14 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             }
         }
 
-        // Now draw additional info on the lower left corner if needed
+        // Now draw additional info in the lower left corner if needed
         val yOffset = (27 * scaleFont + 0.5f).toInt()
         p.textSize = 24 * scaleFont + 0.5f // convert dps to pixels
-        if (::OSDLine1.isInitialized && OSDLine1.length > 0) {
+        if (::varOSDLine1.isInitialized && varOSDLine1.isNotEmpty()) {
             applicationInterface.drawTextWithBackground(
                 canvas,
                 p,
-                OSDLine1,
+                varOSDLine1,
                 Color.WHITE,
                 Color.BLACK,
                 locationX,
@@ -1685,11 +1702,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 Shadow.SHADOW_OUTLINE
             )
         }
-        if (::OSDLine2.isInitialized && OSDLine2.length > 0) {
+        if (::varOSDLine2.isInitialized && varOSDLine2.isNotEmpty()) {
             applicationInterface.drawTextWithBackground(
                 canvas,
                 p,
-                OSDLine2,
+                varOSDLine2,
                 Color.WHITE,
                 Color.BLACK,
                 locationX,
@@ -1706,17 +1723,17 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 isoExposureString = ""
                 if (cameraController.captureResultHasIso()) {
                     val iso: Int = cameraController.captureResultIso()
-                    if (isoExposureString!!.length > 0) isoExposureString += " "
+                    if (isoExposureString.isNotEmpty()) isoExposureString += " "
                     isoExposureString += preview.getISOString(iso)
                 }
                 if (cameraController.captureResultHasExposureTime()) {
                     val exposureTime: Long = cameraController.captureResultExposureTime()
-                    if (isoExposureString!!.length > 0) isoExposureString += " "
+                    if (isoExposureString.isNotEmpty()) isoExposureString += " "
                     isoExposureString += preview.getExposureTimeString(exposureTime)
                 }
                 if (preview.isVideoRecording && cameraController.captureResultHasFrameDuration()) {
                     val frameDuration: Long = cameraController.captureResultFrameDuration()
-                    if (isoExposureString!!.length > 0) isoExposureString += " "
+                    if (isoExposureString.isNotEmpty()) isoExposureString += " "
                     isoExposureString += preview.getFrameDurationString(frameDuration)
                 }
 
@@ -1742,7 +1759,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 lastIsoExposureTime = timeMs
             }
 
-            if (isoExposureString!!.length > 0) {
+            if (isoExposureString.isNotEmpty()) {
                 var textColor = Color.rgb(255, 235, 59) // Yellow 500
                 if (isScanning) {
                     // we only change the color if ae scanning is at least a certain time, otherwise we get a lot of flickering of the color
@@ -1804,7 +1821,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     val locationRadius = iconSize / 10
                     val indicatorX = locationX2 + iconSize - (locationRadius * 1.5).toInt()
                     val indicatorY = locationY + (locationRadius * 1.5).toInt()
-                    p.color = if (locationInfo.LocationWasCached()) Color.rgb(
+                    p.color = if (locationInfo.locationWasCached()) Color.rgb(
                         127,
                         127,
                         127
@@ -1887,7 +1904,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             }
 
             if ((photoMode === PhotoMode.DRO || photoMode === PhotoMode.HDR || photoMode === PhotoMode.Panorama || photoMode === PhotoMode.ExpoBracketing ||  //photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ||
-                        photoMode === PhotoMode.FastBurst || photoMode === PhotoMode.NoiseReduction || photoMode === PhotoMode.X_Night || photoMode === PhotoMode.X_Bokeh || photoMode === PhotoMode.X_Beauty
+                        photoMode === PhotoMode.FastBurst || photoMode === PhotoMode.NoiseReduction || photoMode === PhotoMode.XNight || photoMode === PhotoMode.XBokeh || photoMode === PhotoMode.XBeauty
                         ) &&
                 !applicationInterface.isVideoPref()
             ) { // these photo modes not supported for video mode
@@ -1899,18 +1916,16 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 p.alpha = 255
                 val bitmap =
                     if (photoMode === PhotoMode.DRO) droBitmap else if (photoMode === PhotoMode.HDR) hdrBitmap else if (photoMode === PhotoMode.Panorama) panoramaBitmap else if (photoMode === PhotoMode.ExpoBracketing) expoBitmap else  //photoMode == MyApplicationInterface.PhotoMode.FocusBracketing ? focusBracketBitmap :
-                        if (photoMode === PhotoMode.FastBurst) burstBitmap else if (photoMode === PhotoMode.NoiseReduction) nrBitmap else if (photoMode === PhotoMode.X_Night) xNightBitmap else if (photoMode === PhotoMode.X_Bokeh) xBokehBitmap else if (photoMode === PhotoMode.X_Beauty) xBeautyBitmap else null
+                        if (photoMode === PhotoMode.FastBurst) burstBitmap else if (photoMode === PhotoMode.NoiseReduction) nrBitmap else if (photoMode === PhotoMode.XNight) xNightBitmap else if (photoMode === PhotoMode.XBokeh) xBokehBitmap else if (photoMode === PhotoMode.XBeauty) xBeautyBitmap else null
                 if (bitmap != null) {
                     if (photoMode === PhotoMode.NoiseReduction && applicationInterface.getNRModePref() === ApplicationInterface.NRModePref.NRMODE_LOW_LIGHT) {
-                        p.setColorFilter(
-                            PorterDuffColorFilter(
-                                Color.rgb(255, 235, 59),
-                                PorterDuff.Mode.SRC_IN
-                            )
+                        p.colorFilter = PorterDuffColorFilter(
+                            Color.rgb(255, 235, 59),
+                            PorterDuff.Mode.SRC_IN
                         ) // Yellow 500
                     }
                     canvas.drawBitmap(bitmap, null, iconDest, p)
-                    p.setColorFilter(null)
+                    p.colorFilter = null
 
                     if (deviceUiRotation == 180) {
                         locationX2 -= iconSize + flashPadding
@@ -1922,7 +1937,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
 
             // photo-stamp is supported for photos taken in video mode
-            // but it isn't supported in RAW-only mode
+            // but, it isn't supported in RAW-only mode
             if (storedHasStampPref && !(isRawOnlyPref && preview.supportsRaw())) {
                 iconDest[locationX2, locationY, locationX2 + iconSize] = locationY + iconSize
                 p.style = Paint.Style.FILL
@@ -1955,7 +1970,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 }
             }
 
-            // icons for slow motion, time lapse or high speed video
+            // icons for slow motion, time-lapse or high speed video
             if (abs((captureRateFactor - 1.0f).toDouble()) > 1.0e-5 && applicationInterface.isVideoPref()) {
                 iconDest[locationX2, locationY, locationX2 + iconSize] = locationY + iconSize
                 p.style = Paint.Style.FILL
@@ -2078,7 +2093,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 						   if r=g=b, then this gives:
 						       a2 = 1/[2+1/a0]
                                a1 = 1 - a2/[a0.(1-a2)]
-                           However this then means that for non-overlapping colours, red is too
+                           However this then means that for non-overlapping colors, red is too
                            strong whilst blue is too weak, so we instead adjust to:
                                a0' = (a0+a1)/2
                                a1' = a1
@@ -2165,7 +2180,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val geoDirection: Double = preview.geoDirection
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val systemOrientationPortrait =
-            systemOrientation === MainActivity.SystemOrientation.PORTRAIT
+            systemOrientation === SystemOrientation.PORTRAIT
         var textBaseY = 0
 
         canvas.save()
@@ -2178,7 +2193,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             val gapY = (20 * scaleFont + 0.5f).toInt() // convert dps to pixels
             val textY = (16 * scaleFont + 0.5f).toInt() // convert dps to pixels
             var avoidUi = false
-            // fine tuning to adjust placement of text with respect to the GUI, depending on orientation
+            // fine-tuning to adjust placement of text with respect to the GUI, depending on orientation
             if (uiPlacement === MainUI.UIPlacement.UIPLACEMENT_TOP && (deviceUiRotation == 0 || deviceUiRotation == 180)) {
                 textBaseY = canvas.height - (0.1 * gapY).toInt()
                 if (deviceUiRotation == 0) avoidUi = true
@@ -2211,7 +2226,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     }*/
                 }
 
-                // diffX is the difference from the centre of the canvas to the position we want
+                // diffX is the difference from the center of the canvas to the position we want
                 var maxX = if (systemOrientationPortrait) canvas.height else canvas.width
                 val midX = maxX / 2
                 var diffX = takePhotoTop - midX
@@ -2223,7 +2238,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     Log.d(TAG, "compare offsetX: " + (preview.view.getRootView().getRight()/2 - diffX)/scale);
 				}*/
 
-                // diffX is the difference from the centre of the canvas to the position we want
+                // diffX is the difference from the center of the canvas to the position we want
                 // assumes canvas is centered
                 // avoids calling getLocationOnScreen for performance
                 /*int offsetX = (int) (124 * scale + 0.5f); // convert dps to pixels
@@ -2259,11 +2274,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             if (avoidUi) {
                 // avoid parts of the UI
                 var view: View = mainActivity.findViewById(R.id.focus_seekbar)
-                if (view.visibility == View.VISIBLE) {
+                if (view.isVisible) {
                     textBaseY -= view.height
                 }
                 view = mainActivity.findViewById(R.id.focus_bracketing_target_seekbar)
-                if (view.visibility == View.VISIBLE) {
+                if (view.isVisible) {
                     textBaseY -= view.height
                 }
                 /*view = main_activity.findViewById(R.id.sliders_container);
@@ -2358,7 +2373,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 if (geoAngle < 0.0f) {
                     geoAngle += 360.0f
                 }
-                val string = Math.round(geoAngle).toString() + 0x00B0.toChar()
+                val string = geoAngle.roundToInt().toString() + 0x00B0.toChar()
                 applicationInterface.drawTextWithBackground(
                     canvas,
                     p,
@@ -2628,7 +2643,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             p.textAlign = Paint.Align.CENTER
             val pixelsOffset = (20 * scaleFont + 0.5f).toInt() // convert dps to pixels
             if (preview.hasPermissions()) {
-                if (preview.OpenKameraFailed()) {
+                if (preview.openCameraFailed()) {
                     canvas.drawText(
                         context.resources.getString(R.string.failed_to_open_camera_1),
                         canvas.width / 2.0f,
@@ -2677,16 +2692,16 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 /*if( MyDebug.LOG )
                     Log.d(TAG, "update cached topIconShift");*/
                 var topMargin = getViewOnScreenX(topIcon)
-                if (systemOrientation === MainActivity.SystemOrientation.LANDSCAPE) topMargin += topIcon.width
-                else if (systemOrientation === MainActivity.SystemOrientation.PORTRAIT) topMargin += topIcon.height
-                // n.b., don't adjust topMargin for icon width/height for an reverse orientation
+                if (systemOrientation === SystemOrientation.LANDSCAPE) topMargin += topIcon.width
+                else if (systemOrientation === SystemOrientation.PORTRAIT) topMargin += topIcon.height
+                // n.b., don't adjust topMargin for icon width/height for a reverse orientation
                 preview.view.getLocationOnScreen(guiLocation)
                 var previewLeft = guiLocation[if (systemOrientationPortrait) 1 else 0]
-                if (systemOrientation === MainActivity.SystemOrientation.REVERSE_LANDSCAPE) previewLeft += preview.view
-                    .getWidth() // actually want preview-right for reverse landscape
+                if (systemOrientation === SystemOrientation.REVERSE_LANDSCAPE) previewLeft += preview.view
+                    .width // actually want preview-right for reverse landscape
 
                 this.topIconShift = topMargin - previewLeft
-                if (systemOrientation === MainActivity.SystemOrientation.REVERSE_LANDSCAPE) this.topIconShift =
+                if (systemOrientation === SystemOrientation.REVERSE_LANDSCAPE) this.topIconShift =
                     -this.topIconShift
 
                 /*if( MyDebug.LOG ) {
@@ -2714,7 +2729,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                        if( wantHistogram )
                            focusSeekbarsMarginLeftDp += DrawPreview.histogramHeightDp;*/
             // 135 needed to make room for on-screen info lines in DrawPreview.onDrawInfoLines(), including the histogram
-            // but we also need to take the topIconShift into account, for widescreen aspect ratios and "icons along top" UI placement
+            // but, we also need to take the topIconShift into account, for widescreen aspect ratios and "icons along top" UI placement
             val focusSeekbarsMarginLeftDp = 135
             var newFocusSeekbarsMarginLeft =
                 (focusSeekbarsMarginLeftDp * scaleDp + 0.5f).toInt() // convert dps to pixels
@@ -2734,13 +2749,13 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 var layoutParams = view.layoutParams as RelativeLayout.LayoutParams
                 preview.view.getLocationOnScreen(guiLocation)
                 var previewLeft = guiLocation[if (systemOrientationPortrait) 1 else 0]
-                if (systemOrientation === MainActivity.SystemOrientation.REVERSE_LANDSCAPE) previewLeft += preview.view
-                    .getWidth() // actually want preview-right for reverse landscape
+                if (systemOrientation === SystemOrientation.REVERSE_LANDSCAPE) previewLeft += preview.view
+                    .width // actually want preview-right for reverse landscape
 
 
                 view.getLocationOnScreen(guiLocation)
                 var seekbarRight = guiLocation[if (systemOrientationPortrait) 1 else 0]
-                if (systemOrientation === MainActivity.SystemOrientation.LANDSCAPE || systemOrientation === MainActivity.SystemOrientation.PORTRAIT) {
+                if (systemOrientation === SystemOrientation.LANDSCAPE || systemOrientation === SystemOrientation.PORTRAIT) {
                     // n.b., we read view.getWidth() even if systemOrientation is portrait, because the seekbar is rotated in portrait orientation
                     seekbarRight += view.width
                 } else {
@@ -2750,7 +2765,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
                 val minSeekbarWidth = (150 * scaleDp + 0.5f).toInt() // convert dps to pixels
                 var newSeekbarWidth =
-                    if (systemOrientation === MainActivity.SystemOrientation.LANDSCAPE || systemOrientation === MainActivity.SystemOrientation.PORTRAIT) {
+                    if (systemOrientation === SystemOrientation.LANDSCAPE || systemOrientation === SystemOrientation.PORTRAIT) {
                         seekbarRight - (previewLeft + focusSeekbarsMarginLeft)
                     } else {
                         // reversed landscape
@@ -2865,8 +2880,12 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val cameraController: CameraController? = preview.cameraController
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val systemOrientationPortrait =
-            systemOrientation === MainActivity.SystemOrientation.PORTRAIT
-        val uiState = try { mainActivity.cameraViewModel.uiState.value } catch (_: Exception) { null }
+            systemOrientation === SystemOrientation.PORTRAIT
+        val uiState = try {
+            mainActivity.cameraViewModel.uiState.value
+        } catch (_: Exception) {
+            null
+        }
         val horizonAngleState = uiState?.horizonAngle
         val hasLevelAngle: Boolean = preview.hasLevelAngle() || (horizonAngleState != null)
         val actualShowAngleLinePref =
@@ -2878,11 +2897,14 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val allowAngleLines = cameraController != null && !preview.isPreviewPaused
 
         if (allowAngleLines && hasLevelAngle && (actualShowAngleLinePref || showPitchLinesPref || showGeoDirectionLinesPref)) {
-            val levelAngle: Double = horizonAngleState?.angleDegrees?.toDouble() ?: preview.levelAngle
+            val levelAngle: Double = horizonAngleState?.angleDegrees ?: preview.levelAngle
             val hasPitchAngle: Boolean = preview.hasPitchAngle()
             val pitchAngle: Double = preview.pitchAngle
-            val hasGeoDirection: Boolean = preview.hasGeoDirection() || ((uiState?.compassDegrees ?: 0.0f) != 0.0f)
-            val geoDirection: Double = if ((uiState?.compassDegrees ?: 0.0f) != 0.0f) uiState!!.compassDegrees.toDouble() else preview.geoDirection
+            val hasGeoDirection: Boolean =
+                preview.hasGeoDirection() || ((uiState?.compassDegrees ?: 0.0f) != 0.0f)
+            val geoDirection: Double = if ((uiState?.compassDegrees
+                    ?: 0.0f) != 0.0f
+            ) uiState!!.compassDegrees.toDouble() else preview.geoDirection
             // n.b., must draw this without the standard canvas rotation
             // lines should be shorter in portrait
             val radiusDps = if (deviceUiRotation == 90 || deviceUiRotation == 270) 60 else 80
@@ -3055,7 +3077,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 }
             }
             if (hasGeoDirection && hasPitchAngle && showGeoDirectionLinesPref) {
-                // lines should be longer in portrait - n.b., this is opposite to behaviour of pitch lines, as
+                // lines should be longer in portrait - n.b., this is opposite to behavior of pitch lines, as
                 // geo lines are drawn perpendicularly
                 val geoRadiusDps =
                     if (deviceUiRotation == 90 || deviceUiRotation == 270) 100 else 80
@@ -3070,7 +3092,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 						Log.d(TAG, "geoAngle: " + geoAngle);
 						Log.d(TAG, "thisAngle: " + thisAngle);
 					}*/
-                    // normalise to be in interval [0, 360)
+                    // normalize to be in interval [0, 360)
                     while (thisAngle >= 360.0) thisAngle -= 360.0
                     while (thisAngle < -360.0) thisAngle += 360.0
                     // pick shortest angle
@@ -3400,7 +3422,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         val cameraController: CameraController? = preview.cameraController
         val uiRotation: Int = preview.uIRotation
 
-        // set up preview bitmaps (histogram etc)
+        // set up preview bitmaps (histogram etc.)
         val wantPreviewBitmap =
             wantHistogram || wantZebraStripes || wantFocusPeaking || wantPreShots
         val usePreviewBitmapSmall = wantHistogram || wantZebraStripes || wantFocusPeaking
@@ -3433,7 +3455,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         // has the problem that we blank whenever the camera is being reopened, e.g., when switching
         // cameras or changing photo modes that require a reopen. The intent however is to only
         // cover up the camera when the application is pausing, and to keep it covered up until
-        // after we've resumed, and the camera has been reopened and we've received frames.
+        // after we've resumed, and the camera has been reopened, and we've received frames.
         if (preview.usingCamera2API()) {
             val cameraIsActive =
                 cameraController != null && !cameraController.shouldCoverPreview()
@@ -3596,16 +3618,14 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 setLastImageMatrix(canvas, focusPeakingBitmap, 0, false)
                 p.alpha = 127
                 if (focusPeakingColorPref != Color.WHITE) {
-                    p.setColorFilter(
-                        PorterDuffColorFilter(
-                            focusPeakingColorPref,
-                            PorterDuff.Mode.SRC_IN
-                        )
+                    p.colorFilter = PorterDuffColorFilter(
+                        focusPeakingColorPref,
+                        PorterDuff.Mode.SRC_IN
                     )
                 }
                 canvas.drawBitmap(focusPeakingBitmap, lastImageMatrix, p)
                 if (focusPeakingColorPref != Color.WHITE) {
-                    p.setColorFilter(null)
+                    p.colorFilter = null
                 }
                 p.alpha = 255
             }
@@ -3638,7 +3658,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             if (gyroSensor.isRecording) {
                 val systemOrientation: SystemOrientation = mainActivity.systemOrientation
                 val systemOrientationPortrait =
-                    systemOrientation === MainActivity.SystemOrientation.PORTRAIT
+                    systemOrientation === SystemOrientation.PORTRAIT
                 for (gyroDirection in gyroDirections) {
                     gyroSensor.getRelativeInverseVector(transformedGyroDirection, gyroDirection)
                     gyroSensor.getRelativeInverseVector(
@@ -3686,7 +3706,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                             0.0f,
                             48,
                             true
-                        ) // draw spot for the centre of the screen, to help the user orient the device
+                        ) // draw spot for the center of the screen, to help the user orient the device
                         p.color = Color.BLUE
                         val dirX = -transformedGyroDirectionUp[1]
                         val dirY = -transformedGyroDirectionUp[0]
@@ -3865,8 +3885,8 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
      * @param line2 Second line to display
      */
     fun onExtraOSDValuesChanged(line1: String, line2: String) {
-        OSDLine1 = line1
-        OSDLine2 = line2
+        varOSDLine1 = line1
+        varOSDLine2 = line2
     }
 
     // for testing:

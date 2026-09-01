@@ -238,7 +238,7 @@ class BluetoothLeService : Service() {
         val formatUint16 = BluetoothGattCharacteristic.FORMAT_UINT16
         var remoteCommand = -1
 
-        if (KrakenGattAttributes.KRAKEN_BUTTONS_CHARACTERISTIC.equals(uuid)) {
+        if (KrakenGattAttributes.KRAKEN_BUTTONS_CHARACTERISTIC == uuid) {
             if (MyDebug.LOG) Log.d(TAG, "Got Kraken button press")
             val buttonCode = characteristic.getIntValue(formatUint8, 0)
             if (MyDebug.LOG) Log.d(TAG, String.format("Received Button press: %d", buttonCode))
@@ -248,28 +248,43 @@ class BluetoothLeService : Service() {
             // from the Bluetooth LE service
             // TODO: update to remove all those tests and just forward buttonCode since value is identical
             //       but this is more readable if we want to implement other drivers
-            if (buttonCode == 32) {
-                // Shutter press
-                remoteCommand = COMMAND_SHUTTER
-            } else if (buttonCode == 16) {
-                // "Mode" button: either "back" action or "Photo/Camera" switch
-                remoteCommand = COMMAND_MODE
-            } else if (buttonCode == 48) {
-                // "Menu" button
-                remoteCommand = COMMAND_MENU
-            } else if (buttonCode == 97) {
-                // AF/MF button
-                remoteCommand = COMMAND_AFMF
-            } else if (buttonCode == 96) {
-                // Long press on MF/AF button.
-                // Note: the camera issues button code 97 first, then
-                // 96 after one second of continuous press
-            } else if (buttonCode == 64) {
-                // Up button
-                remoteCommand = COMMAND_UP
-            } else if (buttonCode == 80) {
-                // Down button
-                remoteCommand = COMMAND_DOWN
+            when (buttonCode) {
+                32 -> {
+                    // Shutter press
+                    remoteCommand = COMMAND_SHUTTER
+                }
+
+                16 -> {
+                    // "Mode" button: either "back" action or "Photo/Camera" switch
+                    remoteCommand = COMMAND_MODE
+                }
+
+                48 -> {
+                    // "Menu" button
+                    remoteCommand = COMMAND_MENU
+                }
+
+                97 -> {
+                    // AF/MF button
+                    remoteCommand = COMMAND_AFMF
+                }
+
+                96 -> {
+                    // Long press on MF/AF button.
+                    // Note: the camera issues button code 97 first, then
+                    // 96 after one second of continuous press
+                }
+
+                64 -> {
+                    // Up button
+                    remoteCommand = COMMAND_UP
+                }
+
+                80 -> {
+                    // Down button
+                    remoteCommand = COMMAND_DOWN
+                }
+                // Only send forward if we have something to say
             }
             // Only send forward if we have something to say
             if (remoteCommand > -1) {
@@ -277,7 +292,7 @@ class BluetoothLeService : Service() {
                 intent.putExtra(EXTRA_DATA, remoteCommand)
                 sendBroadcast(intent)
             }
-        } else if (KrakenGattAttributes.KRAKEN_SENSORS_CHARACTERISTIC.equals(uuid)) {
+        } else if (KrakenGattAttributes.KRAKEN_SENSORS_CHARACTERISTIC == uuid) {
             // The housing returns four bytes.
             // Byte 0-1: depth = (Byte 0 + Byte 1 << 8) / 10 / density
             // Byte 2-3: temperature = (Byte 2 + Byte 3 << 8) / 10
@@ -313,7 +328,7 @@ class BluetoothLeService : Service() {
 
     private val mBinder: IBinder = LocalBinder()
 
-    override fun onBind(intent: Intent): IBinder? {
+    override fun onBind(intent: Intent): IBinder {
         if (MyDebug.LOG) Log.d(TAG, "onBind")
         return mBinder
     }
@@ -484,7 +499,7 @@ class BluetoothLeService : Service() {
 
         val descriptor =
             characteristic.getDescriptor(KrakenGattAttributes.CLIENT_CHARACTERISTIC_CONFIG)
-        descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         bluetoothGatt!!.writeDescriptor(descriptor)
     }
 

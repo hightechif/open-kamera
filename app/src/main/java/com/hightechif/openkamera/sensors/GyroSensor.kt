@@ -34,7 +34,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
     private var timestamp: Long = 0
 
     private val deltaRotationVector = FloatArray(4)
-    private var has_gyroVector = false
+    private var hasGyroVector = false
     private val gyroVector = FloatArray(3)
     private val currentRotationMatrix = FloatArray(9)
     private val currentRotationMatrixGyroOnly = FloatArray(9)
@@ -48,7 +48,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
 
     private var hasOriginalRotationMatrix = false
     private val originalRotationMatrix = FloatArray(9)
-    private var has_rotationVector = false
+    private var hasRotationVector = false
     private val rotationVector = FloatArray(3)
 
     // temporary vectors:
@@ -75,7 +75,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
     private var targetAchieved = false
     private var tooFarAngle = 0f // in radians
     private var targetCallback: TargetCallback? = null
-    private var has_lastTargetAngle = false
+    private var hasLastTargetAngle = false
     private var lastTargetAngle = 0f
     var isUpright: Int =
         0 // if hasTarget==true, this stores whether the "upright" orientation of the device is close enough to the orientation when recording was started: 0 for yes, otherwise -1 for too anti-clockwise, +1 for too clockwise
@@ -94,7 +94,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
     }
 
     fun hasSensors(): Boolean {
-        // even though the gyro sensor works if mSensorAccel is not present, for best behaviour we require them both
+        // even though the gyro sensor works if mSensorAccel is not present, for best behavior we require them both
         return mSensor != null && mSensorAccel != null
     }
 
@@ -138,8 +138,8 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
      */
     fun enableSensors() {
         if (MyDebug.LOG) Log.d(TAG, "enableSensors")
-        has_rotationVector = false
-        has_gyroVector = false
+        hasRotationVector = false
+        hasGyroVector = false
         for (i in 0..2) {
             accelVector[i] = 0.0f
             rotationVector[i] = 0.0f
@@ -194,7 +194,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
         this.uprightAngleTol = uprightAngleTol
         this.tooFarAngle = tooFarAngle
         this.targetCallback = targetCallback
-        this.has_lastTargetAngle = false
+        this.hasLastTargetAngle = false
         this.lastTargetAngle = 0.0f
     }
 
@@ -207,7 +207,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
         this.hasTarget = false
         targetVectors.clear()
         this.targetCallback = null
-        this.has_lastTargetAngle = false
+        this.hasLastTargetAngle = false
         this.lastTargetAngle = 0.0f
     }
 
@@ -266,7 +266,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
 
         /*
         // compute matrix to transform tempVector to accelVector
-        // compute (tempVector X accelVector) normalised
+        // compute (tempVector X accelVector) normalized
         double aX = tempVector[1] * accelVector[2] - tempVector[2] * accelVector[1];
         double aY = tempVector[2] * accelVector[0] - tempVector[0] * accelVector[2];
         double aZ = tempVector[0] * accelVector[1] - tempVector[1] * accelVector[0];
@@ -395,7 +395,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
 
             adjustGyroForAccel()
         } else if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
-            if (has_gyroVector) {
+            if (hasGyroVector) {
                 val sensorAlpha = 0.5f // for filter
                 for (i in 0..2) {
                     //this.gyroVector[i] = event.values[i];
@@ -404,7 +404,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
                 }
             } else {
                 System.arraycopy(event.values, 0, this.gyroVector, 0, 3)
-                has_gyroVector = true
+                hasGyroVector = true
             }
 
             // This timestep's delta rotation to be multiplied by the current rotation
@@ -493,7 +493,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
 
             timestamp = event.timestamp
         } else if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR || event.sensor.type == Sensor.TYPE_GAME_ROTATION_VECTOR) {
-            if (has_rotationVector) {
+            if (hasRotationVector) {
                 //final float sensorAlpha = 0.7f; // for filter
                 val sensorAlpha = 0.8f // for filter
                 for (i in 0..2) {
@@ -503,7 +503,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
                 }
             } else {
                 System.arraycopy(event.values, 0, this.rotationVector, 0, 3)
-                has_rotationVector = true
+                hasRotationVector = true
             }
 
             SensorManager.getRotationMatrixFromVector(tempMatrix, rotationVector)
@@ -631,7 +631,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
                         targetAchieved = true
                         if (targetCallback != null) {
                             //targetCallback.onAchieved(indx);
-                            if (has_lastTargetAngle) {
+                            if (hasLastTargetAngle) {
                                 if (MyDebug.LOG) Log.d(
                                     TAG,
                                     "        last target angle: " + Math.toDegrees(lastTargetAngle.toDouble()) + " degrees"
@@ -644,7 +644,7 @@ class GyroSensor internal constructor(context: Context) : SensorEventListener {
                             }
                         }
                         // only bother setting the lastTargetAngle if within the target angle - otherwise we'll have problems if there is more than one target set
-                        has_lastTargetAngle = true
+                        hasLastTargetAngle = true
                         lastTargetAngle = angle
                     }
                 }

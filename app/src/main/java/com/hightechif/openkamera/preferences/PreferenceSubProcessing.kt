@@ -30,7 +30,7 @@ class PreferenceSubProcessing : PreferenceSubScreen() {
 
         var hasAntibanding = false
         val antibandingValues = bundle.getStringArray("antibanding")
-        if (antibandingValues != null && antibandingValues.isNotEmpty()) {
+        if (!antibandingValues.isNullOrEmpty()) {
             val antibandingEntries = bundle.getStringArray("antibanding_entries")
             if (antibandingEntries != null && antibandingEntries.size == antibandingValues.size) {
                 MyPreferenceFragment.readFromBundle(
@@ -57,7 +57,7 @@ class PreferenceSubProcessing : PreferenceSubScreen() {
 
         var hasEdgeMode = false
         val edgeModeValues = bundle.getStringArray("edge_modes")
-        if (edgeModeValues != null && edgeModeValues.isNotEmpty()) {
+        if (!edgeModeValues.isNullOrEmpty()) {
             val edgeModeEntries = bundle.getStringArray("edge_modes_entries")
             if (edgeModeEntries != null && edgeModeEntries.size == edgeModeValues.size) {
                 MyPreferenceFragment.readFromBundle(
@@ -84,7 +84,7 @@ class PreferenceSubProcessing : PreferenceSubScreen() {
 
         var hasNoiseReductionMode = false
         val noiseReductionModeValues = bundle.getStringArray("noise_reduction_modes")
-        if (noiseReductionModeValues != null && noiseReductionModeValues.isNotEmpty()) {
+        if (!noiseReductionModeValues.isNullOrEmpty()) {
             val noiseReductionModeEntries = bundle.getStringArray("noise_reduction_modes_entries")
             if (noiseReductionModeEntries != null && noiseReductionModeEntries.size == noiseReductionModeValues.size) {
                 MyPreferenceFragment.readFromBundle(

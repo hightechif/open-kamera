@@ -30,9 +30,9 @@ import java.util.Date
  * ApplicationInterface.
  */
 interface ApplicationInterface {
-    object NoFreeStorageException : Exception() {
-        private fun readResolve(): Any = NoFreeStorageException
-        private const val serialVersionUID = -2021932609486148748L
+    class NoFreeStorageException : Exception() {
+        private fun readResolve(): Any = NoFreeStorageException()
+        private val serialVersionUID = -2021932609486148748L
     }
 
     data class VideoMaxFileSize(
@@ -148,7 +148,7 @@ interface ApplicationInterface {
     fun getVideoMaxFileSizePref(): VideoMaxFileSize // see VideoMaxFileSize class for details
     fun getVideoFlashPref(): Boolean // option to switch flash on/off while recording video (should be false in most cases!)
     fun getVideoLowPowerCheckPref(): Boolean // whether to stop video automatically on critically low battery
-    fun getPreviewSizePref(): String // "preference_preview_size_wysiwyg" is recommended (preview matches aspect ratio of photo resolution as close as possible), but can also be "preference_preview_size_display" to maximise the preview size
+    fun getPreviewSizePref(): String // "preference_preview_size_wysiwyg" is recommended (preview matches aspect ratio of photo resolution as close as possible), but can also be "preference_preview_size_display" to maximize the preview size
     fun getLockOrientationPref(): String // return "none" for default; use "portrait" or "landscape" to lock photos/videos to that orientation
     fun getTouchCapturePref(): Boolean // whether to enable touch to capture
     fun getDoubleTapCapturePref(): Boolean // whether to enable double-tap to capture
@@ -165,17 +165,17 @@ interface ApplicationInterface {
     fun getRecordAudioChannelsPref(): String // either "audio_default", "audio_mono" or "audio_stereo"
     fun getRecordAudioSourcePref(): String // "audio_src_camcorder" is recommended, but other options are: "audio_src_mic", "audio_src_default", "audio_src_voice_communication", "audio_src_unprocessed" (unprocessed required Android 7+); see corresponding values in android.media.MediaRecorder.AudioSource
     fun getZoomPref(): Int // index into Preview.getSupportedZoomRatios() array (each entry is the zoom factor, scaled by 100; array is sorted from min to max zoom); return -1 for default 1x zoom
-    fun getCalibratedLevelAngle(): Double // set to non-zero to calibrate the accelerometer used for the level angles
+    fun getCalibratedLevelAngle(): Double // set to a non-zero to calibrate the accelerometer used for the level angles
     fun canTakeNewPhoto(): Boolean // whether taking new photos is allowed (e.g., can return false if queue for processing images would become full)
 
     // called during some burst operations, whether we can allow taking the supplied number of extra photos
     fun imageQueueWouldBlock(nRaw: Int, nJpegs: Int): Boolean
 
-    /** Same behaviour as Activity.getWindowManager().getDefaultDisplay().getRotation() (including
+    /** Same behavior as Activity.getWindowManager().getDefaultDisplay().getRotation() (including
      * returning a member of Surface.ROTATION_*), but allows application to modify e.g. for
      * upside-down preview.
      * @param preferLater When the device orientation changes, there can be some ambiguity if this
-     * is called during this rotation, since getRotation() may updated shortly
+     * is called during this rotation, since getRotation() may update shortly
      * before the UI appears to rotate. If preferLater==false, then prefer the
      * previous rotation in such cases. This can be implemented by caching the
      * value. preferLater should be set to false when this is being called
@@ -222,7 +222,7 @@ interface ApplicationInterface {
     fun usePhotoVideoRecording(): Boolean // whether to enable support for taking photos when recording video (if not supported, this won't be called)
     fun isPreviewInBackground(): Boolean // if true, then Preview can disable real-time effects (e.g., computing histogram); also it won't try to open the camera when in the background
     fun allowZoom(): Boolean // if false, don't allow zoom functionality even if the device supports it - Preview.supportsZoom() will also return false; if true, allow zoom if the device supports it
-    fun optimiseFocusForLatency(): Boolean // behaviour for taking photos with continuous focus mode: if true, optimise focus for latency (take photo asap); if false, optimise for quality (don't take photo until scene is focused)
+    fun optimiseFocusForLatency(): Boolean // behavior for taking photos with continuous focus mode: if true, optimize focus for latency (take photo asap); if false, optimize for quality (don't take photo until scene is focused)
 
     /** Return size of default display, e.g., Activity.getWindowManager().getDefaultDisplay().getSize().
      * @param displaySize The returned display size.

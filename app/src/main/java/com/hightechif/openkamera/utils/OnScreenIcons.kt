@@ -19,10 +19,11 @@ import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
+import androidx.core.content.edit
 
 /**
- * This contains functionality related to the (mainly customisable) on-screen icons.
- * To add a new customisable on-screen icon:
+ * This contains functionality related to the (mainly customizable) on-screen icons.
+ * To add a new customizable on-screen icon:
  * - Add the button to addOnScreenIcons().
  * - If the icon image or content description should depend on something persistent (e.g., saved
  *   preference), then add to updateOnScreenIcons(), with a corresponding new update*Icon() method.
@@ -330,10 +331,7 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
     fun showAudioControlIcon(): Boolean {
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         val audio_control = sharedPreferences.getString(PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none")
-        if (audio_control == "noise") {
-            return true
-        }
-        return false
+        return audio_control == "noise"
     }
 
     private fun showCycleLockOrientationIcon(): Boolean {
@@ -583,9 +581,12 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         var value = mainActivity.applicationInterface.getPreShotsPref(mainActivity.applicationInterface.photoMode)
         value = !value
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.PRE_SHOTS_PREFERENCE_KEY, if (value) "preference_save_preshots_on" else "preference_save_preshots_off")
-        editor.apply()
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.PRE_SHOTS_PREFERENCE_KEY,
+                if (value) "preference_save_preshots_on" else "preference_save_preshots_off"
+            )
+        }
 
         updatePreviewShotsIcon()
         mainActivity.applicationInterface.drawPreview.updateSettings()

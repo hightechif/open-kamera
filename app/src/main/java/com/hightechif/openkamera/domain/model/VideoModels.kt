@@ -7,6 +7,8 @@
 package com.hightechif.openkamera.domain.model
 
 import android.media.MediaRecorder
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * Immutable configuration for video recording sessions and encoder surfaces.
@@ -49,6 +51,7 @@ enum class VideoResolutionPreset(val width: Int, val height: Int, val displayNam
  */
 enum class VideoCodecPreset(val encoder: Int, val format: Int, val mimeType: String) {
     H264(MediaRecorder.VideoEncoder.H264, MediaRecorder.OutputFormat.MPEG_4, "video/avc"),
+    @RequiresApi(Build.VERSION_CODES.N)
     HEVC_H265(MediaRecorder.VideoEncoder.HEVC, MediaRecorder.OutputFormat.MPEG_4, "video/hevc")
 }
 

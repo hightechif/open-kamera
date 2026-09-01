@@ -18,6 +18,8 @@ import android.renderscript.Script.LaunchOptions
 import android.renderscript.ScriptIntrinsicHistogram
 import android.renderscript.Type
 import android.util.Log
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.get
 import com.hightechif.openkamera.ScriptC_align_mtb
 import com.hightechif.openkamera.ScriptC_avg_brighten
 import com.hightechif.openkamera.ScriptC_calculate_sharpness
@@ -83,8 +85,8 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
     }
 
     enum class DROTonemappingAlgorithm {
-        DROALGORITHM_NONE,
-        DROALGORITHM_GAINGAMMA
+        DROALGORITHMNONE,
+        DROALGORITHMGAINGAMMA
     }
 
     private fun freeScripts() {
@@ -124,12 +126,12 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
      * We estimate as y = parameter_A * x + parameter_B.
      */
     private class ResponseFunction {
-        var parameter_A: Float = 0f
-        var parameter_B: Float = 0f
+        var parameterA: Float = 0f
+        var parameterB: Float = 0f
 
-        private constructor(parameter_A: Float, parameter_B: Float) {
-            this.parameter_A = parameter_A
-            this.parameter_B = parameter_B
+        private constructor(parameterA: Float, parameterB: Float) {
+            this.parameterA = parameterA
+            this.parameterB = parameterB
         }
 
         /** Computes the response function.
@@ -194,32 +196,32 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             // A ( sumWx^2 - sumW . sumWx2 ) = sumWy . sumWx - sumW . sumWxy
             // then plug A into:
             // B . sumW = sumWy - A . sumWx
-            val A_numer = sumWy * sumWx - sumW * sumWxy
-            val A_denom = sumWx * sumWx - sumW * sumWx2
+            val aNumer = sumWy * sumWx - sumW * sumWxy
+            val aDenom = sumWx * sumWx - sumW * sumWx2
             if (MyDebug.LOG) {
-                Log.d(TAG, "A_numer = $A_numer")
-                Log.d(TAG, "A_denom = $A_denom")
+                Log.d(TAG, "aNumer = $aNumer")
+                Log.d(TAG, "aDenom = $aDenom")
             }
-            if (abs(A_denom) < 1.0e-5) {
+            if (abs(aDenom) < 1.0e-5) {
                 if (MyDebug.LOG) Log.e(TAG, "denom too small")
                 // will fall back to linear Y = AX
             } else {
-                parameter_A = (A_numer / A_denom).toFloat()
-                parameter_B = ((sumWy - parameter_A * sumWx) / sumW).toFloat()
+                parameterA = (aNumer / aDenom).toFloat()
+                parameterB = ((sumWy - parameterA * sumWx) / sumW).toFloat()
                 if (MyDebug.LOG) {
-                    Log.d(TAG, "parameter_A = $parameter_A")
-                    Log.d(TAG, "parameter_B = $parameter_B")
+                    Log.d(TAG, "parameter_A = $parameterA")
+                    Log.d(TAG, "parameter_B = $parameterB")
                 }
                 // we don't want a function that is not monotonic, or can be negative!
-                if (parameter_A < 1.0e-5) {
+                if (parameterA < 1.0e-5) {
                     if (MyDebug.LOG) Log.e(
                         TAG,
-                        "parameter A too small or negative: $parameter_A"
+                        "parameter A too small or negative: $parameterA"
                     )
-                } else if (parameter_B < 1.0e-5) {
+                } else if (parameterB < 1.0e-5) {
                     if (MyDebug.LOG) Log.e(
                         TAG,
-                        "parameter B too small or negative: $parameter_B"
+                        "parameter B too small or negative: $parameterB"
                     )
                 } else {
                     done = true
@@ -245,24 +247,24 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
                 if (denom < 1.0e-5) {
                     if (MyDebug.LOG) Log.e(TAG, "denom too small")
-                    parameter_A = 1.0f
+                    parameterA = 1.0f
                 } else {
-                    parameter_A = (numer / denom).toFloat()
+                    parameterA = (numer / denom).toFloat()
                     // we don't want a function that is not monotonic!
-                    if (parameter_A < 1.0e-5) {
+                    if (parameterA < 1.0e-5) {
                         if (MyDebug.LOG) Log.e(
                             TAG,
-                            "parameter A too small or negative: $parameter_A"
+                            "parameter A too small or negative: $parameterA"
                         )
-                        parameter_A = 1.0e-5f
+                        parameterA = 1.0e-5f
                     }
                 }
-                parameter_B = 0.0f
+                parameterB = 0.0f
             }
 
             if (MyDebug.LOG) {
-                Log.d(TAG, "parameter_A = $parameter_A")
-                Log.d(TAG, "parameter_B = $parameter_B")
+                Log.d(TAG, "parameter_A = $parameterA")
+                Log.d(TAG, "parameter_B = $parameterB")
             }
 
             /*if( MyDebug.LOG ) {
@@ -354,7 +356,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
      */
     @Throws(HDRProcessorException::class)
     fun processHDR(
-        bmaps: MutableList<Bitmap?>,
+        bitmaps: MutableList<Bitmap?>,
         releaseBitmaps: Boolean,
         outputBitmap: Bitmap?,
         assumeSorted: Boolean,
@@ -365,17 +367,17 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         tonemappingAlgorithm: TonemappingAlgorithm,
         droTonemappingAlgorithm: DROTonemappingAlgorithm
     ) {
-        var bitmaps = bmaps
+        var mutBitmaps = bitmaps
         if (MyDebug.LOG) Log.d(TAG, "processHDR")
         if (!assumeSorted && !releaseBitmaps) {
             if (MyDebug.LOG) Log.d(TAG, "take a copy of bitmaps array")
             // if !releaseBitmaps, then we shouldn't be modifying the input bitmaps array - but if !assumeSorted, we need to sort them
             // so make sure we take a copy
-            bitmaps = ArrayList(bitmaps)
+            mutBitmaps = ArrayList(mutBitmaps)
         }
-        val nBitmaps = bitmaps.size
+        val nBitmaps = mutBitmaps.size
         //if( nBitmaps != 1 && nBitmaps != 3 && nBitmaps != 5 && nBitmaps != 7 ) {
-        if (nBitmaps < 1 || nBitmaps > 7) {
+        if (nBitmaps !in 1..7) {
             if (MyDebug.LOG) Log.e(
                 TAG,
                 "n_bitmaps not supported: $nBitmaps"
@@ -383,15 +385,15 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             throw HDRProcessorException(HDRProcessorException.INVALID_N_IMAGES)
         }
         for (i in 1..<nBitmaps) {
-            if (bitmaps[i]!!.width != bitmaps[0]!!.width ||
-                bitmaps[i]!!.height != bitmaps[0]!!.height
+            if (mutBitmaps[i]!!.width != mutBitmaps[0]!!.width ||
+                mutBitmaps[i]!!.height != mutBitmaps[0]!!.height
             ) {
                 if (MyDebug.LOG) {
                     Log.e(TAG, "bitmaps not of same resolution")
                     for (j in 0..<nBitmaps) {
                         Log.e(
-                            TAG, "bitmaps $j : " + bitmaps[j]!!
-                                .width + " x " + bitmaps[j]!!.height
+                            TAG, "bitmaps $j : " + mutBitmaps[j]!!
+                                .width + " x " + mutBitmaps[j]!!.height
                         )
                     }
                 }
@@ -409,9 +411,9 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     sortOrder.add(0)
                     sortCb.sortOrder(sortOrder)
                 }
-                if (!useRenderscript) {
+                if (!USE_RENDERSCRIPT) {
                     processSingleImage(
-                        bitmaps.filterNotNull().toMutableList(),
+                        mutBitmaps.filterNotNull().toMutableList(),
                         releaseBitmaps,
                         outputBitmap,
                         hdrAlpha,
@@ -421,7 +423,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     )
                 } else {
                     processSingleImageRS(
-                        bitmaps,
+                        mutBitmaps,
                         releaseBitmaps,
                         outputBitmap,
                         hdrAlpha,
@@ -433,7 +435,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }
 
             HDRAlgorithm.HDRALGORITHM_STANDARD -> processHDRCore(
-                bitmaps,
+                mutBitmaps,
                 releaseBitmaps,
                 outputBitmap,
                 assumeSorted,
@@ -489,8 +491,8 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 if (xCoord + offsetX < 0 || xCoord + offsetX >= inBitmap.width || yCoord + offsetY < 0 || yCoord + offsetY >= inBitmap.height) {
                     continue
                 }
-                val inCol = inBitmap.getPixel(xCoord + offsetX, yCoord + offsetY)
-                val outCol = outBitmap.getPixel(xCoord, yCoord)
+                val inCol = inBitmap[xCoord + offsetX, yCoord + offsetY]
+                val outCol = outBitmap[xCoord, yCoord]
                 val inValue = averageRGB(inCol)
                 val outValue = averageRGB(outCol)
                 avgIn += inValue
@@ -499,7 +501,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 ySamples.add(outValue)
             }
         }
-        if (xSamples.size == 0) {
+        if (xSamples.isEmpty()) {
             Log.e(TAG, "no samples for response function!")
             // shouldn't happen, but could do with a very large offset - just make up a dummy sample
             val inValue = 255.0
@@ -615,7 +617,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         val useHdrN = nBitmaps != 3
 
         var allocations: Array<Allocation?>? = null
-        if (useRenderscript) {
+        if (USE_RENDERSCRIPT) {
             initRenderscript()
             if (MyDebug.LOG) Log.d(
                 TAG,
@@ -638,10 +640,10 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         // for even number of images, round up to brighter image
 
         // perform auto-alignment
-        // if assumeSorted if false, this function will also sort the allocations and bitmaps from darkest to brightest.
+        // if assumeSorted is false, this function will also sort the allocations and bitmaps from darkest to brightest.
         val brightnessDetails = autoAlignment(
-            offsetsX!!,
-            offsetsY!!,
+            offsetsX,
+            offsetsY,
             allocations,
             width,
             height,
@@ -669,7 +671,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             if (i != baseBitmap) {
                 function = createFunctionFromBitmaps(
                     i,
-                    bitmaps[i]!!, bitmaps[baseBitmap]!!, offsetsX!![i], offsetsY!![i]
+                    bitmaps[i]!!, bitmaps[baseBitmap]!!, offsetsX[i], offsetsY[i]
                 )
             } else if (useHdrN) {
                 // for hdrN, need to still create the identity response function
@@ -684,8 +686,8 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
         if (nBitmaps % 2 == 0) {
             // need to remap so that we aim for a brightness between the middle two images
-            var a = sqrt(responseFunctions[baseBitmap - 1]!!.parameter_A.toDouble()).toFloat()
-            val b = responseFunctions[baseBitmap - 1]!!.parameter_B / (a + 1.0f)
+            var a = sqrt(responseFunctions[baseBitmap - 1]!!.parameterA.toDouble()).toFloat()
+            val b = responseFunctions[baseBitmap - 1]!!.parameterB / (a + 1.0f)
             if (MyDebug.LOG) {
                 Log.d(TAG, "remap for even number of images")
                 Log.d(TAG, "    a: $a")
@@ -700,21 +702,21 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 )
             }
             for (i in 0..<nBitmaps) {
-                val this_A = responseFunctions[i]!!.parameter_A
-                val this_B = responseFunctions[i]!!.parameter_B
-                responseFunctions[i]!!.parameter_A = this_A / a
-                responseFunctions[i]!!.parameter_B = this_B - this_A * b / a
-                if (responseFunctions[i]!!.parameter_B < 1.0e-5f) {
+                val thisA = responseFunctions[i]!!.parameterA
+                val thisB = responseFunctions[i]!!.parameterB
+                responseFunctions[i]!!.parameterA = thisA / a
+                responseFunctions[i]!!.parameterB = thisB - thisA * b / a
+                if (responseFunctions[i]!!.parameterB < 1.0e-5f) {
                     if (MyDebug.LOG) Log.e(
                         TAG,
-                        "remapped parameter B too small or negative: " + responseFunctions[i]!!.parameter_B
+                        "remapped parameter B too small or negative: " + responseFunctions[i]!!.parameterB
                     )
-                    responseFunctions[i]!!.parameter_B = 1.0e-5f
+                    responseFunctions[i]!!.parameterB = 1.0e-5f
                 }
                 if (MyDebug.LOG) {
                     Log.d(TAG, "remapped: $i")
-                    Log.d(TAG, "    A: " + this_A + " -> " + responseFunctions[i]!!.parameter_A)
-                    Log.d(TAG, "    B: " + this_B + " -> " + responseFunctions[i]!!.parameter_B)
+                    Log.d(TAG, "    A: " + thisA + " -> " + responseFunctions[i]!!.parameterA)
+                    Log.d(TAG, "    B: " + thisB + " -> " + responseFunctions[i]!!.parameterB)
                 }
             }
         }
@@ -753,7 +755,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
         // write new hdr image
         var maxPossibleValue =
-            responseFunctions[0]!!.parameter_A * 255 + responseFunctions[0]!!.parameter_B
+            responseFunctions[0]!!.parameterA * 255 + responseFunctions[0]!!.parameterB
         //float maxPossibleValue = responseFunctions[baseBitmap - 1].parameter_A * 255 + responseFunctions[baseBitmap - 1].parameter_B;
         if (MyDebug.LOG) Log.d(
             TAG,
@@ -839,7 +841,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
         // algorithm specific parameters
         var linearScale = 0.0f
-        var W = 0.0f
+        var w = 0.0f
         when (tonemappingAlgorithm) {
             TonemappingAlgorithm.TONEMAPALGORITHM_EXPONENTIAL -> {
                 // The basic algorithm is f(V) = 1 - exp( - E * V ), where V is the HDR value, E is a
@@ -888,27 +890,27 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 // For FU2, we have f(V) = U(EV) / U(W), where V is the HDR value, U is a function.
                 // We want f(Vmax) = 1, so EVmax = W
                 val fu2ExposureBias = 2.0f / 255.0f // should match setting in process_hdr.rs
-                W = fu2ExposureBias * maxPossibleValue
-                if (MyDebug.LOG) Log.d(TAG, "fu2 W: $W")
+                w = fu2ExposureBias * maxPossibleValue
+                if (MyDebug.LOG) Log.d(TAG, "fu2 W: $w")
             }
 
             else -> {}
         }
 
-        if (!useRenderscript) {
+        if (!USE_RENDERSCRIPT) {
             if (releaseBitmaps) {
                 outputBitmap = bitmaps[baseBitmap]
             }
 
-            val parameters_A = FloatArray(responseFunctions.size)
-            val parameters_B = FloatArray(responseFunctions.size)
+            val parametersA = FloatArray(responseFunctions.size)
+            val parametersB = FloatArray(responseFunctions.size)
             for (i in responseFunctions.indices) {
                 if (responseFunctions[i] != null) {
-                    parameters_A[i] = responseFunctions[i]!!.parameter_A
-                    parameters_B[i] = responseFunctions[i]!!.parameter_B
+                    parametersA[i] = responseFunctions[i]!!.parameterA
+                    parametersB[i] = responseFunctions[i]!!.parameterB
                 } else {
-                    parameters_A[i] = 1.0f
-                    parameters_B[i] = 0.0f
+                    parametersA[i] = 1.0f
+                    parametersB[i] = 0.0f
                 }
             }
             if (MyDebug.LOG) Log.d(
@@ -921,24 +923,24 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 function = JavaImageFunctionsHDR.HDRNApplyFunction(
                     tonemappingAlgorithm,
                     tonemapScaleC,
-                    W,
+                    w,
                     linearScale,
                     bitmaps.filterNotNull(),
                     offsetsX,
                     offsetsY,
                     width,
                     height,
-                    parameters_A,
-                    parameters_B
+                    parametersA,
+                    parametersB
                 )
             } else {
                 function = JavaImageFunctionsHDR.HDRApplyFunction(
-                    tonemappingAlgorithm, tonemapScaleC, W, linearScale,
+                    tonemappingAlgorithm, tonemapScaleC, w, linearScale,
                     bitmaps[0],
                     bitmaps[2],
                     offsetsX[0],
                     offsetsY[0],
-                    offsetsX[2], offsetsY[2], width, height, parameters_A, parameters_B
+                    offsetsX[2], offsetsY[2], width, height, parametersA, parametersB
                 )
             }
 
@@ -973,7 +975,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             processHDRScript = new ScriptC_process_hdr(rs);
         }*/
 
-            val processHDRScript: ScriptC_process_hdr = ScriptC_process_hdr(rs)
+            val processHDRScript = ScriptC_process_hdr(rs)
 
             // set allocations
             processHDRScript.set_bitmap0(allocations!![0])
@@ -991,12 +993,12 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }
 
             // set response functions
-            processHDRScript.set_parameter_A0(responseFunctions[0]!!.parameter_A)
-            processHDRScript.set_parameter_B0(responseFunctions[0]!!.parameter_B)
+            processHDRScript.set_parameter_A0(responseFunctions[0]!!.parameterA)
+            processHDRScript.set_parameter_B0(responseFunctions[0]!!.parameterB)
             // no response function for middle image
             if (nBitmaps > 2) {
-                processHDRScript.set_parameter_A2(responseFunctions[2]!!.parameter_A)
-                processHDRScript.set_parameter_B2(responseFunctions[2]!!.parameter_B)
+                processHDRScript.set_parameter_A2(responseFunctions[2]!!.parameterA)
+                processHDRScript.set_parameter_B2(responseFunctions[2]!!.parameterB)
             }
 
             if (useHdrN) {
@@ -1004,37 +1006,37 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 processHDRScript.set_bitmap1(allocations[1])
                 processHDRScript.set_offset_x1(offsetsX[1])
                 processHDRScript.set_offset_y1(offsetsY[1])
-                processHDRScript.set_parameter_A1(responseFunctions[1]!!.parameter_A)
-                processHDRScript.set_parameter_B1(responseFunctions[1]!!.parameter_B)
+                processHDRScript.set_parameter_A1(responseFunctions[1]!!.parameterA)
+                processHDRScript.set_parameter_B1(responseFunctions[1]!!.parameterB)
             }
 
             if (nBitmaps > 3) {
                 processHDRScript.set_bitmap3(allocations[3])
                 processHDRScript.set_offset_x3(offsetsX[3])
                 processHDRScript.set_offset_y3(offsetsY[3])
-                processHDRScript.set_parameter_A3(responseFunctions[3]!!.parameter_A)
-                processHDRScript.set_parameter_B3(responseFunctions[3]!!.parameter_B)
+                processHDRScript.set_parameter_A3(responseFunctions[3]!!.parameterA)
+                processHDRScript.set_parameter_B3(responseFunctions[3]!!.parameterB)
 
                 if (nBitmaps > 4) {
                     processHDRScript.set_bitmap4(allocations[4])
                     processHDRScript.set_offset_x4(offsetsX[4])
                     processHDRScript.set_offset_y4(offsetsY[4])
-                    processHDRScript.set_parameter_A4(responseFunctions[4]!!.parameter_A)
-                    processHDRScript.set_parameter_B4(responseFunctions[4]!!.parameter_B)
+                    processHDRScript.set_parameter_A4(responseFunctions[4]!!.parameterA)
+                    processHDRScript.set_parameter_B4(responseFunctions[4]!!.parameterB)
 
                     if (nBitmaps > 5) {
                         processHDRScript.set_bitmap5(allocations[5])
                         processHDRScript.set_offset_x5(offsetsX[5])
                         processHDRScript.set_offset_y5(offsetsY[5])
-                        processHDRScript.set_parameter_A5(responseFunctions[5]!!.parameter_A)
-                        processHDRScript.set_parameter_B5(responseFunctions[5]!!.parameter_B)
+                        processHDRScript.set_parameter_A5(responseFunctions[5]!!.parameterA)
+                        processHDRScript.set_parameter_B5(responseFunctions[5]!!.parameterB)
 
                         if (nBitmaps > 6) {
                             processHDRScript.set_bitmap6(allocations[6])
                             processHDRScript.set_offset_x6(offsetsX[6])
                             processHDRScript.set_offset_y6(offsetsY[6])
-                            processHDRScript.set_parameter_A6(responseFunctions[6]!!.parameter_A)
-                            processHDRScript.set_parameter_B6(responseFunctions[6]!!.parameter_B)
+                            processHDRScript.set_parameter_A6(responseFunctions[6]!!.parameterA)
+                            processHDRScript.set_parameter_B6(responseFunctions[6]!!.parameterB)
                         }
                     }
                 }
@@ -1046,27 +1048,27 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             when (tonemappingAlgorithm) {
                 TonemappingAlgorithm.TONEMAPALGORITHM_CLAMP -> {
                     if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: clamp")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript.get_tonemap_algorithm_clamp_c())
+                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_clamp_c)
                 }
 
                 TonemappingAlgorithm.TONEMAPALGORITHM_EXPONENTIAL -> {
                     if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: exponential")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript.get_tonemap_algorithm_exponential_c())
+                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_exponential_c)
                 }
 
                 TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD -> {
                     if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: reinhard")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript.get_tonemap_algorithm_reinhard_c())
+                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_reinhard_c)
                 }
 
                 TonemappingAlgorithm.TONEMAPALGORITHM_FU2 -> {
                     if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: fu2")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript.get_tonemap_algorithm_fu2_c())
+                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_fu2_c)
                 }
 
                 TonemappingAlgorithm.TONEMAPALGORITHM_ACES -> {
                     if (MyDebug.LOG) Log.d(TAG, "tonemapping algorithm: aces")
-                    processHDRScript.set_tonemap_algorithm(processHDRScript.get_tonemap_algorithm_aces_c())
+                    processHDRScript.set_tonemap_algorithm(processHDRScript._tonemap_algorithm_aces_c)
                 }
             }
 
@@ -1079,7 +1081,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 )
 
                 TonemappingAlgorithm.TONEMAPALGORITHM_FU2 -> {
-                    processHDRScript.set_W(W)
+                    processHDRScript.set_W(w)
                 }
 
                 else -> {}
@@ -1196,7 +1198,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             outputBitmap = inputBitmap
         }
 
-        if (droTonemappingAlgorithm == DROTonemappingAlgorithm.DROALGORITHM_GAINGAMMA) {
+        if (droTonemappingAlgorithm == DROTonemappingAlgorithm.DROALGORITHMGAINGAMMA) {
             // brighten?
             val histo = computeHistogram(inputBitmap, HistogramType.HISTOGRAM_TYPE_VALUE)
             val histogramInfo = getHistogramInfo(histo)
@@ -1307,9 +1309,13 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             outputAllocation = Allocation.createFromBitmap(rs, outputBitmap)
         }
 
-        if (droTonemappingAlgorithm == DROTonemappingAlgorithm.DROALGORITHM_GAINGAMMA) {
+        if (droTonemappingAlgorithm == DROTonemappingAlgorithm.DROALGORITHMGAINGAMMA) {
             // brighten?
-            val histo = computeHistogramRS(allocation, width, height, false, false)
+            val histo = computeHistogramRS(
+                allocation, width, height,
+                avg = false,
+                floatingPoint = false
+            )
             val histogramInfo = getHistogramInfo(histo)
             val brightness = histogramInfo.medianBrightness
             val maxBrightness = histogramInfo.maxBrightness
@@ -1344,7 +1350,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     JavaImageProcessing.applyFunction(function, allocation, false, outputAllocation, 0, 0, width, height);
                 }
                 else*/
-                run<Unit> {
+                run {
                     val script: ScriptC_avg_brighten = ScriptC_avg_brighten(rs)
                     script.invoke_setBrightenParameters(
                         gain,
@@ -1431,7 +1437,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         if (abs(gain - 1.0) > 1.0e-5 || maxBrightness != 255 || abs(gamma - 1.0) > 1.0e-5) {
             if (MyDebug.LOG) Log.d(TAG, "apply gain/gamma")
 
-            if (!useRenderscript) {
+            if (!USE_RENDERSCRIPT) {
                 val function: JavaImageFunctionsHDR.DROBrightenApplyFunction =
                     JavaImageFunctionsHDR.DROBrightenApplyFunction(
                         gain,
@@ -1474,7 +1480,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
     private fun initRenderscript() {
         if (MyDebug.LOG) Log.d(TAG, "initRenderscript")
-        if (!useRenderscript) {
+        if (!USE_RENDERSCRIPT) {
             throw RuntimeException("shouldn't be using renderscript")
         }
         if (rs == null) {
@@ -1497,7 +1503,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             if (sceneIsLowLight(captureResultIso, captureResultExposureTim)) 2 else 1
         //this.cachedAvgSampleSize = 1;
         //this.cachedAvgSampleSize = 2;
-        if (MyDebug.LOG) Log.d(TAG, "getAvgSampleSize: " + avgSampleSize)
+        if (MyDebug.LOG) Log.d(TAG, "getAvgSampleSize: $avgSampleSize")
         return avgSampleSize
     }
 
@@ -1577,7 +1583,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         val width = bitmapAvg.width
         val height = bitmapAvg.height
 
-        if (useRenderscript) {
+        if (USE_RENDERSCRIPT) {
             initRenderscript()
             if (MyDebug.LOG) Log.d(
                 TAG,
@@ -1832,7 +1838,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                         alignScaleMatrix,
                         filterAlign
                     )
-                    if (useRenderscript) allocationAvgAlign =
+                    if (USE_RENDERSCRIPT) allocationAvgAlign =
                         Allocation.createFromBitmap(rs, bitmapAvgAlign)
                     if (MyDebug.LOG) Log.d(
                         TAG,
@@ -1848,7 +1854,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     alignScaleMatrix,
                     filterAlign
                 )
-                if (useRenderscript) allocationNewAlign =
+                if (USE_RENDERSCRIPT) allocationNewAlign =
                     Allocation.createFromBitmap(rs, bitmapNewAlign)
 
                 alignmentWidth = bitmapNewAlign!!.width
@@ -1856,7 +1862,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
                 alignBitmaps.add(bitmapAvgAlign!!)
                 alignBitmaps.add(bitmapNewAlign!!)
-                if (useRenderscript) {
+                if (USE_RENDERSCRIPT) {
                     alignAllocations = arrayOfNulls(2)
                     alignAllocations!![0] = allocationAvgAlign
                     alignAllocations!![1] = allocationNewAlign
@@ -1945,7 +1951,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }
         }
         limitedIso = max(limitedIso.toDouble(), 100.0).toFloat()
-        var wiener_C = 10.0f * limitedIso
+        var wienerC = 10.0f * limitedIso
 
         //float wiener_C = 1000.0f;
         //float wiener_C = 4000.0f;
@@ -1964,11 +1970,11 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 "tapered_wiener_scale: $taperedWienerScale"
             )
         }
-        wiener_C /= taperedWienerScale
+        wienerC /= taperedWienerScale
 
-        val wiener_C_cutoff = wienerCutoffFactor * wiener_C
+        val wienerCCutoff = wienerCutoffFactor * wienerC
         if (MyDebug.LOG) {
-            Log.d(TAG, "wiener_C: $wiener_C")
+            Log.d(TAG, "wiener_C: $wienerC")
             Log.d(
                 TAG,
                 "wiener_cutoff_factor: $wienerCutoffFactor"
@@ -1984,7 +1990,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             bitmapOrig = bitmapAvg
         }
 
-        if (!useRenderscript /*&& !floatingPoint*/) {
+        if (!USE_RENDERSCRIPT /*&& !floatingPoint*/) {
             /*float [] pixelsRgbf;
             if( allocationAvg != null ) {
                 if( MyDebug.LOG )
@@ -2008,7 +2014,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 JavaImageFunctionsHDR.AvgApplyFunction(
                     pixelsRgbfOut, bitmapNew!!, bitmapOrig!!, width, height,
                     offsetsX!![1],
-                    offsetsY!![1], avgFactor, wiener_C, wiener_C_cutoff
+                    offsetsY!![1], avgFactor, wienerC, wienerCCutoff
                 )
             JavaImageProcessing.applyFunction(function, bitmapAvg, null, 0, 0, width, height)
             if (MyDebug.LOG) Log.d(
@@ -2106,8 +2112,8 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
             // set globals
             processAvgScript?.set_avg_factor(avgFactor)
-            processAvgScript?.set_wiener_C(wiener_C)
-            processAvgScript?.set_wiener_C_cutoff(wiener_C_cutoff)
+            processAvgScript?.set_wiener_C(wienerC)
+            processAvgScript?.set_wiener_C_cutoff(wienerCCutoff)
 
             /*final float maxWeight = 0.9375f;
         if( MyDebug.LOG ) {
@@ -2328,7 +2334,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         if (MyDebug.LOG) Log.d(TAG, "autoAlignment")
         initRenderscript()
         var allocations: Array<Allocation?>? = null
-        if (useRenderscript) {
+        if (USE_RENDERSCRIPT) {
             allocations = arrayOfNulls(bitmaps.size)
             for (i in bitmaps.indices) {
                 allocations[i] = Allocation.createFromBitmap(rs, bitmaps[i])
@@ -2489,13 +2495,12 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                     Log.d(TAG, "    " + i + ": " + luminanceInfos!![i])
                 }
             }
-            Collections.sort(bitmapInfos, object : Comparator<BitmapInfo> {
-                override fun compare(o1: BitmapInfo, o2: BitmapInfo): Int {
-                    // important to use the code in LuminanceInfo.compareTo(), as that's also tested via the unit test
+            Collections.sort(
+                bitmapInfos,
+                Comparator<BitmapInfo> { o1, o2 -> // important to use the code in LuminanceInfo.compareTo(), as that's also tested via the unit test
                     // sortLuminanceInfo()
-                    return o1.luminanceInfo.compareTo(o2.luminanceInfo)
-                }
-            })
+                    o1.luminanceInfo.compareTo(o2.luminanceInfo)
+                })
             bitmaps.clear()
             for (i in bitmapInfos.indices) {
                 bitmaps.add(bitmapInfos[i].bitmap)
@@ -2541,7 +2546,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         var mtbBitmaps: Array<Bitmap?>? = null // when not using renderscript
         var mtbAllocations: Array<Allocation?>? = null // when using renderscript
 
-        if (!useRenderscript) {
+        if (!USE_RENDERSCRIPT) {
             mtbBitmaps = arrayOfNulls(nImages)
         } else {
             mtbAllocations = arrayOfNulls(nImages) // when using renderscript
@@ -2602,7 +2607,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 "$i: median_value is now: $medianValue"
             )
 
-            if (!useRenderscript) {
+            if (!USE_RENDERSCRIPT) {
                 val outputMtbBitmap =
                     Bitmap.createBitmap(mtbWidth, mtbHeight, Bitmap.Config.ALPHA_8)
                 val function: JavaImageFunctionsHDR.CreateMTBApplyFunction =
@@ -2737,7 +2742,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             return BrightnessDetails(medianBrightness)
         }
 
-        if (useRenderscript) {
+        if (USE_RENDERSCRIPT) {
             // create RenderScript
             if (alignMTBScript == null) {
                 alignMTBScript = ScriptC_align_mtb(rs)
@@ -2770,7 +2775,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 continue
             }
 
-            if (useRenderscript) {
+            if (USE_RENDERSCRIPT) {
                 alignMTBScript?.set_bitmap1(mtbAllocations!![i])
             }
 
@@ -2819,7 +2824,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
                 val errors: IntArray
 
-                if (!useRenderscript) {
+                if (!USE_RENDERSCRIPT) {
                     val function: JavaImageFunctionsHDR.AlignMTBApplyFunction =
                         JavaImageFunctionsHDR.AlignMTBApplyFunction(
                             useMtb,
@@ -3016,15 +3021,15 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             return "min: $minValue , median: $medianValue , hi: $hiValue , noisy: $noisy"
         }
 
-        override fun compareTo(o: LuminanceInfo): Int {
-            var value = this.medianValue - o.medianValue
+        override fun compareTo(other: LuminanceInfo): Int {
+            var value = this.medianValue - other.medianValue
             if (value == 0) {
                 // fall back to using minValue
-                value = this.minValue - o.minValue
+                value = this.minValue - other.minValue
             }
             if (value == 0) {
                 // fall back to using hiValue
-                value = this.hiValue - o.hiValue
+                value = this.hiValue - other.hiValue
             }
             return value
         }
@@ -3062,7 +3067,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 val xCoord = mtbX + (beta * mtbWidth).toInt()
                 /*if( MyDebug.LOG )
                     Log.d(TAG, "sample value from " + xCoord + " , " + yCoord);*/
-                val color = bitmap.getPixel(xCoord, yCoord)
+                val color = bitmap[xCoord, yCoord]
                 val r = (color and 0xFF0000) shr 16
                 val g = (color and 0xFF00) shr 8
                 val b = (color and 0xFF)
@@ -3418,7 +3423,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             }*/
             val histogramAllocation = Allocation.createSized(rs, Element.I32(rs), 256)
             if (MyDebug.LOG) Log.d(TAG, "create histogramScript")
-            val histogramScript: ScriptC_histogram_compute = ScriptC_histogram_compute(rs)
+            val histogramScript = ScriptC_histogram_compute(rs)
             if (MyDebug.LOG) Log.d(TAG, "bind histogram allocation")
             histogramScript.bind_histogram(histogramAllocation)
 
@@ -3514,14 +3519,14 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 "adjustHistogram: time after creating histograms: " + (System.currentTimeMillis() - timeS)
             )
 
-            val c_histogramAllocation =
+            val cHistogramAllocation =
                 Allocation.createSized(rs, Element.I32(rs), nTiles * nTiles * 256)
-            c_histogramAllocation.copyFrom(cHistogram)
+            cHistogramAllocation.copyFrom(cHistogram)
             /*if( histogramAdjustScript == null ) {
                 histogramAdjustScript = new ScriptC_histogram_adjust(rs);
             }*/
-            val histogramAdjustScript: ScriptC_histogram_adjust = ScriptC_histogram_adjust(rs)
-            histogramAdjustScript.set_c_histogram(c_histogramAllocation)
+            val histogramAdjustScript = ScriptC_histogram_adjust(rs)
+            histogramAdjustScript.set_c_histogram(cHistogramAllocation)
             histogramAdjustScript.set_hdr_alpha(hdrAlpha)
             histogramAdjustScript.set_n_tiles(nTiles)
             histogramAdjustScript.set_width(width)
@@ -3537,7 +3542,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 "time after histogramAdjustScript: " + (System.currentTimeMillis() - timeS)
             )
 
-            c_histogramAllocation.destroy()
+            cHistogramAllocation.destroy()
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "time after adjusting histogram: " + (System.currentTimeMillis() - timeS)
@@ -3570,7 +3575,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
                 histogramScript = new ScriptC_histogram_compute(rs);
             }*/
             if (MyDebug.LOG) Log.d(TAG, "create histogramScript")
-            val histogramScript: ScriptC_histogram_compute = ScriptC_histogram_compute(rs)
+            val histogramScript = ScriptC_histogram_compute(rs)
             if (MyDebug.LOG) Log.d(TAG, "bind histogram allocation")
             histogramScript.bind_histogram(histogramAllocation)
             histogramScript.invoke_init_histogram()
@@ -3622,7 +3627,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             Log.d(TAG, "type: $type")
         }
         val timeS = System.currentTimeMillis()
-        if (!useRenderscript) {
+        if (!USE_RENDERSCRIPT) {
             /*final int nPixels = bitmap.getWidth()*bitmap.getHeight();
                        int [] pixels = new int[nPixels];
                        bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
@@ -3898,7 +3903,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             "median_filter_strength: $medianFilterStrength"
         )
 
-        val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val outputBitmap = createBitmap(width, height)
         val function: JavaImageFunctionsHDR.AvgBrightenApplyFunction =
             JavaImageFunctionsHDR.AvgBrightenApplyFunction(
                 pixelsInRgbf,
@@ -3981,7 +3986,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
         val timeS = System.currentTimeMillis()
 
-        val histo = computeHistogramRS(input, width, height, false, true)
+        val histo = computeHistogramRS(input, width, height, avg = false, floatingPoint = true)
 
         val histogramInfo = getHistogramInfo(histo)
         val brightness = histogramInfo.medianBrightness
@@ -4037,7 +4042,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         /*if( avgBrightenScript == null ) {
             avgBrightenScript = new ScriptC_avg_brighten(rs);
         }*/
-        val avgBrightenScript: ScriptC_avg_brighten = ScriptC_avg_brighten(rs)
+        val avgBrightenScript = ScriptC_avg_brighten(rs)
         avgBrightenScript.set_bitmap(input)
         avgBrightenScript.invoke_setBlackLevel(blackLevel)
 
@@ -4050,7 +4055,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             maxBrightness.toFloat()
         )
 
-        val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val outputBitmap = createBitmap(width, height)
         val allocationOut = Allocation.createFromBitmap(rs, outputBitmap)
         if (MyDebug.LOG) Log.d(
             TAG,
@@ -4133,7 +4138,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
         iso: Int,
         exposureTime: Long
     ): Bitmap {
-        return if (!useRenderscript) {
+        return if (!USE_RENDERSCRIPT) {
             //float [] pixelsRgbf = HDRProcessor.AllocationToRGBf(avg_data.allocationOut, width, height);
             //return avgBrightenRGBf(pixelsRgbf, width, height, iso, exposureTime);
             avgBrightenRGBf(avgData.pixelsRgbfOut, width, height, iso, exposureTime)
@@ -4161,7 +4166,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             if( MyDebug.LOG )
                 Log.d(TAG, "### time after create sharpnessScript: " + (System.currentTimeMillis() - timeS));
         }*/
-        val sharpnessScript: ScriptC_calculate_sharpness = ScriptC_calculate_sharpness(rs)
+        val sharpnessScript = ScriptC_calculate_sharpness(rs)
         if (MyDebug.LOG) Log.d(
             TAG,
             "### time after create sharpnessScript: " + (System.currentTimeMillis() - timeS)
@@ -4200,13 +4205,13 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
 
         // flag to control migration away from renderscript!
         // if useRenderscript==false, then use Java instead of Renderscript
-        const val useRenderscript: Boolean = false
+        const val USE_RENDERSCRIPT: Boolean = false
 
         val defaultTonemappingAlgorithmC: TonemappingAlgorithm =
             TonemappingAlgorithm.TONEMAPALGORITHM_REINHARD
 
         fun sceneIsLowLight(iso: Int, exposureTime: Long): Boolean {
-            val ISO_FOR_DARK = 1100
+            val isoForDark = 1100
             // For Nexus 6, max reported ISO is 1196, so the limit for dark scenes shouldn't be more than this
             // Nokia 8's max reported ISO is 1551
             // Note that OnePlus 3T has max reported ISO of 800, but this is a device bug
@@ -4219,7 +4224,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
             // manual mode) - since long exposure times will give lower ISOs (e.g., on Galaxy S10e)
             // (also useful for cameras where max ISO isn't as high as ISO_FOR_DARK)
             //return iso >= ISO_FOR_DARK;
-            return (iso >= ISO_FOR_DARK && iso * exposureTime >= 69 * 1000000000L) || exposureTime >= (1000000000L / 5 - 10000L)
+            return (iso >= isoForDark && iso * exposureTime >= 69 * 1000000000L) || exposureTime >= (1000000000L / 5 - 10000L)
         }
 
         private fun getBrightnessTarget(

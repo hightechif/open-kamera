@@ -590,8 +590,8 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                     if (MyDebug.LOG) {
                         Log.d(TAG, "    display width: " + displaySize.x)
                         Log.d(TAG, "    display height: " + displaySize.y)
-                        Log.d(TAG, "    layoutUI display width: " + mainUI.layoutUI_display_w)
-                        Log.d(TAG, "    layoutUI display height: " + mainUI.layoutUI_display_h)
+                        Log.d(TAG, "    layoutUI display width: " + mainUI.layoutUIDisplayW)
+                        Log.d(TAG, "    layoutUI display height: " + mainUI.layoutUIDisplayH)
                     }
                     // We need to call layoutUI when the window is resized without an orientation change -
                     // this can happen in split-screen or multi-window mode, where onConfigurationChanged
@@ -600,7 +600,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                     // when the resize is due to the device rotating and onConfigurationChanged is called -
                     // in fact we'd have a problem of repeatedly calling layoutUI, since doing layoutUI
                     // causes onLayoutChange() to be called again.
-                    if (displaySize.x != mainUI.layoutUI_display_w || displaySize.y != mainUI.layoutUI_display_h) {
+                    if (displaySize.x != mainUI.layoutUIDisplayW || displaySize.y != mainUI.layoutUIDisplayH) {
                         if (MyDebug.LOG)
                             Log.d(TAG, "call layoutUI due to resize")
                         mainUI.layoutUI()
@@ -6170,19 +6170,19 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             PhotoMode.Panorama -> photoModeString =
                 resources.getString(R.string.photo_mode_panorama_full)
 
-            PhotoMode.X_Auto -> photoModeString =
+            PhotoMode.XAuto -> photoModeString =
                 resources.getString(R.string.photo_mode_x_auto_full)
 
-            PhotoMode.X_HDR -> photoModeString =
+            PhotoMode.XHDR -> photoModeString =
                 resources.getString(R.string.photo_mode_x_hdr_full)
 
-            PhotoMode.X_Night -> photoModeString =
+            PhotoMode.XNight -> photoModeString =
                 resources.getString(R.string.photo_mode_x_night_full)
 
-            PhotoMode.X_Bokeh -> photoModeString =
+            PhotoMode.XBokeh -> photoModeString =
                 resources.getString(R.string.photo_mode_x_bokeh_full)
 
-            PhotoMode.X_Beauty -> photoModeString =
+            PhotoMode.XBeauty -> photoModeString =
                 resources.getString(R.string.photo_mode_x_beauty_full)
         }
         return photoModeString
