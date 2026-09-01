@@ -206,6 +206,7 @@ class CameraController2(
         get() = imageReaderPipeline.imageReaderRaw
     private var onImageAvailableListener: OnImageAvailableListener? = null
 
+    val focusCoordinator = Camera2FocusMeteringCoordinator()
     val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
 
     private val expoBracketingNImages: Int
