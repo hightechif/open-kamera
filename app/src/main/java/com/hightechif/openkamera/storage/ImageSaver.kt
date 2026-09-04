@@ -50,8 +50,6 @@ import java.io.Writer
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.Date
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.BlockingQueue
 import kotlin.concurrent.Volatile
 import kotlin.math.ceil
 import kotlin.math.max
@@ -59,22 +57,23 @@ import kotlin.math.min
 
 /** Handles the saving (and any required processing) of photos.
  */
-class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("ImageSaver") {
+class ImageSaver internal constructor(val mainActivity: MainActivity) {
 
     private val hdrProcessor: HDRProcessor
     private val panoramaProcessor: PanoramaProcessor
     private val postProcessing: PostProcessing
+    val bitmapPostProcessor: BitmapPostProcessor
+    val mediaPersistenceManager: MediaPersistenceManager
+    val pipeline: ImageSavePipeline
 
-    @get:Synchronized
-    var nImagesToSave: Int = 0
-        private set
+    val nImagesToSave: Int
+        get() = pipeline.currentPendingCount
 
-    @get:Synchronized
-    var nRealImagesToSave: Int = 0
-        private set
+    val nRealImagesToSave: Int
+        get() = pipeline.currentRealImageCount
 
     val queueSize: Int
-    private val queue: BlockingQueue<Request>
+        get() = pipeline.queueCapacity
 
     private var appIsPaused = true
 
@@ -161,12 +160,28 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
         val activityManager =
             mainActivity.getSystemService(Activity.ACTIVITY_SERVICE) as ActivityManager
-        this.queueSize = computeQueueSize(activityManager.largeMemoryClass)
-        this.queue = ArrayBlockingQueue(queueSize)
+        val initialQueueSize = ImageSavePipeline.computeQueueSize(activityManager.largeMemoryClass)
 
         this.hdrProcessor = HDRProcessor(mainActivity, mainActivity.isTest)
         this.panoramaProcessor = PanoramaProcessor(mainActivity, hdrProcessor)
         this.postProcessing = PostProcessing(mainActivity)
+        this.bitmapPostProcessor = BitmapPostProcessor(mainActivity, postProcessing)
+        this.mediaPersistenceManager = MediaPersistenceManager(mainActivity)
+
+        this.pipeline = ImageSavePipeline(
+            queueCapacity = initialQueueSize,
+            maxConcurrentWorkers = 2,
+            onQueueChanged = {
+                mainActivity.runOnUiThread { mainActivity.imageQueueChanged() }
+            },
+            taskExecutor = { task ->
+                executeSaveTask(task)
+            }
+        )
+    }
+
+    fun start() {
+        if (MyDebug.LOG) Log.d(TAG, "start called on ImageSaver facade")
     }
 
     fun computePhotoCost(nRaw: Int, nJpegs: Int): Int {
@@ -187,23 +202,8 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
         return this.queueWouldBlock(photoCost)
     }
 
-    @Synchronized
     fun queueWouldBlock(photoCost: Int): Boolean {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "queueWouldBlock")
-            Log.d(TAG, "photo_cost: $photoCost")
-            Log.d(TAG, "n_images_to_save: $nImagesToSave")
-            Log.d(TAG, "queue_capacity: $queueSize")
-        }
-        if (nImagesToSave == 0) {
-            if (MyDebug.LOG) Log.d(TAG, "queue is empty")
-            return false
-        } else if (nImagesToSave + photoCost > queueSize + 1) {
-            if (MyDebug.LOG) Log.d(TAG, "queue would block")
-            return true
-        }
-        if (MyDebug.LOG) Log.d(TAG, "queue would not block")
-        return false
+        return pipeline.queueWouldBlock(photoCost)
     }
 
     val maxDNG: Int
@@ -228,115 +228,129 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
 
     fun onDestroy() {
         if (MyDebug.LOG) Log.d(TAG, "onDestroy")
-        run {
-            val request = Request(
-                Request.Type.ON_DESTROY,
-                Request.ProcessType.NORMAL,
-                false,
-                0,
-                Request.SaveBase.SAVEBASE_NONE,
-                mutableListOf(),
-                null,
-                null,
-                false, null,
-                usingCamera2 = false, usingCameraExtensions = false,
-                Request.ImageFormat.STD, 0,
-                false, 0.0, null,
-                isFrontFacing = false,
-                mirror = false,
-                null,
-                HDRProcessor.defaultTonemappingAlgorithmC,
-                null,
-                0,
-                0,
-                1.0f,
-                null, null, 0, 0, null, null, null, null,
-                null,
-                false, Request.RemoveDeviceExif.OFF, false, null, false, 0.0,
-                0.0, false,
-                null, null,
-                1
-            )
-            if (MyDebug.LOG) Log.d(TAG, "add on_destroy request")
-            addRequest(request, 1)
-        }
+        pipeline.destroy()
         panoramaProcessor.onDestroy()
         hdrProcessor.onDestroy()
     }
 
-    override fun run() {
-        if (MyDebug.LOG) Log.d(TAG, "starting ImageSaver thread...")
-        while (true) {
+    private fun executeSaveTask(task: SaveTask): Boolean {
+        if (testSlowSaving) {
             try {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "ImageSaver thread reading from queue, size: " + queue.size
-                )
-                val request = queue.take()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "ImageSaver thread found new request from queue, size is now: " + queue.size
-                )
-                val success: Boolean
-                var onDestroy = false
-                when (request.type) {
-                    Request.Type.RAW -> {
-                        if (MyDebug.LOG) Log.d(TAG, "request is raw")
-                        success = saveImageNowRaw(request)
-                    }
-
-                    Request.Type.JPEG -> {
-                        if (MyDebug.LOG) Log.d(TAG, "request is jpeg")
-                        success = saveImageNow(request)
-                    }
-
-                    Request.Type.DUMMY -> {
-                        if (MyDebug.LOG) Log.d(TAG, "request is dummy")
-                        success = true
-                    }
-
-                    Request.Type.ON_DESTROY -> {
-                        if (MyDebug.LOG) Log.d(TAG, "request is on_destroy")
-                        success = true
-                        onDestroy = true
-                    }
-                }
-                if (testSlowSaving) {
-                    sleep(2000)
-                }
-                if (MyDebug.LOG) {
-                    if (success) Log.d(TAG, "ImageSaver thread successfully saved image")
-                    else Log.e(TAG, "ImageSaver thread failed to save image")
-                }
-                synchronized(this) {
-                    nImagesToSave--
-                    if (request.type != Request.Type.DUMMY && request.type != Request.Type.ON_DESTROY) nRealImagesToSave--
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "ImageSaver thread processed new request from queue, images to save is now: $nImagesToSave"
-                    )
-                    if (MyDebug.LOG && nImagesToSave < 0) {
-                        Log.e(TAG, "images to save has become negative")
-                        throw RuntimeException()
-                    } else if (MyDebug.LOG && nRealImagesToSave < 0) {
-                        Log.e(TAG, "real images to save has become negative")
-                        throw RuntimeException()
-                    }
-                    (this as Object).notifyAll()
-                    mainActivity.runOnUiThread { mainActivity.imageQueueChanged() }
-                }
-                if (onDestroy) {
-                    break
-                }
-            } catch (e: InterruptedException) {
-                MyDebug.logStackTrace(
-                    TAG,
-                    "interrupted while trying to read from ImageSaver queue",
-                    e
-                )
+                Thread.sleep(2000)
+            } catch (_: InterruptedException) {
+                // ignore
             }
         }
-        if (MyDebug.LOG) Log.d(TAG, "stopping ImageSaver thread...")
+        return when (task) {
+            is SaveTask.SaveRaw -> {
+                val req = Request(
+                    type = Request.Type.RAW,
+                    processType = Request.ProcessType.NORMAL,
+                    forceSuffix = task.forceSuffix,
+                    suffixOffset = task.suffixOffset,
+                    saveBase = Request.SaveBase.SAVEBASE_NONE,
+                    jpegImages = mutableListOf(),
+                    preshotBitmaps = null,
+                    rawImage = task.rawImage,
+                    imageCaptureIntent = false,
+                    imageCaptureIntentUri = null,
+                    usingCamera2 = true,
+                    usingCameraExtensions = false,
+                    imageFormat = Request.ImageFormat.STD,
+                    imageQuality = 0,
+                    doAutoStabilise = false,
+                    levelAngle = 0.0,
+                    gyroRotationMatrix = null,
+                    isFrontFacing = false,
+                    mirror = false,
+                    currentDate = task.currentDate,
+                    preferenceHdrTonemappingAlgorithm = HDRProcessor.defaultTonemappingAlgorithmC,
+                    preferenceHdrContrastEnhancement = null,
+                    iso = 0,
+                    exposureTime = 0L,
+                    zoomFactor = 1.0f,
+                    preferenceStamp = null,
+                    preferenceTextstamp = null,
+                    fontSize = 0,
+                    color = 0,
+                    prefStyle = null,
+                    preferenceStampDateformat = null,
+                    preferenceStampTimeformat = null,
+                    preferenceStampGpsformat = null,
+                    preferenceUnitsDistance = null,
+                    panoramaCrop = false,
+                    removeDeviceExif = Request.RemoveDeviceExif.OFF,
+                    storeLocation = false,
+                    location = null,
+                    storeGeoDirection = false,
+                    geoDirection = 0.0,
+                    pitchAngle = 0.0,
+                    storeYpr = false,
+                    customTagArtist = null,
+                    customTagCopyright = null,
+                    sampleFactor = 1
+                )
+                saveImageNowRaw(req)
+            }
+
+            is SaveTask.SaveJpeg -> {
+                val req = Request(
+                    type = Request.Type.JPEG,
+                    processType = task.processType,
+                    forceSuffix = task.forceSuffix,
+                    suffixOffset = task.suffixOffset,
+                    saveBase = task.saveBase,
+                    jpegImages = task.jpegImages,
+                    preshotBitmaps = task.preshotBitmaps,
+                    rawImage = null,
+                    imageCaptureIntent = task.imageCaptureIntent,
+                    imageCaptureIntentUri = task.imageCaptureIntentUri,
+                    usingCamera2 = task.usingCamera2,
+                    usingCameraExtensions = task.usingCameraExtensions,
+                    imageFormat = task.imageFormat,
+                    imageQuality = task.imageQuality,
+                    doAutoStabilise = task.doAutoStabilise,
+                    levelAngle = task.levelAngle,
+                    gyroRotationMatrix = task.gyroRotationMatrix,
+                    isFrontFacing = task.isFrontFacing,
+                    mirror = task.mirror,
+                    currentDate = task.currentDate,
+                    preferenceHdrTonemappingAlgorithm = task.preferenceHdrTonemappingAlgorithm,
+                    preferenceHdrContrastEnhancement = task.preferenceHdrContrastEnhancement,
+                    iso = task.iso,
+                    exposureTime = task.exposureTime,
+                    zoomFactor = task.zoomFactor,
+                    preferenceStamp = task.preferenceStamp,
+                    preferenceTextstamp = task.preferenceTextstamp,
+                    fontSize = task.fontSize,
+                    color = task.color,
+                    prefStyle = task.prefStyle,
+                    preferenceStampDateformat = task.preferenceStampDateformat,
+                    preferenceStampTimeformat = task.preferenceStampTimeformat,
+                    preferenceStampGpsformat = task.preferenceStampGpsformat,
+                    preferenceUnitsDistance = task.preferenceUnitsDistance,
+                    panoramaCrop = task.panoramaCrop,
+                    removeDeviceExif = task.removeDeviceExif,
+                    storeLocation = task.storeLocation,
+                    location = task.location,
+                    storeGeoDirection = task.storeGeoDirection,
+                    geoDirection = task.geoDirection,
+                    pitchAngle = task.pitchAngle,
+                    storeYpr = task.storeYpr,
+                    customTagArtist = task.customTagArtist,
+                    customTagCopyright = task.customTagCopyright,
+                    sampleFactor = task.sampleFactor
+                ).apply {
+                    panoramaDirLeftToRight = task.panoramaDirLeftToRight
+                    cameraViewAngleX = task.cameraViewAngleX
+                    cameraViewAngleY = task.cameraViewAngleY
+                }
+                saveImageNow(req)
+            }
+
+            is SaveTask.Dummy -> true
+            is SaveTask.OnDestroy -> true
+        }
     }
 
     fun saveImageJpeg(
@@ -763,120 +777,82 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
             Log.e(TAG, "application is destroyed, image lost!")
             return
         }
-        var done = false
-        while (!done) {
-            try {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "ImageSaver thread adding to queue, size: " + queue.size
-                )
-                synchronized(this) {
-                    nImagesToSave++
-                    if (request.type != Request.Type.DUMMY && request.type != Request.Type.ON_DESTROY) nRealImagesToSave++
-                    mainActivity.runOnUiThread { mainActivity.imageQueueChanged() }
-                }
-                if (queue.size + 1 > queueSize) {
-                    Log.e(
-                        TAG,
-                        "ImageSaver thread is going to block, queue already full: " + queue.size
-                    )
-                    testQueueBlocked = true
-                }
-                queue.put(request)
-                if (MyDebug.LOG) {
-                    synchronized(this) {
-                        Log.d(TAG, "ImageSaver thread added to queue, size is now: " + queue.size)
-                        Log.d(TAG, "images still to save is now: $nImagesToSave")
-                        Log.d(TAG, "real images still to save is now: $nRealImagesToSave")
-                    }
-                }
-                done = true
-            } catch (e: InterruptedException) {
-                MyDebug.logStackTrace(TAG, "interrupted while trying to add to ImageSaver queue", e)
-            }
+        val task = when (request.type) {
+            Request.Type.RAW -> SaveTask.SaveRaw(
+                forceSuffix = request.forceSuffix,
+                suffixOffset = request.suffixOffset,
+                rawImage = request.rawImage,
+                currentDate = request.currentDate,
+                cost = cost
+            )
+
+            Request.Type.JPEG -> SaveTask.SaveJpeg(
+                processType = request.processType,
+                forceSuffix = request.forceSuffix,
+                suffixOffset = request.suffixOffset,
+                saveBase = request.saveBase,
+                jpegImages = request.jpegImages,
+                preshotBitmaps = request.preshotBitmaps,
+                imageCaptureIntent = request.imageCaptureIntent,
+                imageCaptureIntentUri = request.imageCaptureIntentUri,
+                usingCamera2 = request.usingCamera2,
+                usingCameraExtensions = request.usingCameraExtensions,
+                imageFormat = request.imageFormat,
+                imageQuality = request.imageQuality,
+                doAutoStabilise = request.doAutoStabilise,
+                levelAngle = request.levelAngle,
+                gyroRotationMatrix = request.gyroRotationMatrix,
+                isFrontFacing = request.isFrontFacing,
+                mirror = request.mirror,
+                currentDate = request.currentDate,
+                preferenceHdrTonemappingAlgorithm = request.preferenceHdrTonemappingAlgorithm,
+                preferenceHdrContrastEnhancement = request.preferenceHdrContrastEnhancement,
+                iso = request.iso,
+                exposureTime = request.exposureTime,
+                zoomFactor = request.zoomFactor,
+                preferenceStamp = request.preferenceStamp,
+                preferenceTextstamp = request.preferenceTextstamp,
+                fontSize = request.fontSize,
+                color = request.color,
+                prefStyle = request.prefStyle,
+                preferenceStampDateformat = request.preferenceStampDateformat,
+                preferenceStampTimeformat = request.preferenceStampTimeformat,
+                preferenceStampGpsformat = request.preferenceStampGpsformat,
+                preferenceUnitsDistance = request.preferenceUnitsDistance,
+                panoramaCrop = request.panoramaCrop,
+                removeDeviceExif = request.removeDeviceExif,
+                storeLocation = request.storeLocation,
+                location = request.location,
+                storeGeoDirection = request.storeGeoDirection,
+                geoDirection = request.geoDirection,
+                pitchAngle = request.pitchAngle,
+                storeYpr = request.storeYpr,
+                customTagArtist = request.customTagArtist,
+                customTagCopyright = request.customTagCopyright,
+                sampleFactor = request.sampleFactor,
+                panoramaDirLeftToRight = request.panoramaDirLeftToRight,
+                cameraViewAngleX = request.cameraViewAngleX,
+                cameraViewAngleY = request.cameraViewAngleY,
+                cost = cost
+            )
+
+            Request.Type.DUMMY -> SaveTask.Dummy(cost = cost)
+            Request.Type.ON_DESTROY -> SaveTask.OnDestroy(cost = cost)
         }
-        if (cost > 0) {
-            repeat(cost - 1) {
-                addDummyRequest()
-            }
+        if (pipeline.queueWouldBlock(cost)) {
+            testQueueBlocked = true
         }
+        pipeline.submit(task)
     }
 
     private fun addDummyRequest() {
-        val dummyRequest = Request(
-            type = Request.Type.DUMMY,
-            processType = Request.ProcessType.NORMAL,
-            forceSuffix = false,
-            suffixOffset = 0,
-            saveBase = Request.SaveBase.SAVEBASE_NONE,
-            jpegImages = mutableListOf(),
-            preshotBitmaps = null,
-            rawImage = null,
-            imageCaptureIntent = false,
-            imageCaptureIntentUri = null,
-            usingCamera2 = false,
-            usingCameraExtensions = false,
-            imageFormat = Request.ImageFormat.STD,
-            imageQuality = 0,
-            doAutoStabilise = false,
-            levelAngle = 0.0,
-            gyroRotationMatrix = null,
-            isFrontFacing = false,
-            mirror = false,
-            currentDate = null,
-            preferenceHdrTonemappingAlgorithm = HDRProcessor.defaultTonemappingAlgorithmC,
-            preferenceHdrContrastEnhancement = null,
-            iso = 0,
-            exposureTime = 0,
-            zoomFactor = 1.0f,
-            preferenceStamp = null,
-            preferenceTextstamp = null,
-            fontSize = 0,
-            color = 0,
-            prefStyle = null,
-            preferenceStampDateformat = null,
-            preferenceStampTimeformat = null,
-            preferenceStampGpsformat = null,
-            preferenceUnitsDistance = null,
-            panoramaCrop = false,
-            removeDeviceExif = Request.RemoveDeviceExif.OFF,
-            storeLocation = false,
-            location = null,
-            storeGeoDirection = false,
-            geoDirection = 0.0,
-            pitchAngle = 0.0,
-            storeYpr = false,
-            customTagArtist = null,
-            customTagCopyright = null,
-            sampleFactor = 1
-        )
-        if (MyDebug.LOG) Log.d(TAG, "add dummy request")
-        addRequest(dummyRequest, 1)
+        pipeline.submit(SaveTask.Dummy())
     }
 
     fun waitUntilDone() {
         if (MyDebug.LOG) Log.d(TAG, "waitUntilDone")
-        synchronized(this) {
-            if (MyDebug.LOG) {
-                Log.d(TAG, "waitUntilDone: queue is size " + queue.size)
-                Log.d(TAG, "waitUntilDone: images still to save $nImagesToSave")
-            }
-            while (nImagesToSave > 0) {
-                if (MyDebug.LOG) Log.d(TAG, "wait until done...")
-                try {
-                    (this as Object).wait()
-                } catch (e: InterruptedException) {
-                    MyDebug.logStackTrace(
-                        TAG,
-                        "interrupted while waiting for ImageSaver queue to be empty",
-                        e
-                    )
-                }
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "waitUntilDone: queue is size " + queue.size)
-                    Log.d(TAG, "waitUntilDone: images still to save $nImagesToSave")
-                }
-            }
+        kotlinx.coroutines.runBlocking {
+            pipeline.joinAllTasks(10000L)
         }
         if (MyDebug.LOG) Log.d(TAG, "waitUntilDone: images all saved")
     }
@@ -1724,6 +1700,8 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                     } else {
                         outputStream!!.write(data)
                     }
+                } catch (_: Exception) {
+                    // do nothing
                 } finally {
                     outputStream?.close()
                 }
@@ -1756,6 +1734,8 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                                     "failed to create ParcelFileDescriptor for saveUri: $saveUri"
                                 )
                             }
+                        } catch (_: Exception) {
+                            // do nothing
                         } finally {
                             parcelFileDescriptor?.close()
                         }
@@ -2038,16 +2018,13 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                     success = true
                 }
 
-                val updateThumbnail = rawOnly
-                val shareImage = rawOnly
-
                 if (rawOnly) {
                     if (saveUri == null) {
-                        applicationInterface.addLastImage(picFile!!, shareImage)
+                        applicationInterface.addLastImage(picFile!!, rawOnly)
                     } else if (storageUtils.isUsingSAF) {
-                        applicationInterface.addLastImageSAF(saveUri, shareImage)
+                        applicationInterface.addLastImageSAF(saveUri, rawOnly)
                     } else if (useMediaStore) {
-                        applicationInterface.addLastImageMediaStore(saveUri, shareImage)
+                        applicationInterface.addLastImageMediaStore(saveUri, rawOnly)
                     }
                 }
 
@@ -2059,7 +2036,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                         file = picFile,
                         isNewPicture = true,
                         isNewVideo = true,
-                        setLastScanned = updateThumbnail,
+                        setLastScanned = rawOnly,
                         hasnoexifdatetime = hasnoexifdatetime,
                         safUri = null
                     )
@@ -2084,7 +2061,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) : Thread("
                             isNewPicture = true,
                             isNewVideo = true
                         )
-                        if (updateThumbnail) {
+                        if (rawOnly) {
                             storageUtils.setLastMediaScanned(
                                 saveUri,
                                 true,
