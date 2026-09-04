@@ -56,16 +56,28 @@ class ImageSavePipelineTest {
     }
 
     @Test
-    fun testPipelineQueueWouldBlock() {
-        val pipeline = ImageSavePipeline(queueCapacity = 5)
+    fun testPipelineQueueWouldBlock() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val pipeline = ImageSavePipeline(
+            queueCapacity = 5,
+            defaultDispatcher = testDispatcher,
+            ioDispatcher = testDispatcher,
+            taskExecutor = { true }
+        )
         assertFalse(pipeline.queueWouldBlock(1))
 
-        // Submit tasks up to capacity
+        // Submit tasks up to capacity without draining yet
         repeat(5) {
             pipeline.submit(SaveTask.Dummy())
         }
 
+        assertEquals(5, pipeline.currentPendingCount)
         assertTrue(pipeline.queueWouldBlock(2))
+
+        advanceUntilIdle()
+        assertEquals(0, pipeline.currentPendingCount)
+        assertFalse(pipeline.queueWouldBlock(1))
+
         pipeline.destroy()
     }
 }
