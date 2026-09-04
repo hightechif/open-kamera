@@ -89,6 +89,8 @@ import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
 import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
 import com.hightechif.openkamera.preview.timer.CaptureTimerCoordinator
+import com.hightechif.openkamera.preview.video.VideoProfileResolver
+import com.hightechif.openkamera.preview.video.VideoRecordingCoordinator
 import com.hightechif.openkamera.preview.video.VideoSessionManager
 import com.hightechif.openkamera.preview.video.VideoSessionOutput
 import com.hightechif.openkamera.utils.MyDebug
@@ -268,6 +270,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var videoRestartOnMaxFilesize = false
 
     val videoSessionManager by lazy { VideoSessionManager() }
+    val videoRecordingCoordinator by lazy { VideoRecordingCoordinator(sessionManager = videoSessionManager) }
+    val videoProfileResolver by lazy { VideoProfileResolver() }
     private var videoFileInfo: VideoFileInfo
         get() = videoSessionManager.activeOutput ?: VideoFileInfo()
         set(value) {
