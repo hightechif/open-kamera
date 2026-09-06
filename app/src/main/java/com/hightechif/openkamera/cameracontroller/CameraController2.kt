@@ -57,13 +57,16 @@ import androidx.annotation.RequiresApi
 import com.hightechif.openkamera.cameracontroller.burst.Camera2CaptureCoordinator
 import com.hightechif.openkamera.cameracontroller.burst.FocusBracketingCalculator
 import com.hightechif.openkamera.cameracontroller.capabilities.Camera2CapabilitiesResolver
+import com.hightechif.openkamera.cameracontroller.capabilities.Camera2InfoCache
 import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
 import com.hightechif.openkamera.cameracontroller.extension.Camera2DeviceQuirks
 import com.hightechif.openkamera.cameracontroller.extension.Camera2VendorTagsExtension
+import com.hightechif.openkamera.cameracontroller.focus.Camera23AController
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
 import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManager
 import com.hightechif.openkamera.cameracontroller.pipeline.Camera2ImageReaderPipeline
+import com.hightechif.openkamera.cameracontroller.pipeline.Camera2PipelineManager
 import com.hightechif.openkamera.cameracontroller.pipeline.ImageReaderConfig
 import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
 import com.hightechif.openkamera.cameracontroller.threading.Camera2ThreadManager
@@ -104,6 +107,9 @@ class CameraController2(
     private val isSamsungS7: Boolean get() = deviceQuirks.isSamsungS7
     private val isSamsungGalaxyS: Boolean get() = deviceQuirks.isSamsungGalaxyS
     private val isSamsungGalaxyF: Boolean get() = deviceQuirks.isSamsungGalaxyF
+
+    var infoCache: Camera2InfoCache? = null
+        private set
 
     // characteristics of camera - if a specific physical camera is being used, these are characteristics for the physical camera
     private var characteristics: CameraCharacteristics? = null
@@ -200,6 +206,7 @@ class CameraController2(
     val callbackDispatcher = Camera2StateCallbackDispatcher()
     val sessionManager = Camera2SessionManager()
     val imageReaderPipeline = Camera2ImageReaderPipeline()
+    val pipelineManager = Camera2PipelineManager(imageReaderPipeline)
     private val imageReader: ImageReader?
         get() = imageReaderPipeline.imageReaderJpeg
     private val imageReaderRaw: ImageReader?
@@ -207,6 +214,7 @@ class CameraController2(
     private var onImageAvailableListener: OnImageAvailableListener? = null
 
     val focusCoordinator = Camera2FocusMeteringCoordinator()
+    val threeAController = Camera23AController(focusCoordinator)
     val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
 
     private val expoBracketingNImages: Int
@@ -6926,6 +6934,7 @@ class CameraController2(
                         if (MyDebug.LOG) Log.d(TAG, "try to get camera characteristics")
                         characteristics =
                             manager.getCameraCharacteristics((cameraIdSPhysical ?: cameraIdS))
+                        this@CameraController2.infoCache = Camera2InfoCache(characteristics)
                         if (MyDebug.LOG) Log.d(TAG, "successfully obtained camera characteristics")
                         // now read cached values
                         this@CameraController2.cameraOrientation =

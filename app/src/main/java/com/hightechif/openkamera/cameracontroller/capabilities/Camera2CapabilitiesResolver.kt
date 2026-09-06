@@ -81,25 +81,31 @@ object Camera2CapabilitiesResolver {
      * Computes horizontal and vertical view angles from CameraCharacteristics.
      */
     fun computeViewAngles(characteristics: CameraCharacteristics): SizeF {
-        val activeSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
-        val physicalSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
-        val pixelSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
-        val focalLengths = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+        return try {
+            val activeSize =
+                characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+            val physicalSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+            val pixelSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+            val focalLengths =
+                characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
 
-        if (activeSize == null || physicalSize == null || pixelSize == null || focalLengths == null || focalLengths.isEmpty()) {
-            return SizeF(55.0f, 43.0f)
+            if (activeSize == null || physicalSize == null || pixelSize == null || focalLengths == null || focalLengths.isEmpty()) {
+                return SizeF(55.0f, 43.0f)
+            }
+
+            val fracX = activeSize.width().toFloat() / pixelSize.width.toFloat()
+            val fracY = activeSize.height().toFloat() / pixelSize.height.toFloat()
+            val viewAngleX = Math.toDegrees(
+                2.0 * atan2((physicalSize.width * fracX).toDouble(), (2.0 * focalLengths[0]))
+            ).toFloat()
+            val viewAngleY = Math.toDegrees(
+                2.0 * atan2((physicalSize.height * fracY).toDouble(), (2.0 * focalLengths[0]))
+            ).toFloat()
+
+            SizeF(viewAngleX, viewAngleY)
+        } catch (_: Throwable) {
+            SizeF(55.0f, 43.0f)
         }
-
-        val fracX = activeSize.width().toFloat() / pixelSize.width.toFloat()
-        val fracY = activeSize.height().toFloat() / pixelSize.height.toFloat()
-        val viewAngleX = Math.toDegrees(
-            2.0 * atan2((physicalSize.width * fracX).toDouble(), (2.0 * focalLengths[0]))
-        ).toFloat()
-        val viewAngleY = Math.toDegrees(
-            2.0 * atan2((physicalSize.height * fracY).toDouble(), (2.0 * focalLengths[0]))
-        ).toFloat()
-
-        return SizeF(viewAngleX, viewAngleY)
     }
 
     /**
@@ -118,7 +124,8 @@ object Camera2CapabilitiesResolver {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                val zoomRatioRange = characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+                val zoomRatioRange =
+                    characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
                 if (zoomRatioRange != null) {
                     minZoom = zoomRatioRange.lower
                     maxZoom = zoomRatioRange.upper
@@ -130,7 +137,8 @@ object Camera2CapabilitiesResolver {
 
         if (minZoom == 0.0f || maxZoom == 0.0f) {
             minZoom = 1.0f
-            maxZoom = characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 0.0f
+            maxZoom =
+                characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 0.0f
         }
 
         return Pair(minZoom, maxZoom)
@@ -141,10 +149,10 @@ object Camera2CapabilitiesResolver {
      */
     fun computeZoomRatios(ratios: MutableList<Int>, minZoom: Float, maxZoom: Float): Int {
         val zoomValue1x: Int
-        val scaleFactorC = 1.0174796921026863936352862847966
+        val scaleFactorC = 2.0.pow(1.0 / 40.0)
         val zoomRatiosAboveOne: MutableList<Int> = ArrayList()
         var zoom = scaleFactorC
-        while (zoom < maxZoom - 1.0e-5f) {
+        while (zoom < maxZoom - 1.0e-5) {
             val zoomRatio = (zoom * 100 + 1.0e-5).toInt()
             zoomRatiosAboveOne.add(zoomRatio)
             zoom *= scaleFactorC
@@ -166,7 +174,7 @@ object Camera2CapabilitiesResolver {
 
             zoom = minZoom.toDouble()
             val scaleFactor = (1.0f / minZoom).toDouble().pow(1.0 / nStepsBelowOne.toDouble())
-            for (i in 0 until nStepsBelowOne - 1) {
+            repeat(nStepsBelowOne - 1) {
                 zoom *= scaleFactor
                 val zoomRatio = (zoom * 100).toInt()
                 if (zoomRatio > ratios[0]) {
@@ -175,7 +183,9 @@ object Camera2CapabilitiesResolver {
             }
 
             zoomValue1x = ratios.size
-            for (i in 0 until nStepsOne) ratios.add(100)
+            repeat(nStepsOne) {
+                ratios.add(100)
+            }
         } else {
             zoomValue1x = 0
         }
@@ -186,7 +196,9 @@ object Camera2CapabilitiesResolver {
             if (zoomRatio != zoomRatiosAboveOne[zoomRatiosAboveOne.size - 1] && zoomRatio % 100 == 0) {
                 val zoomRatioInt = zoomRatio / 100
                 if (zoomRatioInt != 0 && (zoomRatioInt and (zoomRatioInt - 1)) == 0) {
-                    for (i in 0 until nStepsPowerTwo - 1) ratios.add(zoomRatio)
+                    repeat(nStepsPowerTwo - 1) {
+                        ratios.add(zoomRatio)
+                    }
                 }
             }
         }
@@ -254,7 +266,8 @@ object Camera2CapabilitiesResolver {
     fun getPhysicalCameraIds(characteristics: CameraCharacteristics?): Set<String> {
         if (characteristics == null) return emptySet()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+            val capabilities =
+                characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
             if (capabilities != null && capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA)) {
                 return characteristics.physicalCameraIds
             }
