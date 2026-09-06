@@ -1631,21 +1631,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
         // we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
         if (MyDebug.LOG) Log.d(TAG, "check for permissions")
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!applicationInterface.hasCameraPermission()) {
             if (MyDebug.LOG) Log.d(TAG, "camera permission not available")
             hasPermissions = false
             applicationInterface.requestCameraPermission()
             // return for now - the application should try to reopen the camera if permission is granted
             return
         }
-        if (applicationInterface.needsStoragePermission() && ContextCompat.checkSelfPermission(
-                context, Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (applicationInterface.needsStoragePermission() && !applicationInterface.hasStoragePermission()) {
             if (MyDebug.LOG) Log.d(TAG, "storage permission not available")
             hasPermissions = false
             applicationInterface.requestStoragePermission()

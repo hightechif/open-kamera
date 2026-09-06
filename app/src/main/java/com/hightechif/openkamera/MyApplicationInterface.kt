@@ -2961,26 +2961,32 @@ class MyApplicationInterface internal constructor(
         )
     }
 
+    override fun hasCameraPermission(): Boolean {
+        return mainActivity.permissionManager.hasCameraPermission()
+    }
+
+    override fun hasStoragePermission(): Boolean {
+        return mainActivity.permissionManager.hasStoragePermission()
+    }
+
     override fun requestCameraPermission() {
         if (MyDebug.LOG) Log.d(TAG, "requestCameraPermission")
-        mainActivity.permissionHandler.requestCameraPermission()
+        mainActivity.permissionManager.requestCameraPermission()
     }
 
     override fun needsStoragePermission(): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "needsStoragePermission")
-        if (MainActivity.useScopedStorage()) return false // no longer need storage permission with scoped storage - and shouldn't request it either
-
-        return true
+        return !hasStoragePermission()
     }
 
     override fun requestStoragePermission() {
         if (MyDebug.LOG) Log.d(TAG, "requestStoragePermission")
-        mainActivity.permissionHandler.requestStoragePermission()
+        mainActivity.permissionManager.requestStoragePermission()
     }
 
     override fun requestRecordAudioPermission() {
         if (MyDebug.LOG) Log.d(TAG, "requestRecordAudioPermission")
-        mainActivity.permissionHandler.requestRecordAudioPermission()
+        mainActivity.permissionManager.requestRecordAudioPermission()
     }
 
     override fun clearExposureTimePref() {

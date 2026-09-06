@@ -102,6 +102,12 @@ import com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfil
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager.CameraInfo
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager2
 import com.hightechif.openkamera.domain.model.CaptureMode
+import com.hightechif.openkamera.domain.repository.ILocationRepository
+import com.hightechif.openkamera.domain.repository.IMediaRepository
+import com.hightechif.openkamera.domain.repository.ISensorRepository
+import com.hightechif.openkamera.domain.repository.ISettingsRepository
+import com.hightechif.openkamera.lifecycle.CameraLifecycleCoordinator
+import com.hightechif.openkamera.lifecycle.OrientationLifecycleManager
 import com.hightechif.openkamera.preferences.MyPreferenceFragment
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preferences.SettingsManager
@@ -125,15 +131,14 @@ import com.hightechif.openkamera.ui.FolderChooserDialog
 import com.hightechif.openkamera.ui.MainUI
 import com.hightechif.openkamera.ui.ManualSeekbars
 import com.hightechif.openkamera.ui.SettingsViewModel
+import com.hightechif.openkamera.ui.activity.DialogCoordinator
+import com.hightechif.openkamera.ui.activity.KeyEventHandler
+import com.hightechif.openkamera.ui.activity.PermissionManager
 import com.hightechif.openkamera.utils.MultiCamHandler
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.SaveLocationHandler
 import com.hightechif.openkamera.utils.TextFormatter
 import com.hightechif.openkamera.utils.ToastBoxer
-import com.hightechif.openkamera.domain.repository.ILocationRepository
-import com.hightechif.openkamera.domain.repository.IMediaRepository
-import com.hightechif.openkamera.domain.repository.ISensorRepository
-import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.io.File
@@ -157,13 +162,17 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
     val cameraViewModel: CameraViewModel by viewModels()
     val settingsViewModel: SettingsViewModel by viewModels()
 
-    @Inject lateinit var settingsRepository: ISettingsRepository
-    @Inject lateinit var mediaRepository: IMediaRepository
-    @Inject lateinit var locationRepository: ILocationRepository
-    @Inject lateinit var sensorRepository: ISensorRepository
+    @Inject
+    lateinit var settingsRepository: ISettingsRepository
+    @Inject
+    lateinit var mediaRepository: IMediaRepository
+    @Inject
+    lateinit var locationRepository: ILocationRepository
+    @Inject
+    lateinit var sensorRepository: ISensorRepository
 
     var isAppPaused: Boolean = true
-        private set
+        internal set
 
     private lateinit var mSensorManager: SensorManager
     private var mSensorAccelerometer: Sensor? = null
@@ -179,6 +188,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
     lateinit var soundPoolManager: SoundPoolManager
     lateinit var magneticSensor: MagneticSensor
     lateinit var multiCamHandler: MultiCamHandler
+
+    lateinit var keyEventHandler: KeyEventHandler
+    lateinit var orientationLifecycleManager: OrientationLifecycleManager
+    lateinit var permissionManager: PermissionManager
+    lateinit var dialogCoordinator: DialogCoordinator
+    lateinit var cameraLifecycleCoordinator: CameraLifecycleCoordinator
 
     //private val speechControl
     lateinit var preview: Preview
@@ -406,7 +421,8 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
         // set up components
         bluetoothRemoteControl = BluetoothRemoteControl(this)
-        permissionHandler = PermissionHandler(this)
+        permissionManager = PermissionManager(this)
+        permissionHandler = permissionManager.permissionHandler
         settingsManager = SettingsManager(this)
         mainUI = MainUI(this)
         manualSeekbars = ManualSeekbars()
@@ -425,6 +441,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         textFormatter = TextFormatter(this)
         soundPoolManager = SoundPoolManager(this)
         magneticSensor = MagneticSensor(this)
+
+        keyEventHandler = KeyEventHandler(this)
+        orientationLifecycleManager = OrientationLifecycleManager(this)
+        permissionManager = PermissionManager(this)
+        dialogCoordinator = DialogCoordinator(this)
+        cameraLifecycleCoordinator = CameraLifecycleCoordinator(this)
 
         //speechControl = new SpeechControl(this)
 
@@ -564,20 +586,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         // initialize state of on-screen icons
         mainUI.getOnScreenIcons().updateOnScreenIcons()
 
-        if (LOCK_TO_LANDSCAPE) {
-            // listen for orientation event change (only required if lock_to_landscape==true
-            // (MainUI.onOrientationChanged() does nothing if lock_to_landscape==false)
-            orientationEventListener = object : OrientationEventListener(this) {
-                override fun onOrientationChanged(p0: Int) {
-                    mainUI.onOrientationChanged(p0)
-                }
-            }
-            if (MyDebug.LOG)
-                Log.d(
-                    TAG,
-                    "onCreate: time after setting orientation event listener: " + (System.currentTimeMillis() - debugTime)
-                )
-        }
+        orientationLifecycleManager.initOrientationListener()
 
         layoutChangeListener =
             OnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
@@ -672,81 +681,14 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
         // show "about" dialog for first time use
         if (!hasDoneFirstTime) {
-            if (!isTest) {
-                val alertDialog = AlertDialog.Builder(this)
-                alertDialog.setTitle(R.string.app_name)
-                alertDialog.setMessage(R.string.intro_text)
-                alertDialog.setPositiveButton(android.R.string.ok, null)
-                alertDialog.setNegativeButton(R.string.preference_online_help) { dialog, which ->
-                    if (MyDebug.LOG)
-                        Log.d(TAG, "online help")
-                    launchOnlineHelp()
-                }
-                alertDialog.show()
+            dialogCoordinator.showFirstTimeHelpDialog(isTest) {
+                if (MyDebug.LOG) Log.d(TAG, "online help")
+                launchOnlineHelp()
             }
-
             setFirstTimeFlag()
         }
 
-        run {
-            // handle What's New dialog
-            var versionCode = -1
-            try {
-                val pInfo = packageManager.getPackageInfo(packageName, 0)
-                versionCode = pInfo.versionCode
-            } catch (e: PackageManager.NameNotFoundException) {
-                MyDebug.logStackTrace(
-                    TAG,
-                    "NameNotFoundException exception trying to get version number",
-                    e
-                )
-            }
-            if (versionCode != -1) {
-                val latestVersion =
-                    sharedPreferences.getInt(PreferenceKeys.LATEST_VERSION_PREFERENCE_KEY, 0)
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "version_code: $versionCode")
-                    Log.d(TAG, "latest_version: $latestVersion")
-                }
-                //final boolean whats_new_enabled = false
-                val whatsNewEnabled = true
-                if (whatsNewEnabled) {
-                    // whats_new_version is the version code that the What's New text is written for. Normally it will equal the
-                    // current release (version_code), but it some cases we may want to leave it unchanged.
-                    // E.g., we have a "What's New" for 1.44 (64), but then push out a quick fix for 1.44.1 (65). We don't want to
-                    // show the dialog again to people who already received 1.44 (64), but we still want to show the dialog to people
-                    // upgrading from earlier versions.
-                    var whatsNewVersion = 94 // 1.56
-                    whatsNewVersion =
-                        whatsNewVersion.coerceAtMost(versionCode) // whats_new_version should always be <= version_code, but just in case!
-                    if (MyDebug.LOG) {
-                        Log.d(TAG, "whats_new_version: $whatsNewVersion")
-                    }
-                    val forceWhatsNew = false
-                    //final boolean force_whats_new = true // for testing
-                    val allowShowWhatsNew = sharedPreferences.getBoolean(
-                        PreferenceKeys.SHOW_WHATS_NEW_PREFERENCE_KEY,
-                        true
-                    )
-                    if (MyDebug.LOG)
-                        Log.d(TAG, "allow_show_whats_new: $allowShowWhatsNew")
-                    // don't show What's New if this is the first time the user has run
-                    if (hasDoneFirstTime && allowShowWhatsNew && (forceWhatsNew || whatsNewVersion > latestVersion)) {
-                        val alertDialog = AlertDialog.Builder(this)
-                        alertDialog.setTitle(R.string.whats_new)
-                        alertDialog.setMessage(R.string.whats_new_text)
-                        alertDialog.setPositiveButton(android.R.string.ok, null)
-                        alertDialog.show()
-                    }
-                }
-                // We set the latest_version whether the dialog is shown - if we showed the first time dialog, we don't
-                // want to then show the What's New dialog next time we run! Similarly, if the user had disabled showing the dialog,
-                // but then enables it, we still shouldn't show the dialog until the new time Open Kamera upgrades.
-                sharedPreferences.edit {
-                    putInt(PreferenceKeys.LATEST_VERSION_PREFERENCE_KEY, versionCode)
-                }
-            }
-        }
+        dialogCoordinator.checkAndShowWhatsNewDialog(sharedPreferences, hasDoneFirstTime)
 
         setModeFromIntents(savedInstanceState)
 
@@ -857,12 +799,15 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Starting,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.CapturingBurst,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Processing -> {
-                                takePhotoButton?.animate()?.scaleX(0.88f)?.scaleY(0.88f)?.setDuration(70)?.start()
+                                takePhotoButton?.animate()?.scaleX(0.88f)?.scaleY(0.88f)
+                                    ?.setDuration(70)?.start()
                             }
+
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Idle,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Completed,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Failed -> {
-                                takePhotoButton?.animate()?.scaleX(1.0f)?.scaleY(1.0f)?.setDuration(100)?.start()
+                                takePhotoButton?.animate()?.scaleX(1.0f)?.scaleY(1.0f)
+                                    ?.setDuration(100)?.start()
                             }
                         }
                     }
@@ -1481,6 +1426,9 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             // don't allow keys such as volume keys for taking photo when camera in background!
             if (MyDebug.LOG) Log.d(TAG, "camera is in background")
         } else {
+            if (::keyEventHandler.isInitialized && keyEventHandler.onKeyDown(keyCode, event)) {
+                return true
+            }
             val handled: Boolean = mainUI.onKeyDown(keyCode, event)
             if (handled) return true
         }
@@ -1493,6 +1441,9 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             // don't allow keys such as volume keys for taking photo when camera in background!
             if (MyDebug.LOG) Log.d(TAG, "camera is in background")
         } else {
+            if (::keyEventHandler.isInitialized) {
+                keyEventHandler.onKeyUp(keyCode, event)
+            }
             mainUI.onKeyUp(keyCode, event)
         }
         return super.onKeyUp(keyCode, event)
@@ -1632,17 +1583,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             window.isNavigationBarContrastEnforced = false
         }
 
-        registerDisplayListener()
-
-        mSensorManager.registerListener(
-            accelerometerListener,
-            mSensorAccelerometer,
-            SensorManager.SENSOR_DELAY_NORMAL
-        )
-        magneticSensor.registerMagneticListener(mSensorManager)
-        if (::orientationEventListener.isInitialized) {
-            orientationEventListener.enable()
-        }
+        orientationLifecycleManager.onResume(mSensorManager, mSensorAccelerometer, magneticSensor)
         window.decorView.addOnLayoutChangeListener(layoutChangeListener)
 
         // if BLE remote control is enabled, then start the background BLE service
@@ -1762,12 +1703,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             "onWindowFocusChanged: $hasFocus"
         )
         super.onWindowFocusChanged(hasFocus)
-        if (!this.isCameraInBackground && hasFocus) {
-            // low profile mode is cleared when app goes into background
-            // and for Kit Kat immersive mode, we want to set up the timer
-            // we do in onWindowFocusChanged rather than onResume(), to also catch when window lost focus due to notification bar being dragged down (which prevents resetting of immersive mode)
-            initImmersiveMode()
-        }
+        cameraLifecycleCoordinator.onWindowFocusChanged(hasFocus)
     }
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
@@ -1781,12 +1717,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         this.isAppPaused = true
 
         mainUI.destroyPopup() // important as user could change/reset settings from Android settings when pausing
-        unregisterDisplayListener()
-        mSensorManager.unregisterListener(accelerometerListener)
-        magneticSensor.unregisterMagneticListener(mSensorManager)
-        if (::orientationEventListener.isInitialized) {
-            orientationEventListener.disable()
-        }
+        orientationLifecycleManager.onPause(mSensorManager, magneticSensor)
         window.decorView.removeOnLayoutChangeListener(layoutChangeListener)
         bluetoothRemoteControl.stopRemoteControl()
         freeAudioListener(false)
@@ -4392,10 +4323,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                 if (MyDebug.LOG) Log.d(TAG, "doInBackground")
                 val media: StorageUtils.Media? = applicationInterface.storageUtils.latestMedia
                 var thumbnail: Bitmap? = null
-                val keyguardManager =
-                    this@MainActivity.getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-                val isLocked =
-                    keyguardManager != null && keyguardManager.inKeyguardRestrictedInputMode()
+                val isLocked = cameraLifecycleCoordinator.isDeviceLocked()
                 if (MyDebug.LOG) Log.d(TAG, "is_locked?: $isLocked")
                 if (media != null && contentResolver != null && !isLocked) {
                     // check for getContentResolver() != null, as have had reported Google Play crashes
@@ -5014,63 +4942,15 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
      * and on scoped storage, as an alternative to using FolderChooserDialog).
      */
     fun createSaveFolderDialog(): AlertDialog.Builder {
-        val alertDialog = AlertDialog.Builder(this)
-        alertDialog.setTitle(R.string.preference_save_location)
-
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.alertdialog_edittext, null)
-        val editText = dialogView.findViewById<EditText>(R.id.edit_text)
-
-        // set hint instead of content description for EditText, see https://support.google.com/accessibility/android/answer/6378120
-        editText.hint = resources.getString(R.string.preference_save_location)
-        editText.inputType = InputType.TYPE_CLASS_TEXT
         val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
-        editText.setText(
-            sharedPreferences.getString(
-                PreferenceKeys.SAVE_LOCATION_PREFERENCE_KEY,
-                "OpenKamera"
-            )
-        )
-        val filter: InputFilter = object : InputFilter {
-            // whilst Android seems to allow any characters on internal memory, SD cards are typically formatted with FAT32
-            val disallowed: String = "|\\?*<\":>"
-            override fun filter(
-                source: CharSequence,
-                start: Int,
-                end: Int,
-                dest: Spanned,
-                dstart: Int,
-                dend: Int
-            ): CharSequence? {
-                for (i in start..<end) {
-                    if (disallowed.indexOf(source[i]) != -1) {
-                        return ""
-                    }
-                }
-                // also check for '/', not allowed at start
-                if (dstart == 0 && start < source.length && source[start] == '/') {
-                    return ""
-                }
-                return null
-            }
+        val initialFolder = sharedPreferences.getString(
+            PreferenceKeys.SAVE_LOCATION_PREFERENCE_KEY,
+            "OpenKamera"
+        ) ?: "OpenKamera"
+        return dialogCoordinator.createSaveFolderDialog(initialFolder) { folder ->
+            val processedFolder = processUserSaveLocation(folder)
+            updateSaveFolder(processedFolder)
         }
-        editText.filters = arrayOf(filter)
-
-        alertDialog.setView(dialogView)
-
-        alertDialog.setPositiveButton(
-            android.R.string.ok
-        ) { dialogInterface, i ->
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "save location clicked okay"
-            )
-            var folder = editText.text.toString()
-            folder = processUserSaveLocation(folder)
-            updateSaveFolder(folder)
-        }
-        alertDialog.setNegativeButton(android.R.string.cancel, null)
-
-        return alertDialog
     }
 
     /** Opens Open Kamera's own (non-Storage Access Framework) dialog to select a folder.
@@ -5176,13 +5056,8 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                     TAG,
                     "selected clear save history"
                 )
-                AlertDialog.Builder(this@MainActivity)
-                    .setIcon(android.R.drawable.ic_dialog_alert)
-                    .setTitle(R.string.clear_folder_history)
-                    .setMessage(R.string.clear_folder_history_question)
-                    .setPositiveButton(
-                        android.R.string.yes
-                    ) { dialog, which ->
+                dialogCoordinator.showClearFolderHistoryConfirmationDialog(
+                    onConfirmed = {
                         if (MyDebug.LOG) Log.d(
                             TAG,
                             "confirmed clear save history"
@@ -5191,26 +5066,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                         else clearFolderHistory()
                         setWindowFlagsForCamera()
                         showPreview(true)
-                    }
-                    .setNegativeButton(
-                        android.R.string.no
-                    ) { dialog, which ->
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "don't clear save history"
-                        )
+                    },
+                    onDismissOrCancel = {
                         setWindowFlagsForCamera()
                         showPreview(true)
                     }
-                    .setOnCancelListener {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "cancelled clear save history"
-                        )
-                        setWindowFlagsForCamera()
-                        showPreview(true)
-                    }
-                    .show()
+                )
             } else if (which == newIndex) {
                 if (MyDebug.LOG) Log.d(
                     TAG,
@@ -6538,18 +6399,10 @@ $captureRateString${resources.getString(R.string.fps)}${
 
     fun startAudioListener() {
         if (MyDebug.LOG) Log.d(TAG, "startAudioListener")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
-            if (MyDebug.LOG) Log.d(TAG, "check for record audio permission")
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.RECORD_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                if (MyDebug.LOG) Log.d(TAG, "record audio permission not available")
-                applicationInterface.requestRecordAudioPermission()
-                return
-            }
+        if (!permissionManager.hasRecordAudioPermission()) {
+            if (MyDebug.LOG) Log.d(TAG, "record audio permission not available")
+            applicationInterface.requestRecordAudioPermission()
+            return
         }
 
         val callback = MyAudioTriggerListenerCallback(this)
@@ -6616,9 +6469,11 @@ $captureRateString${resources.getString(R.string.fps)}${
         } else if (isCameraInBackground) {
             if (MyDebug.LOG) Log.d(TAG, "initLocation: camera in background!")
             // we will end up here if app is pause/resumed when camera in background (settings, dialog, etc)
-        } else if (!applicationInterface.locationSupplier.setupLocationListener()) {
+        } else if (!permissionManager.hasLocationPermission()) {
             if (MyDebug.LOG) Log.d(TAG, "location permission not available, so request permission")
-            permissionHandler.requestLocationPermission()
+            permissionManager.requestLocationPermission()
+        } else {
+            applicationInterface.locationSupplier.setupLocationListener()
         }
     }
 
@@ -6647,7 +6502,7 @@ $captureRateString${resources.getString(R.string.fps)}${
             "onRequestPermissionsResult: requestCode $requestCode"
         )
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        permissionHandler.onRequestPermissionsResult(requestCode, grantResults)
+        permissionManager.onRequestPermissionsResult(requestCode, grantResults)
     }
 
     fun restartOpenKamera() {
