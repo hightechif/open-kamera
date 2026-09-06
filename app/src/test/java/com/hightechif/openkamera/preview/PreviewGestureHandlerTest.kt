@@ -50,4 +50,35 @@ class PreviewGestureHandlerTest {
         val overZoomed = PreviewGestureHandler.calculatePinchZoom(currentZoom, 10.0f, 1.0f, 10.0f)
         assertEquals(10.0f, overZoomed, 0.001f) // Clamped to max 10.0
     }
+
+    @Test
+    fun getScaledZoomFactor_calculatesZoomStepsCorrectly() {
+        val zoomRatios = listOf(100, 150, 200, 300, 400)
+        val maxZoom = zoomRatios.size - 1
+
+        // Zoom in with smooth zoom
+        val (factorIn, smoothIn) = PreviewGestureHandler.getScaledZoomFactor(
+            scaleFactor = 1.6f,
+            zoomFactor = 0,
+            zoomRatios = zoomRatios,
+            hasSmoothZoom = true,
+            currentSmoothZoom = 1.0f,
+            maxZoom = maxZoom
+        )
+        assertEquals(1, factorIn)
+        assertEquals(1.6f, smoothIn, 0.001f)
+
+        // Zoom out with smooth zoom
+        val (factorOut, smoothOut) = PreviewGestureHandler.getScaledZoomFactor(
+            scaleFactor = 0.5f,
+            zoomFactor = 3,
+            zoomRatios = zoomRatios,
+            hasSmoothZoom = true,
+            currentSmoothZoom = 3.0f,
+            maxZoom = maxZoom
+        )
+        assertEquals(1, factorOut)
+        assertEquals(1.5f, smoothOut, 0.001f)
+    }
 }
+

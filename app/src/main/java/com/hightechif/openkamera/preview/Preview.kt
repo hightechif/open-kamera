@@ -82,9 +82,9 @@ import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
 import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
-import com.hightechif.openkamera.preview.geometry.PreviewMatrixCalculator
-import com.hightechif.openkamera.preview.geometry.ViewportDimensions
+import com.hightechif.openkamera.preview.camerasurface.PreviewSurfaceManager
 import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
+import com.hightechif.openkamera.preview.gesture.PreviewGestureHandler
 import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
 import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
@@ -119,6 +119,7 @@ import kotlin.math.min
 import kotlin.math.tan
 
 private typealias VideoFileInfo = VideoSessionOutput
+internal typealias CameraOpenState = CameraCaptureStateMachine.CameraOpenState
 
 /** This class was originally named due to encapsulating the camera preview,
  * but in practice it's grown to more than this, and includes most of the
@@ -227,14 +228,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     // cache for CameraController2
     private val cameraFeaturesCaches: Map<String, CameraFeaturesCache> = Hashtable()
 
-    internal enum class CameraOpenState {
-        CAMERAOPENSTATE_CLOSED,  // have yet to attempt to open the camera (either at all, or since the camera was closed)
-        CAMERAOPENSTATE_OPENING,  // the camera is currently being opened (on a background thread)
-        CAMERAOPENSTATE_OPENED,  // either the camera is open (if cameraController!=null) or we failed to open the camera (if cameraController==null)
-        CAMERAOPENSTATE_CLOSING // the camera is currently being closed (on a background thread)
-    }
+    val cameraCaptureStateMachine by lazy { CameraCaptureStateMachine() }
+    val surfaceManager by lazy { PreviewSurfaceManager(cameraSurface) }
 
-    private var cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+    private var cameraOpenState: CameraOpenState
+        get() = cameraCaptureStateMachine.openState
+        set(value) {
+            cameraCaptureStateMachine.setOpenState(value)
+        }
 
     // background task used for opening camera
     private var openCameraTask: AsyncTask<Void?, Void?, CameraController?>? = null
@@ -610,35 +611,27 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     // and/or set "Rotate preview" option to 180 degrees.
     private fun calculateCameraToPreviewMatrix() {
         if (MyDebug.LOG) Log.d(TAG, "calculateCameraToPreviewMatrix")
-        val controller = cameraController ?: return
-        val dimensions = ViewportDimensions(
-            surfaceWidth = cameraSurface.view.width,
-            surfaceHeight = cameraSurface.view.height,
-            previewWidth = previewW,
-            previewHeight = previewH,
-            displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = controller.cameraOrientation,
-            displayOrientation = if (usingAndroidL) 0 else controller.displayOrientation,
-            isCameraFacingFront = (controller.facing === Facing.FACING_FRONT),
-            isUsingCamera2 = usingAndroidL
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        _cameraToPreviewMatrix.set(
+            surfaceManager.calculateCameraToPreviewMatrix(
+                cameraController,
+                getDisplayRotationDegrees(false),
+                usingAndroidL
+            )
         )
-        _cameraToPreviewMatrix.set(PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dimensions))
     }
 
     private fun calculatePreviewToCameraMatrix() {
-        val controller = cameraController ?: return
-        val dimensions = ViewportDimensions(
-            surfaceWidth = cameraSurface.view.width,
-            surfaceHeight = cameraSurface.view.height,
-            previewWidth = previewW,
-            previewHeight = previewH,
-            displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = controller.cameraOrientation,
-            displayOrientation = if (usingAndroidL) 0 else controller.displayOrientation,
-            isCameraFacingFront = (controller.facing === Facing.FACING_FRONT),
-            isUsingCamera2 = usingAndroidL
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        _previewToCameraMatrix.set(
+            surfaceManager.calculatePreviewToCameraMatrix(
+                cameraController,
+                getDisplayRotationDegrees(false),
+                usingAndroidL
+            )
         )
-        _previewToCameraMatrix.set(PreviewMatrixCalculator.calculatePreviewToCameraMatrix(dimensions))
         calculateCameraToPreviewMatrix()
     }
 
@@ -649,12 +642,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     /** Return a focus area from supplied point. Supplied coordinates should be in camera coordinates. */
     private fun getAreas(focusX: Float, focusY: Float): ArrayList<CameraController.Area> {
-        return PreviewMatrixCalculator.calculateFocusAreas(
-            focusX,
-            focusY,
-            focusSize = 50,
-            weight = 1000
-        )
+        return PreviewGestureHandler.getFocusMeteringAreas(focusX, focusY)
     }
 
     private var hasMultitouchStartZoomFactor = false
@@ -797,9 +785,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         android.graphics.PointF(normX, normY)
                     )
                 }
-                val coords = floatArrayOf(event.x, event.y)
                 calculatePreviewToCameraMatrix()
-                _previewToCameraMatrix.mapPoints(coords)
+                val coords = PreviewGestureHandler.mapTouchToSensorCoords(
+                    event.x,
+                    event.y,
+                    _previewToCameraMatrix
+                )
                 val focusX = coords[0]
                 val focusY = coords[1]
                 val areas: ArrayList<CameraController.Area> = getAreas(focusX, focusY)
@@ -1051,11 +1042,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             TAG,
             "configureTransform rotation: $rotation"
         )
-        val matrix = ViewportTransformHelper.calculateTextureTransform(
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        val matrix = surfaceManager.calculateTextureTransform(
             textureViewWidth = textureViewW,
             textureViewHeight = textureViewH,
-            previewWidth = previewW,
-            previewHeight = previewH,
             displayRotation = rotation
         )
         cameraSurface.setTransform(matrix)
@@ -4230,113 +4221,20 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         var newZoomFactor = 0
         if (this.cameraController != null && this.hasZoom) {
             val zoomFactor: Int = cameraController!!.zoom
-            var zoomRatio: Float
-            if (hasSmoothZoom) {
-                zoomRatio = smoothZoom
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "    use smooth_zoom: " + smoothZoom + " instead of: " + zoomRatios!![zoomFactor] / 100.0f
-                )
-            } else {
-                zoomRatio = zoomRatios!![zoomFactor] / 100.0f
-            }
-            zoomRatio *= scaleFactor
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "    zoom_ratio: $zoomRatio"
+            val (calculatedZoomFactor, calculatedSmoothZoom) = PreviewGestureHandler.getScaledZoomFactor(
+                scaleFactor = scaleFactor,
+                zoomFactor = zoomFactor,
+                zoomRatios = zoomRatios,
+                hasSmoothZoom = hasSmoothZoom,
+                currentSmoothZoom = smoothZoom,
+                maxZoom = maxZoom
             )
-
-            newZoomFactor = zoomFactor
-            if (zoomRatio <= zoomRatios!![0] / 100.0f) {
-                newZoomFactor = 0
-                if (hasSmoothZoom) smoothZoom = zoomRatios!![0] / 100.0f
-            } else if (zoomRatio >= zoomRatios!![maxZoom] / 100.0f) {
-                newZoomFactor = maxZoom
-                if (hasSmoothZoom) smoothZoom = zoomRatios!![maxZoom] / 100.0f
-            } else if (hasSmoothZoom) {
-                // Find the closest zoom level by rounding to nearest.
-                // Important to have same behavior whether zooming in or out, otherwise problem when touching with two fingers and not
-                // moving - we'll get very small scale factors alternately between zooming in and out.
-                // The only reason we have separate codepath for zooming in or out is for performance (since we know to only look at
-                // higher or lower zoom ratios).
-                var dist =
-                    abs((zoomRatio - zoomRatios!![zoomFactor] / 100.0f).toDouble()).toFloat()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "    current dist: $dist"
-                )
-
-                if (scaleFactor > 1.0f) {
-                    // zooming in
-                    for (i in zoomFactor + 1..<zoomRatios!!.size) {
-                        val thisDist =
-                            abs((zoomRatio - zoomRatios!![i] / 100.0f).toDouble()).toFloat()
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "    this_dist: $thisDist"
-                        )
-                        if (thisDist < dist) {
-                            newZoomFactor = i
-                            dist = thisDist
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom in, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " to " + zoomRatio + " , dist " + dist
-                            )
-                        } else if (thisDist > dist + 1.0e-5f) {
-                            break
-                        }
-                    }
-                } else {
-                    // zooming out
-                    for (i in zoomFactor - 1 downTo 0) {
-                        val thisDist =
-                            abs((zoomRatio - zoomRatios!![i] / 100.0f).toDouble()).toFloat()
-                        if (thisDist < dist) {
-                            newZoomFactor = i
-                            dist = thisDist
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom out, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " to " + zoomRatio + " , dist " + dist
-                            )
-                        } else if (thisDist > dist + 1.0e-5f) {
-                            break
-                        }
-                    }
-                }
-
-                smoothZoom = zoomRatio
-            } else {
-                // find the closest zoom level
-                // unclear if we need this code anymore (smoothZoom should always be true?)
-
-                if (scaleFactor > 1.0f) {
-                    // zooming in
-                    for (i in zoomFactor..<zoomRatios!!.size) {
-                        if (zoomRatios!![i] / 100.0f >= zoomRatio) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom in, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " >= " + zoomRatio
-                            )
-                            newZoomFactor = i
-                            break
-                        }
-                    }
-                } else {
-                    // zooming out
-                    for (i in zoomFactor downTo 0) {
-                        if (zoomRatios!![i] / 100.0f <= zoomRatio) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom out, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " <= " + zoomRatio
-                            )
-                            newZoomFactor = i
-                            break
-                        }
-                    }
-                }
+            newZoomFactor = calculatedZoomFactor
+            if (hasSmoothZoom) {
+                smoothZoom = calculatedSmoothZoom
             }
             if (MyDebug.LOG) {
-                Log.d(TAG, "zoom_ratio is now $zoomRatio")
+                Log.d(TAG, "zoom_ratio is now $smoothZoom")
                 Log.d(
                     TAG,
                     "    old zoom_factor " + zoomFactor + " ratio " + zoomRatios!![zoomFactor] / 100.0f

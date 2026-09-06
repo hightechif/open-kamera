@@ -87,9 +87,27 @@ class PreviewSurfaceManager(
     }
 
     /**
+     * Calculates the texture transform matrix for TextureView.
+     */
+    fun calculateTextureTransform(
+        textureViewWidth: Int,
+        textureViewHeight: Int,
+        displayRotation: Int
+    ): Matrix {
+        return com.hightechif.openkamera.preview.geometry.ViewportTransformHelper.calculateTextureTransform(
+            textureViewWidth = textureViewWidth,
+            textureViewHeight = textureViewHeight,
+            previewWidth = previewWidth,
+            previewHeight = previewHeight,
+            displayRotation = displayRotation
+        )
+    }
+
+    /**
      * Asynchronously executes a background task on Dispatchers.IO.
      */
     suspend fun <T> runOnBackgroundThread(block: suspend () -> T): T = withContext(ioDispatcher) {
         block()
     }
 }
+

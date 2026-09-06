@@ -67,4 +67,24 @@ class PreviewSurfaceManagerTest {
         }
         assertEquals(84, result)
     }
+
+    @Test
+    fun testTextureTransform() {
+        val context = RuntimeEnvironment.getApplication()
+        val mockView = View(context)
+        val mockCameraSurface = mockk<CameraSurface>(relaxed = true)
+        every { mockCameraSurface.view } returns mockView
+
+        val surfaceManager = PreviewSurfaceManager(mockCameraSurface)
+        surfaceManager.previewWidth = 1920
+        surfaceManager.previewHeight = 1080
+
+        val matrix = surfaceManager.calculateTextureTransform(
+            textureViewWidth = 1080,
+            textureViewHeight = 1920,
+            displayRotation = 0
+        )
+        assertNotNull(matrix)
+    }
 }
+

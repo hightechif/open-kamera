@@ -69,4 +69,83 @@ object PreviewGestureHandler {
         val newZoom = currentZoom * scaleFactor
         return newZoom.coerceIn(minZoom, maxZoom)
     }
+
+    /**
+     * Calculates the new zoom index factor when pinch-zooming given zoom ratios and scale factor.
+     * Returns a Pair of (newZoomFactor, newSmoothZoom).
+     */
+    fun getScaledZoomFactor(
+        scaleFactor: Float,
+        zoomFactor: Int,
+        zoomRatios: List<Int>?,
+        hasSmoothZoom: Boolean,
+        currentSmoothZoom: Float,
+        maxZoom: Int
+    ): Pair<Int, Float> {
+        if (zoomRatios.isNullOrEmpty()) {
+            return Pair(zoomFactor, currentSmoothZoom)
+        }
+
+        var zoomRatio = if (hasSmoothZoom) {
+            currentSmoothZoom
+        } else {
+            zoomRatios[zoomFactor] / 100.0f
+        }
+        zoomRatio *= scaleFactor
+
+        var newZoomFactor = zoomFactor
+        var newSmoothZoom = currentSmoothZoom
+
+        if (zoomRatio <= zoomRatios[0] / 100.0f) {
+            newZoomFactor = 0
+            if (hasSmoothZoom) newSmoothZoom = zoomRatios[0] / 100.0f
+        } else if (zoomRatio >= zoomRatios[maxZoom] / 100.0f) {
+            newZoomFactor = maxZoom
+            if (hasSmoothZoom) newSmoothZoom = zoomRatios[maxZoom] / 100.0f
+        } else if (hasSmoothZoom) {
+            var dist = kotlin.math.abs((zoomRatio - zoomRatios[zoomFactor] / 100.0f).toDouble()).toFloat()
+
+            if (scaleFactor > 1.0f) {
+                for (i in zoomFactor + 1 until zoomRatios.size) {
+                    val thisDist = kotlin.math.abs((zoomRatio - zoomRatios[i] / 100.0f).toDouble()).toFloat()
+                    if (thisDist < dist) {
+                        newZoomFactor = i
+                        dist = thisDist
+                    } else if (thisDist > dist + 1.0e-5f) {
+                        break
+                    }
+                }
+            } else {
+                for (i in zoomFactor - 1 downTo 0) {
+                    val thisDist = kotlin.math.abs((zoomRatio - zoomRatios[i] / 100.0f).toDouble()).toFloat()
+                    if (thisDist < dist) {
+                        newZoomFactor = i
+                        dist = thisDist
+                    } else if (thisDist > dist + 1.0e-5f) {
+                        break
+                    }
+                }
+            }
+            newSmoothZoom = zoomRatio
+        } else {
+            if (scaleFactor > 1.0f) {
+                for (i in zoomFactor until zoomRatios.size) {
+                    if (zoomRatios[i] / 100.0f >= zoomRatio) {
+                        newZoomFactor = i
+                        break
+                    }
+                }
+            } else {
+                for (i in zoomFactor downTo 0) {
+                    if (zoomRatios[i] / 100.0f <= zoomRatio) {
+                        newZoomFactor = i
+                        break
+                    }
+                }
+            }
+        }
+
+        return Pair(newZoomFactor, newSmoothZoom)
+    }
 }
+

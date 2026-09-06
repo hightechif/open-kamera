@@ -165,33 +165,50 @@ class CameraController2(
 
     //private SessionType sessionType = SessionType.SESSIONTYPE_EXTENSION; // test
     // used if sessionType == SESSIONTYPE_NORMAL
-    private var captureSession: CameraCaptureSession? = null
+    private var captureSession: CameraCaptureSession?
+        get() = sessionManager.captureSession
+        set(value) {
+            if (value != null) {
+                sessionManager.onSessionConfigured(value)
+            } else {
+                sessionManager.closeCaptureSession()
+            }
+        }
 
     // used if sessionType == SESSIONTYPE_EXTENSION
-    private var extensionSession: CameraExtensionSession? = null
+    private var extensionSession: CameraExtensionSession?
+        get() = sessionManager.extensionSession as? CameraExtensionSession
+        set(value) {
+            if (value != null) {
+                sessionManager.onExtensionSessionConfigured(value)
+            } else {
+                sessionManager.closeCaptureSession()
+            }
+        }
     private var cameraExtension = 0 // used if sessionType == SESSIONTYPE_EXTENSION
 
     private var previewBuilder: CaptureRequest.Builder? = null
     var previewIsVideoMode = false
-    val focusMeteringCoordinator = Camera2FocusMeteringCoordinator()
+    val focusCoordinator = Camera2FocusMeteringCoordinator()
+    val focusMeteringCoordinator: Camera2FocusMeteringCoordinator get() = focusCoordinator
     private var autofocusCb: AutoFocusCallback?
-        get() = focusMeteringCoordinator.getAutofocusCallback()
+        get() = focusCoordinator.getAutofocusCallback()
         set(value) {
             if (value != null) {
-                focusMeteringCoordinator.startAutofocusTracking(value, captureFollowsAutofocusHint)
+                focusCoordinator.startAutofocusTracking(value, captureFollowsAutofocusHint)
             } else {
-                focusMeteringCoordinator.resetAutofocusTracking()
+                focusCoordinator.resetAutofocusTracking()
             }
         }
     private var autofocusTimeMs: Long
-        get() = focusMeteringCoordinator.autofocusTimeMs
+        get() = focusCoordinator.autofocusTimeMs
         set(value) {
-            // Managed via focusMeteringCoordinator
+            // Managed via focusCoordinator
         }
     private var captureFollowsAutofocusHint: Boolean
-        get() = focusMeteringCoordinator.captureFollowsAutofocusHint
+        get() = focusCoordinator.captureFollowsAutofocusHint
         set(value) {
-            focusMeteringCoordinator.setCaptureFollowsAutofocusHint(value)
+            focusCoordinator.setCaptureFollowsAutofocusHint(value)
         }
     private var readyForCapture = false
     private var faceDetectionListener: FaceDetectionListener? = null
@@ -213,7 +230,6 @@ class CameraController2(
         get() = imageReaderPipeline.imageReaderRaw
     private var onImageAvailableListener: OnImageAvailableListener? = null
 
-    val focusCoordinator = Camera2FocusMeteringCoordinator()
     val threeAController = Camera23AController(focusCoordinator)
     val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
 
@@ -1035,34 +1051,15 @@ class CameraController2(
      */
     private fun closeCaptureSession() {
         synchronized(backgroundCameraLock) {
-            if (captureSession != null) {
-                if (MyDebug.LOG) Log.d(TAG, "close capture session")
-                captureSession?.close()
-                captureSession = null
-            }
-            if (extensionSession != null) {
-                if (MyDebug.LOG) Log.d(TAG, "close extension session")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    try {
-                        extensionSession!!.close()
-                    } catch (e: CameraAccessException) {
-                        e.printStackTrace()
-                    }
-                }
-                extensionSession = null
-            }
+            sessionManager.closeCaptureSession()
         }
     }
 
     override fun release() {
         if (MyDebug.LOG) Log.d(TAG, "release: $this")
-        closeCaptureSession()
+        sessionManager.closeCamera()
         previewBuilder = null
         previewIsVideoMode = false
-        if (camera != null) {
-            camera?.close()
-            camera = null
-        }
         closePictureImageReader()
         /*if( previewImageReader != null ) {
             previewImageReader.close();
