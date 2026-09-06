@@ -30,14 +30,19 @@ class EffectOverlayRenderer : OverlayRenderer {
     private val lastImageMatrix = Matrix()
 
     private var focusPeakingColorPref: Int = Color.WHITE
+    private var ghostImagePref: String = "preference_ghost_image_off"
     private var ghostImageAlpha: Int = 127
     private var ghostSelectedImageBitmap: Bitmap? = null
     private var lastThumbnail: Bitmap? = null
     private var showLastImage: Boolean = false
-    private var allowGhostImage: Boolean = true
+    private var allowGhostImage: Boolean = false
 
     fun setFocusPeakingColor(color: Int) {
         this.focusPeakingColorPref = color
+    }
+
+    fun setGhostImagePref(pref: String) {
+        this.ghostImagePref = pref
     }
 
     fun setGhostImageAlpha(alpha: Int) {
@@ -59,6 +64,24 @@ class EffectOverlayRenderer : OverlayRenderer {
     fun clearLastImage() {
         this.showLastImage = false
     }
+
+    val isShowingLastImage: Boolean
+        get() = showLastImage
+
+    val isGhostImageAllowed: Boolean
+        get() = allowGhostImage
+
+    val currentGhostImagePref: String
+        get() = ghostImagePref
+
+    val isGhostLastImageActive: Boolean
+        get() = allowGhostImage && ghostImagePref == "preference_ghost_image_last"
+
+    val isGhostSelectedImageActive: Boolean
+        get() = ghostImagePref == "preference_ghost_image_selected" && ghostSelectedImageBitmap != null
+
+    val shouldRenderThumbnailOverlay: Boolean
+        get() = lastThumbnail != null && (showLastImage || isGhostLastImageActive)
 
     fun allowGhostImage() {
         this.allowGhostImage = true
@@ -134,12 +157,15 @@ class EffectOverlayRenderer : OverlayRenderer {
         p.reset()
 
         // Ghost image or last photo playback
-        if (cameraController != null && lastThumbnail != null && (showLastImage || allowGhostImage)) {
+        val isGhostLastImage = allowGhostImage && ghostImagePref == "preference_ghost_image_last"
+        val isGhostSelectedImage = ghostImagePref == "preference_ghost_image_selected" && ghostSelectedImageBitmap != null
+
+        if (cameraController != null && lastThumbnail != null && (showLastImage || isGhostLastImage)) {
             setLastImageMatrix(canvas, lastThumbnail!!, uiRotation, !showLastImage, context)
             if (!showLastImage) p.alpha = ghostImageAlpha
             canvas.drawBitmap(lastThumbnail!!, lastImageMatrix, p)
             if (!showLastImage) p.alpha = 255
-        } else if (cameraController != null && ghostSelectedImageBitmap != null) {
+        } else if (cameraController != null && isGhostSelectedImage && ghostSelectedImageBitmap != null) {
             setLastImageMatrix(canvas, ghostSelectedImageBitmap!!, uiRotation, true, context)
             p.alpha = ghostImageAlpha
             canvas.drawBitmap(ghostSelectedImageBitmap!!, lastImageMatrix, p)

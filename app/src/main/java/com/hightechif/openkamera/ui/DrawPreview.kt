@@ -999,6 +999,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         focusFaceOverlayRenderer.updateSettings()
         effectOverlayRenderer.updateSettings()
         effectOverlayRenderer.setFocusPeakingColor(focusPeakingColorPref)
+        effectOverlayRenderer.setGhostImagePref(ghostImagePref ?: "preference_ghost_image_off")
         effectOverlayRenderer.setGhostImageAlpha(ghostImageAlpha)
         effectOverlayRenderer.setGhostSelectedImageBitmap(ghostSelectedImageBitmap)
         gyroTargetOverlayRenderer.updateSettings()
