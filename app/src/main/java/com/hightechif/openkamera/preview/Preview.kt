@@ -112,14 +112,10 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.Volatile
-import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.asin
 import kotlin.math.atan
-import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 import kotlin.math.tan
 
 private typealias VideoFileInfo = VideoSessionOutput
@@ -6929,63 +6925,32 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         }
     }
 
+    val previewSensorManager: com.hightechif.openkamera.preview.sensor.PreviewSensorManager by lazy {
+        com.hightechif.openkamera.preview.sensor.PreviewSensorManager(applicationInterface)
+    }
+
     fun onAccelerometerSensorChanged(event: SensorEvent) {
-        /*if( MyDebug.LOG )
-    		Log.d(TAG, "onAccelerometerSensorChanged: " + event.values[0] + ", " + event.values[1] + ", " + event.values[2]);*/
-
-        this.hasGravity = true
-        for (i in 0..2) {
-            //this.gravity[i] = event.values[i];
-            gravity[i] = SENSOR_ALPHA * gravity[i] + (1.0f - SENSOR_ALPHA) * event.values[i]
-        }
-        calculateGeoDirection()
-
-        val x = gravity[0].toDouble()
-        val y = gravity[1].toDouble()
-        val z = gravity[2].toDouble()
-        val mag = sqrt(x * x + y * y + z * z)
-
-        /*if( MyDebug.LOG )
-			Log.d(TAG, "xyz: " + x + ", " + y + ", " + z);*/
-        this.hasPitchAngle = false
-        if (mag > 1.0e-8) {
-            this.hasPitchAngle = true
-            this.pitchAngle = asin(-z / mag) * 180.0 / PI
-
-            /*if( MyDebug.LOG )
-				Log.d(TAG, "pitch: " + pitchAngle);*/
-            this.hasLevelAngle = true
-            this.naturalLevelAngle = atan2(-x, y) * 180.0 / PI
-            if (this.naturalLevelAngle < -0.0) {
-                this.naturalLevelAngle += 360.0
-            }
-
-            //naturalLevelAngle = 0.0f; // test zero angle
-            updateLevelAngles()
-        } else {
-            Log.e(TAG, "accel sensor has zero mag: $mag")
-            this.hasLevelAngle = false
-        }
+        previewSensorManager.currentOrientation = this.currentOrientation
+        previewSensorManager.onAccelerometerSensorChanged(event)
+        this.hasGravity = previewSensorManager.hasGravity
+        this.hasPitchAngle = previewSensorManager.hasPitchAngle
+        this.pitchAngle = previewSensorManager.pitchAngle
+        this.hasLevelAngle = previewSensorManager.hasLevelAngle
+        this.naturalLevelAngle = previewSensorManager.naturalLevelAngle
+        this.levelAngle = previewSensorManager.levelAngle
+        this.origLevelAngle = previewSensorManager.origLevelAngle
+        this.hasGeoDirection = previewSensorManager.hasGeoDirection
     }
 
     /** This method should be called when the natural level angle, or the calibration angle, has been updated, to update the other level angle variables.
      *
      */
     fun updateLevelAngles() {
-        if (hasLevelAngle) {
-            this.levelAngle = this.naturalLevelAngle
-            val calibratedLevelAngle: Double = applicationInterface.getCalibratedLevelAngle()
-            this.levelAngle -= calibratedLevelAngle
-            this.origLevelAngle = this.levelAngle
-            this.levelAngle -= currentOrientation.toFloat().toDouble()
-            if (this.levelAngle < -180.0) {
-                this.levelAngle += 360.0
-            } else if (this.levelAngle > 180.0) {
-                this.levelAngle -= 360.0
-            }
-            /*if( MyDebug.LOG )
-				Log.d(TAG, "levelAngle is now: " + levelAngle);*/
-        }
+        previewSensorManager.currentOrientation = this.currentOrientation
+        previewSensorManager.updateLevelAngles()
+        this.hasLevelAngle = previewSensorManager.hasLevelAngle
+        this.levelAngle = previewSensorManager.levelAngle
+        this.origLevelAngle = previewSensorManager.origLevelAngle
     }
 
     fun hasLevelAngle(): Boolean {
@@ -6996,29 +6961,23 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * This is useful as the level angle becomes unstable when device is near vertical
      */
     fun hasLevelAngleStable(): Boolean {
-        if (!isTest && hasPitchAngle && abs(pitchAngle) > 70.0) {
-            // note that if isTest, we always set the level angle - since the device typically lies face down when running tests...
-            return false
-        }
-        return this.hasLevelAngle
+        previewSensorManager.isTest = this.isTest
+        return previewSensorManager.hasLevelAngleStable()
     }
 
     val levelAngleUncalibrated: Double
         /** Returns the uncalibrated level angle in degrees.
          */
-        get() = this.naturalLevelAngle - this.currentOrientation
+        get() = previewSensorManager.levelAngleUncalibrated
 
     fun hasPitchAngle(): Boolean {
         return this.hasPitchAngle
     }
 
     fun onMagneticSensorChanged(event: SensorEvent) {
-        this.hasGeomagnetic = true
-        for (i in 0..2) {
-            //this.geomagnetic[i] = event.values[i];
-            geomagnetic[i] = SENSOR_ALPHA * geomagnetic[i] + (1.0f - SENSOR_ALPHA) * event.values[i]
-        }
-        calculateGeoDirection()
+        previewSensorManager.onMagneticSensorChanged(event)
+        this.hasGeomagnetic = previewSensorManager.hasGeomagnetic
+        this.hasGeoDirection = previewSensorManager.hasGeoDirection
     }
 
     private fun calculateGeoDirection() {
