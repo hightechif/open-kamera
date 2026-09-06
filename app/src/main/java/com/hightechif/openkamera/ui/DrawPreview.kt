@@ -37,13 +37,13 @@ import android.view.Surface
 import android.view.View
 import android.widget.RelativeLayout
 import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withRotation
 import androidx.core.graphics.withSave
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MainActivity.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
-import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
 import com.hightechif.openkamera.MyApplicationInterface.Shadow
@@ -52,8 +52,16 @@ import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
 import com.hightechif.openkamera.preview.Preview
-import com.hightechif.openkamera.sensors.GyroSensor
+import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.sensors.LocationSupplier
+import com.hightechif.openkamera.ui.renderers.CropGuideOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.DrawPreviewContext
+import com.hightechif.openkamera.ui.renderers.EffectOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.FocusFaceOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.GridOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.GyroTargetOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.HorizonAngleOverlayRenderer
+import com.hightechif.openkamera.ui.renderers.TelemetryHudOverlayRenderer
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.PostProcessing
 import java.io.IOException
@@ -67,7 +75,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
-import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -81,6 +88,16 @@ import kotlin.math.tan
 class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicationInterface) {
     private val mainActivity: MainActivity
     private val applicationInterface: MyApplicationInterface
+
+    // Modular sub-renderers
+    val gridOverlayRenderer: GridOverlayRenderer
+    val cropGuideOverlayRenderer: CropGuideOverlayRenderer
+    val horizonAngleOverlayRenderer: HorizonAngleOverlayRenderer
+    val gyroTargetOverlayRenderer: GyroTargetOverlayRenderer
+    val telemetryHudRenderer: TelemetryHudOverlayRenderer
+    val focusFaceOverlayRenderer: FocusFaceOverlayRenderer
+    val effectOverlayRenderer: EffectOverlayRenderer
+    val drawPreviewContext: DrawPreviewContext
 
     // In some cases when reopening the camera or pausing preview, we apply a dimming effect (only
     // supported when using Camera2 API, since we need to know when frames have been received).
@@ -363,6 +380,23 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         this.strokeWidth = (1.0f * scaleDp + 0.5f) // convert dps to pixels
         p.strokeWidth = strokeWidth
 
+        gridOverlayRenderer = GridOverlayRenderer()
+        cropGuideOverlayRenderer = CropGuideOverlayRenderer()
+        horizonAngleOverlayRenderer = HorizonAngleOverlayRenderer()
+        gyroTargetOverlayRenderer = GyroTargetOverlayRenderer(mainActivity)
+        telemetryHudRenderer = TelemetryHudOverlayRenderer(mainActivity, applicationInterface)
+        focusFaceOverlayRenderer = FocusFaceOverlayRenderer()
+        effectOverlayRenderer = EffectOverlayRenderer()
+
+        drawPreviewContext = DrawPreviewContext(
+            mainActivity = mainActivity,
+            applicationInterface = applicationInterface,
+            sharedPreferences = sharedPreferences,
+            scaleDp = scaleDp,
+            scaleFont = scaleFont,
+            strokeWidth = strokeWidth
+        )
+
         locationBitmap =
             BitmapFactory.decodeResource(context.resources, R.drawable.ic_gps_fixed_white_48dp)
         locationOffBitmap =
@@ -530,6 +564,14 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             ghostSelectedImageBitmap = null
         }
         ghostSelectedImagePref = ""
+
+        gridOverlayRenderer.onDestroy()
+        cropGuideOverlayRenderer.onDestroy()
+        horizonAngleOverlayRenderer.onDestroy()
+        telemetryHudRenderer.onDestroy()
+        focusFaceOverlayRenderer.onDestroy()
+        effectOverlayRenderer.onDestroy()
+        gyroTargetOverlayRenderer.onDestroy()
     }
 
     private val context: Context
@@ -593,6 +635,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         this.lastThumbnail = thumbnail
         this.lastThumbnailIsVideo = isVideo
         this.allowGhostLastImage = true
+        effectOverlayRenderer.setLastThumbnail(thumbnail)
         oldThumbnail?.recycle()
     }
 
@@ -605,21 +648,25 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     fun showLastImage() {
         if (MyDebug.LOG) Log.d(TAG, "showLastImage")
         this.showLastImage = true
+        effectOverlayRenderer.showLastImage()
     }
 
     fun clearLastImage() {
         if (MyDebug.LOG) Log.d(TAG, "clearLastImage")
         this.showLastImage = false
+        effectOverlayRenderer.clearLastImage()
     }
 
     fun allowGhostImage() {
         if (MyDebug.LOG) Log.d(TAG, "allowGhostImage")
         if (lastThumbnail != null) this.allowGhostLastImage = true
+        effectOverlayRenderer.allowGhostImage()
     }
 
     fun clearGhostImage() {
         if (MyDebug.LOG) Log.d(TAG, "clearGhostImage")
         this.allowGhostLastImage = false
+        effectOverlayRenderer.clearGhostImage()
     }
 
     fun cameraInOperation(inOperation: Boolean) {
@@ -630,6 +677,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             frontScreenFlash = false
             captureStarted = false
         }
+        focusFaceOverlayRenderer.setTakingPicture(takingPicture)
     }
 
     fun setImageQueueFull(imageQueueFull: Boolean) {
@@ -657,7 +705,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 continuousFocusMovingMs = System.currentTimeMillis()
             }
         }
-        // if we receive start==false, we don't stop the animation - let it continue
+        focusFaceOverlayRenderer.onContinuousFocusMove(start)
     }
 
     fun clearContinuousFocusMove() {
@@ -666,6 +714,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             continuousFocusMoving = false
             continuousFocusMovingMs = 0
         }
+        focusFaceOverlayRenderer.clearContinuousFocusMove()
     }
 
     fun setGyroDirectionMarker(x: Float, y: Float, z: Float) {
@@ -675,15 +724,18 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         gyroDirectionUp[0] = 0f
         gyroDirectionUp[1] = 1f
         gyroDirectionUp[2] = 0f
+        gyroTargetOverlayRenderer.setGyroDirectionMarker(x, y, z)
     }
 
     fun addGyroDirectionMarker(x: Float, y: Float, z: Float) {
         val vector = floatArrayOf(x, y, z)
         gyroDirections.add(vector)
+        gyroTargetOverlayRenderer.addGyroDirectionMarker(x, y, z)
     }
 
     fun clearGyroDirectionMarker() {
         enableGyroTargetSpot = false
+        gyroTargetOverlayRenderer.clearGyroDirectionMarker()
     }
 
     /** For performance reasons, some of the SharedPreferences settings are cached. This method
@@ -939,6 +991,17 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
         focusSeekbarsMarginLeft =
             -1 // needed as the focus seekbars can only be updated when visible
+
+        gridOverlayRenderer.updateSettings()
+        cropGuideOverlayRenderer.updateSettings()
+        horizonAngleOverlayRenderer.updateSettings()
+        telemetryHudRenderer.updateSettings()
+        focusFaceOverlayRenderer.updateSettings()
+        effectOverlayRenderer.updateSettings()
+        effectOverlayRenderer.setFocusPeakingColor(focusPeakingColorPref)
+        effectOverlayRenderer.setGhostImageAlpha(ghostImageAlpha)
+        effectOverlayRenderer.setGhostSelectedImageBitmap(ghostSelectedImageBitmap)
+        gyroTargetOverlayRenderer.updateSettings()
 
         hasSettings = true
     }
@@ -1458,7 +1521,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                         }*/
                         p.style = Paint.Style.FILL
                         p.color = Color.rgb(0, 0, 0)
-                        p.alpha = cropShadingAlphaC
+                        p.alpha = CROP_SHADING_ALPHA_C
                         var left = 1
                         var top = 1
                         var right = canvas.width - 1
@@ -2059,9 +2122,9 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                     /*if( MyDebug.LOG )
 						Log.d(TAG, "histogram length: " + histogram.length);*/
                     val histogramWidth =
-                        (histogramWidthDp * scaleDp + 0.5f).toInt() // convert dps to pixels
+                        (HISTOGRAM_WIDTH_DP * scaleDp + 0.5f).toInt() // convert dps to pixels
                     val histogramHeight =
-                        (histogramHeightDp * scaleDp + 0.5f).toInt() // convert dps to pixels
+                        (HISTOGRAM_HEIGHT_DP * scaleDp + 0.5f).toInt() // convert dps to pixels
                     // n.b., if changing the histogramHeight, remember to update focusSeekbar and
                     // focusBracketingTargetSeekbar margins in activity_main.xml
                     var locationX2 = locationX - flashPadding
@@ -2303,7 +2366,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                         -((if (levelAngle < 0) 16 else 14) * scaleFont + 0.5f).toInt() // convert dps to pixels
                     p.textAlign = Paint.Align.LEFT
                 }
-                if (abs(levelAngle) <= closeLevelAngle) {
+                if (abs(levelAngle) <= CLOSE_LEVEL_ANGLE) {
                     color = angleHighlightColorPref
                     p.isUnderlineText = true
                 }
@@ -2932,7 +2995,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             val cy = canvas.height / 2
 
             var isLevel = false
-            if (hasLevelAngle && abs(levelAngle) <= closeLevelAngle) { // n.b., use levelAngle, not angle or origLevelAngle
+            if (hasLevelAngle && abs(levelAngle) <= CLOSE_LEVEL_ANGLE) { // n.b., use levelAngle, not angle or origLevelAngle
                 isLevel = true
             }
 
@@ -3147,35 +3210,35 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
 
             val levelAngle = preview.origLevelAngle
 
-            canvas.save()
-            canvas.rotate(-levelAngle.toFloat(), cx.toFloat(), cy.toFloat())
+            canvas.withRotation(-levelAngle.toFloat(), cx.toFloat(), cy.toFloat()) {
+                // draw shaded area
+                val oDist =
+                    sqrt((canvas.width * canvas.width + canvas.height * canvas.height).toDouble()).toFloat()
+                val oLeft = (canvas.width - oDist) / 2.0f
+                val oTop = (canvas.height - oDist) / 2.0f
+                val oRight = (canvas.width + oDist) / 2.0f
+                val oBottom = (canvas.height + oDist) / 2.0f
+                p.style = Paint.Style.FILL
+                p.color = Color.rgb(0, 0, 0)
+                p.alpha = CROP_SHADING_ALPHA_C
+                canvas.drawRect(oLeft, oTop, left, oBottom, p)
+                canvas.drawRect(right, oTop, oRight, oBottom, p)
+                canvas.drawRect(left, oTop, right, top, p) // top
+                canvas.drawRect(left, bottom, right, oBottom, p) // bottom
 
-            // draw shaded area
-            val oDist =
-                sqrt((canvas.width * canvas.width + canvas.height * canvas.height).toDouble()).toFloat()
-            val oLeft = (canvas.width - oDist) / 2.0f
-            val oTop = (canvas.height - oDist) / 2.0f
-            val oRight = (canvas.width + oDist) / 2.0f
-            val oBottom = (canvas.height + oDist) / 2.0f
-            p.style = Paint.Style.FILL
-            p.color = Color.rgb(0, 0, 0)
-            p.alpha = cropShadingAlphaC
-            canvas.drawRect(oLeft, oTop, left, oBottom, p)
-            canvas.drawRect(right, oTop, oRight, oBottom, p)
-            canvas.drawRect(left, oTop, right, top, p) // top
-            canvas.drawRect(left, bottom, right, oBottom, p) // bottom
+                if (hasLevelAngle && abs(levelAngle) <= CLOSE_LEVEL_ANGLE) { // n.b., use levelAngle, not angle or origLevelAngle
+                    p.color = angleHighlightColorPref
+                } else {
+                    p.color = Color.WHITE
+                }
+                p.style = Paint.Style.STROKE
+                p.strokeWidth = strokeWidth
 
-            if (hasLevelAngle && abs(levelAngle) <= closeLevelAngle) { // n.b., use levelAngle, not angle or origLevelAngle
-                p.color = angleHighlightColorPref
-            } else {
-                p.color = Color.WHITE
+                canvas.drawRect(left, top, right, bottom, p)
+
+                canvas.restore()
+
             }
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = strokeWidth
-
-            canvas.drawRect(left, top, right, bottom, p)
-
-            canvas.restore()
 
             p.style = Paint.Style.FILL // reset
             p.alpha = 255 // reset
@@ -3476,7 +3539,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
                 if (cameraInactiveTimeMs == -1L) {
                     cameraInactiveTimeMs = timeNow
                 }
-                var frac = ((timeNow - cameraInactiveTimeMs) / dimEffectTimeC.toFloat())
+                var frac = ((timeNow - cameraInactiveTimeMs) / DIM_EFFECT_TIME_C.toFloat())
                 frac = min(frac.toDouble(), 1.0).toFloat()
                 val alpha = (frac * 127).toInt()
                 /*if( MyDebug.LOG ) {
@@ -3564,199 +3627,38 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
             }
         }
 
-        drawGrids(canvas)
+        drawPreviewContext.scaleDp = scaleDp
+        drawPreviewContext.scaleFont = scaleFont
+        drawPreviewContext.strokeWidth = strokeWidth
+        drawPreviewContext.deviceUiRotation = deviceUiRotation
+        drawPreviewContext.hasLevelAngle = preview.hasLevelAngle()
+        drawPreviewContext.levelAngle = preview.levelAngle
+        drawPreviewContext.naturalLevelAngle = preview.naturalLevelAngle
+        drawPreviewContext.hasPitchAngle = preview.hasPitchAngle()
+        drawPreviewContext.pitchAngle = preview.pitchAngle
+        drawPreviewContext.hasGeoDirection = preview.hasGeoDirection()
+        drawPreviewContext.geoDirection = preview.geoDirection
+        drawPreviewContext.cameraInactiveTimeMs = cameraInactiveTimeMs
+        drawPreviewContext.hasAutoStabiliseCrop = hasAutoStabiliseCrop
+        drawPreviewContext.autoStabiliseCrop[0] = autoStabiliseCrop[0]
+        drawPreviewContext.autoStabiliseCrop[1] = autoStabiliseCrop[1]
+        drawPreviewContext.previewSizeWysiwygPref = previewSizeWysiwygPref
 
-        drawCropGuides(canvas)
+        gridOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
-        // n.b., don't display ghost image if frontScreenFlash==true (i.e., frontscreen flash is in operation), otherwise
-        // the effectiveness of the "flash" is reduced
-        if (lastThumbnail != null && !lastThumbnailIsVideo && cameraController != null && (showLastImage || (allowGhostLastImage && !frontScreenFlash && ghostImagePref == "preference_ghost_image_last"))) {
-            // If changing this code, ensure that pause preview still works when:
-            // - Taking a photo in portrait or landscape - and check rotating the device while preview paused
-            // - Taking a photo with lock to portrait/landscape options still shows the thumbnail with aspect ratio preserved
-            // Also check ghost last image works okay!
-            if (showLastImage) {
-                p.color = Color.rgb(
-                    0,
-                    0,
-                    0
-                ) // in case image doesn't cover the canvas (due to different aspect ratios)
-                canvas.drawRect(
-                    0.0f,
-                    0.0f,
-                    canvas.width.toFloat(),
-                    canvas.height.toFloat(),
-                    p
-                ) // in case
-            }
-            setLastImageMatrix(canvas, lastThumbnail!!, uiRotation, !showLastImage)
-            if (!showLastImage) p.alpha = ghostImageAlpha
-            canvas.drawBitmap(lastThumbnail!!, lastImageMatrix, p)
-            if (!showLastImage) p.alpha = 255
-        } else if (cameraController != null && !frontScreenFlash && ghostSelectedImageBitmap != null) {
-            setLastImageMatrix(canvas, ghostSelectedImageBitmap!!, uiRotation, true)
-            p.alpha = ghostImageAlpha
-            canvas.drawBitmap(ghostSelectedImageBitmap!!, lastImageMatrix, p)
-            p.alpha = 255
-        }
+        cropGuideOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
-        if (preview.isPreviewBitmapEnabled && !showLastImage) {
-            // draw additional real-time effects
-
-            // draw zebra stripes
-
-            val zebraStripesBitmap: Bitmap? = preview.zebraStripesBitmap
-            if (zebraStripesBitmap != null) {
-                setLastImageMatrix(canvas, zebraStripesBitmap, 0, false)
-                p.alpha = 255
-                canvas.drawBitmap(zebraStripesBitmap, lastImageMatrix, p)
-            }
-
-            // draw focus peaking
-            val focusPeakingBitmap: Bitmap? = preview.focusPeakingBitmap
-            if (focusPeakingBitmap != null) {
-                setLastImageMatrix(canvas, focusPeakingBitmap, 0, false)
-                p.alpha = 127
-                if (focusPeakingColorPref != Color.WHITE) {
-                    p.colorFilter = PorterDuffColorFilter(
-                        focusPeakingColorPref,
-                        PorterDuff.Mode.SRC_IN
-                    )
-                }
-                canvas.drawBitmap(focusPeakingBitmap, lastImageMatrix, p)
-                if (focusPeakingColorPref != Color.WHITE) {
-                    p.colorFilter = null
-                }
-                p.alpha = 255
-            }
-        }
+        effectOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
         doThumbnailAnimation(canvas, timeMs)
 
         drawUI(canvas, deviceUiRotation, timeMs)
 
-        drawAngleLines(canvas, deviceUiRotation, timeMs)
+        horizonAngleOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
-        doFocusAnimation(canvas, timeMs)
+        focusFaceOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
-        val facesDetected: Array<CameraController.Face>? = preview.facesDetected
-        if (facesDetected != null) {
-            p.color = Color.rgb(255, 235, 59) // Yellow 500
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = strokeWidth
-            for (face in facesDetected) {
-                // Android doc recommends filtering out faces with score less than 50 (same for both Camera and Camera2 APIs)
-                if (face.score >= 50) {
-                    canvas.drawRect(face.temp, p)
-                }
-            }
-            p.style = Paint.Style.FILL // reset
-        }
-
-        if (enableGyroTargetSpot && cameraController != null) {
-            val gyroSensor: GyroSensor = mainActivity.applicationInterface.gyroSensor
-            if (gyroSensor.isRecording) {
-                val systemOrientation: SystemOrientation = mainActivity.systemOrientation
-                val systemOrientationPortrait =
-                    systemOrientation === SystemOrientation.PORTRAIT
-                for (gyroDirection in gyroDirections) {
-                    gyroSensor.getRelativeInverseVector(transformedGyroDirection, gyroDirection)
-                    gyroSensor.getRelativeInverseVector(
-                        transformedGyroDirectionUp,
-                        gyroDirectionUp
-                    )
-                    // note that although X of gyroDirection represents left to right on the device, because we're in landscape mode,
-                    // this is y coordinates on the screen
-                    val angleX: Float
-                    val angleY: Float
-                    if (systemOrientationPortrait) {
-                        angleX = asin(transformedGyroDirection[0].toDouble()).toFloat()
-                        angleY = -asin(transformedGyroDirection[1].toDouble()).toFloat()
-                    } else {
-                        angleX = -asin(transformedGyroDirection[1].toDouble()).toFloat()
-                        angleY = -asin(transformedGyroDirection[0].toDouble()).toFloat()
-                    }
-                    if (abs(angleX.toDouble()) < 0.5f * Math.PI && abs(angleY.toDouble()) < 0.5f * Math.PI) {
-                        updateCachedViewAngles(timeMs) // ensure viewAngleXPreview, viewAngleYPreview are computed and up to date
-                        val cameraAngleX: Float
-                        val cameraAngleY: Float
-                        if (systemOrientationPortrait) {
-                            cameraAngleX = this.viewAngleYPreview
-                            cameraAngleY = this.viewAngleXPreview
-                        } else {
-                            cameraAngleX = this.viewAngleXPreview
-                            cameraAngleY = this.viewAngleYPreview
-                        }
-                        var angleScaleX =
-                            (canvas.width / (2.0 * tan(Math.toRadians((cameraAngleX / 2.0))))).toFloat()
-                        var angleScaleY =
-                            (canvas.height / (2.0 * tan(Math.toRadians((cameraAngleY / 2.0))))).toFloat()
-                        angleScaleX *= preview.zoomRatio
-                        angleScaleY *= preview.zoomRatio
-                        val distanceX =
-                            angleScaleX * tan(angleX.toDouble()).toFloat() // angleScale is already in pixels rather than dps
-                        val distanceY =
-                            angleScaleY * tan(angleY.toDouble()).toFloat() // angleScale is already in pixels rather than dps
-                        p.color = Color.WHITE
-                        drawGyroSpot(
-                            canvas,
-                            0.0f,
-                            0.0f,
-                            -1.0f,
-                            0.0f,
-                            48,
-                            true
-                        ) // draw spot for the center of the screen, to help the user orient the device
-                        p.color = Color.BLUE
-                        val dirX = -transformedGyroDirectionUp[1]
-                        val dirY = -transformedGyroDirectionUp[0]
-                        drawGyroSpot(canvas, distanceX, distanceY, dirX, dirY, 45, false)
-                        /*{
-						// for debug only, draw the gyro spot that isn't calibrated with the accelerometer
-						gyroSensor.getRelativeInverseVectorGyroOnly(transformedGyroDirection, gyroDirection);
-						gyroSensor.getRelativeInverseVectorGyroOnly(transformedGyroDirectionUp, gyroDirectionUp);
-						p.setColor(Color.YELLOW);
-						angleX = - (float)Math.asin(transformedGyroDirection[1]);
-						angleY = - (float)Math.asin(transformedGyroDirection[0]);
-						distanceX = angleScaleX * (float) Math.tan(angleX); // angleScale is already in pixels rather than dps
-						distanceY = angleScaleY * (float) Math.tan(angleY); // angleScale is already in pixels rather than dps
-						dirX = -transformedGyroDirectionUp[1];
-						dirY = -transformedGyroDirectionUp[0];
-						drawGyroSpot(canvas, distanceX, distanceY, dirX, dirY, 45);
-					}*/
-                    }
-
-                    // show indicator for not being "upright", but only if tilt angle is within 20 degrees
-                    if (gyroSensor.isUpright != 0 && abs(angleX.toDouble()) <= 20.0f * 0.0174532925199f) {
-                        //applicationInterface.drawTextWithBackground(canvas, p, "not upright", Color.WHITE, Color.BLACK, canvas.getWidth()/2, canvas.getHeight()/2, MyApplicationInterface.Alignment.ALIGNMENT_CENTRE, null, true);
-                        canvas.save()
-                        canvas.rotate(
-                            uiRotation.toFloat(),
-                            canvas.width / 2.0f,
-                            canvas.height / 2.0f
-                        )
-                        val iconSize = (64 * scaleDp + 0.5f).toInt() // convert dps to pixels
-                        val cyOffset = (80 * scaleDp + 0.5f).toInt() // convert dps to pixels
-                        val cx = canvas.width / 2
-                        val cy = canvas.height / 2 - cyOffset
-                        iconDest[cx - iconSize / 2, cy - iconSize / 2, cx + iconSize / 2] =
-                            cy + iconSize / 2
-                        /*p.setStyle(Paint.Style.FILL);
-					p.setColor(Color.BLACK);
-					p.setAlpha(64);
-					canvas.drawRect(iconDest, p);
-					p.setAlpha(255);*/
-                        canvas.drawBitmap(
-                            (if (gyroSensor.isUpright > 0) rotateLeftBitmap else rotateRightBitmap)!!,
-                            null,
-                            iconDest,
-                            p
-                        )
-                        canvas.restore()
-                    }
-                }
-            }
-        }
+        gyroTargetOverlayRenderer.draw(canvas, drawPreviewContext, timeMs)
 
         if (timeMs > lastUpdateFocusSeekbarAutoTime + 100) {
             lastUpdateFocusSeekbarAutoTime = timeMs
@@ -3887,6 +3789,7 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     fun onExtraOSDValuesChanged(line1: String, line2: String) {
         varOSDLine1 = line1
         varOSDLine2 = line2
+        telemetryHudRenderer.setExtraOSDValues(line1, line2)
     }
 
     // for testing:
@@ -3908,15 +3811,15 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         //   camera, before we call setupCamera() on the UI thread.
         // - When pausing the preview in MainActivity.updateForSettings(), we call setupCamera() after
         //   this delay - so we don't want to keep the user waiting too long.
-        const val dimEffectTimeC: Long = 50
+        const val DIM_EFFECT_TIME_C: Long = 50
 
         private val decimalFormat = DecimalFormat("#0.0")
-        private const val closeLevelAngle = 1.0
-        private const val histogramWidthDp = 100
-        private const val histogramHeightDp = 60
+        private const val CLOSE_LEVEL_ANGLE = 1.0
+        private const val HISTOGRAM_WIDTH_DP = 100
+        private const val HISTOGRAM_HEIGHT_DP = 60
 
-        private const val cropShadingAlphaC =
-            160 // alpha to use for shading areas not of interest
+        // alpha to use for shading areas not of interest
+        private const val CROP_SHADING_ALPHA_C = 160
 
         /** Formats the levelAngle double into a string.
          * Beware of calling this too often - shouldn't be every frame due to performance of DecimalFormat

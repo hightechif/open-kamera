@@ -3303,7 +3303,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             // Even if allowDim==false, still run as a postDelayed (a) for consistency, (b) to allow UI to run for a bit (to avoid risk of slow frames).
             handler.postDelayed(
                 { preview.setupCamera(false) },
-                DrawPreview.dimEffectTimeC + 16
+                DrawPreview.DIM_EFFECT_TIME_C + 16
             ) // +16 to allow time for a frame update to run
         }
         // don't set blockStartupToast to false yet, as camera might be closing/opening on background thread

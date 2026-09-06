@@ -112,6 +112,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.concurrent.Volatile
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan
@@ -317,8 +318,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var currentRotation =
         0 // orientation relative to camera's orientation (used for parameters.setRotation())
     private var hasLevelAngle = false
-    private var naturalLevelAngle =
+    var naturalLevelAngle =
         0.0 // "level" angle of device in degrees, before applying any calibration and without accounting for screen orientation
+        private set
 
     /** Returns the level angle in degrees.
      */
@@ -6948,12 +6950,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         this.hasPitchAngle = false
         if (mag > 1.0e-8) {
             this.hasPitchAngle = true
-            this.pitchAngle = asin(-z / mag) * 180.0 / Math.PI
+            this.pitchAngle = asin(-z / mag) * 180.0 / PI
 
             /*if( MyDebug.LOG )
 				Log.d(TAG, "pitch: " + pitchAngle);*/
             this.hasLevelAngle = true
-            this.naturalLevelAngle = atan2(-x, y) * 180.0 / Math.PI
+            this.naturalLevelAngle = atan2(-x, y) * 180.0 / PI
             if (this.naturalLevelAngle < -0.0) {
                 this.naturalLevelAngle += 360.0
             }
@@ -7042,7 +7044,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         SensorManager.getOrientation(cameraRotation, newGeoDirection)
         /*if( MyDebug.LOG ) {
 			Log.d(TAG, "###");
-			Log.d(TAG, "old geoDirection: " + (_geoDirection[0]*180/Math.PI) + ", " + (_geoDirection[1]*180/Math.PI) + ", " + (_geoDirection[2]*180/Math.PI));
+			Log.d(TAG, "old geoDirection: " + (_geoDirection[0]*180/PI) + ", " + (_geoDirection[1]*180/PI) + ", " + (_geoDirection[2]*180/PI));
 		}*/
         for (i in 0..2) {
             var oldCompass = Math.toDegrees(_geoDirection[i].toDouble()).toFloat()
@@ -7055,8 +7057,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             _geoDirection[i] = Math.toRadians(oldCompass.toDouble()).toFloat()
         }
         /*if( MyDebug.LOG ) {
-			Log.d(TAG, "newGeoDirection: " + (newGeoDirection[0]*180/Math.PI) + ", " + (newGeoDirection[1]*180/Math.PI) + ", " + (newGeoDirection[2]*180/Math.PI));
-			Log.d(TAG, "geoDirection: " + (_geoDirection[0]*180/Math.PI) + ", " + (_geoDirection[1]*180/Math.PI) + ", " + (_geoDirection[2]*180/Math.PI));
+			Log.d(TAG, "newGeoDirection: " + (newGeoDirection[0]*180/PI) + ", " + (newGeoDirection[1]*180/PI) + ", " + (newGeoDirection[2]*180/PI));
+			Log.d(TAG, "geoDirection: " + (_geoDirection[0]*180/PI) + ", " + (_geoDirection[1]*180/PI) + ", " + (_geoDirection[2]*180/PI));
 		}*/
     }
 

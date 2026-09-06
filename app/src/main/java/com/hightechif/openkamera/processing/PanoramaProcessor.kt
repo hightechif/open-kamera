@@ -47,6 +47,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.util.Locale
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -1421,10 +1422,10 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                     if (dx0 * dx0 + dy0 * dy0 < minRotationDist2) continue
 
                     val angle = (atan2(dy1, dx1) - atan2(dy0, dx0)).let {
-                        if (it < -Math.PI) it + 2 * Math.PI else if (it > Math.PI) it - 2 * Math.PI else it
+                        if (it < -PI) it + 2 * PI else if (it > PI) it - 2 * PI else it
                     }.toFloat()
 
-                    if (abs(angle) > 30.0f * Math.PI / 180.0f) continue
+                    if (abs(angle) > (30.0 * PI / 180.0).toFloat()) continue
 
                     val c0x = (p0[match.index0].x + p0[match2.index0].x) / 2
                     val c0y = (p0[match.index0].y + p0[match2.index0].y) / 2
@@ -1470,7 +1471,7 @@ class PanoramaProcessor(private val context: Context, private val hdrProcessor: 
                 if (dx0 * dx0 + dy0 * dy0 < 1e-5 || dx1 * dx1 + dy1 * dy1 < 1e-5) null
                 else {
                     val a = atan2(dy1, dx1) - atan2(dy0, dx0)
-                    if (a < -Math.PI) a + 2 * Math.PI else if (a > Math.PI) a - 2 * Math.PI else a
+                    if (a < -PI) a + 2 * PI else if (a > PI) a - 2 * PI else a
                 }
             }
             if (angles.isNotEmpty()) rotation = angles.average().toFloat()
