@@ -49,13 +49,18 @@ import androidx.core.net.toUri
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.Facing
 import com.hightechif.openkamera.cameracontroller.RawImage
+import com.hightechif.openkamera.domain.interactor.CameraSettingsInteractor
 import com.hightechif.openkamera.domain.repository.ILocationRepository
 import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
+import com.hightechif.openkamera.domain.repository.preferences.CameraPreferencesRepository
+import com.hightechif.openkamera.domain.repository.preferences.LocationPreferencesRepository
+import com.hightechif.openkamera.domain.repository.preferences.PhotoPreferencesRepository
+import com.hightechif.openkamera.domain.repository.preferences.UiHudPreferencesRepository
+import com.hightechif.openkamera.domain.repository.preferences.VideoPreferencesRepository
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
-import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
 import com.hightechif.openkamera.preview.ApplicationInterface.NoFreeStorageException
 import com.hightechif.openkamera.preview.ApplicationInterface.RawPref
@@ -63,6 +68,7 @@ import com.hightechif.openkamera.preview.ApplicationInterface.VideoMethod
 import com.hightechif.openkamera.preview.BasicApplicationInterface
 import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.preview.VideoProfile
+import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.PanoramaProcessor
 import com.hightechif.openkamera.sensors.GyroSensor
@@ -83,6 +89,7 @@ import java.util.Date
 import java.util.Timer
 import java.util.TimerTask
 import kotlin.concurrent.Volatile
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -98,7 +105,8 @@ class MyApplicationInterface internal constructor(
     val settingsRepository: ISettingsRepository? = null,
     val mediaRepository: IMediaRepository? = null,
     val locationRepository: ILocationRepository? = null,
-    val sensorRepository: ISensorRepository? = null
+    val sensorRepository: ISensorRepository? = null,
+    settingsInteractor: CameraSettingsInteractor? = null
 ) : BasicApplicationInterface() {
     // note, okay to change the order of enums in future versions, as getPhotoMode() does not rely on the order for the saved photo mode
     enum class PhotoMode {
@@ -125,6 +133,13 @@ class MyApplicationInterface internal constructor(
     val storageUtils: StorageUtils
     val drawPreview: DrawPreview
     val imageSaver: ImageSaver
+    val cameraSettingsInteractor: CameraSettingsInteractor
+
+    val cameraPreferencesRepository: CameraPreferencesRepository get() = cameraSettingsInteractor.cameraPrefs
+    val videoPreferencesRepository: VideoPreferencesRepository get() = cameraSettingsInteractor.videoPrefs
+    val photoPreferencesRepository: PhotoPreferencesRepository get() = cameraSettingsInteractor.photoPrefs
+    val locationPreferencesRepository: LocationPreferencesRepository get() = cameraSettingsInteractor.locationPrefs
+    val uiHudPreferencesRepository: UiHudPreferencesRepository get() = cameraSettingsInteractor.uiHudPrefs
 
     private var nCaptureImages =
         0 // how many calls to onPictureTaken() since the last call to onCaptureStarted()
@@ -425,10 +440,7 @@ class MyApplicationInterface internal constructor(
         return settingsRepository?.getStringPreference(
             PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
             ""
-        ) ?: sharedPreferences.getString(
-            PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
-            ""
-        )!!
+        ) ?: cameraSettingsInteractor.cameraPrefs.getFlashPref(getCameraIdPref())
     }
 
     override fun setFlashPref(flashValue: String?) {
@@ -437,9 +449,7 @@ class MyApplicationInterface internal constructor(
                 PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()),
                 flashValue
             )
-        }
-        sharedPreferences.edit {
-            putString(PreferenceKeys.getFlashPreferenceKey(getCameraIdPref()), flashValue)
+            cameraSettingsInteractor.cameraPrefs.setFlashPref(getCameraIdPref(), flashValue)
         }
     }
 
@@ -451,18 +461,12 @@ class MyApplicationInterface internal constructor(
                 "focus_mode_manual2"
             }
         }
-        return sharedPreferences.getString(
-            PreferenceKeys.getFocusPreferenceKey(
-                getCameraIdPref(),
-                isVideo
-            ), ""
-        )!!
+        return cameraSettingsInteractor.cameraPrefs.getFocusPref(getCameraIdPref(), isVideo)
     }
 
     val focusAssistPref: Int
         get() {
-            val focusAssistValue =
-                sharedPreferences.getString(PreferenceKeys.FOCUS_ASSIST_PREFERENCE_KEY, "0")!!
+            val focusAssistValue = cameraSettingsInteractor.cameraPrefs.getFocusAssistPref()
             var focusAssist: Int
             try {
                 focusAssist = focusAssistValue.toInt()
@@ -490,86 +494,44 @@ class MyApplicationInterface internal constructor(
         }
     }
 
-    override fun getSceneModePref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.SCENE_MODE_PREFERENCE_KEY,
-            CameraController.SCENE_MODE_DEFAULT
-        )!!
-    }
+    override fun getSceneModePref(): String =
+        cameraSettingsInteractor.cameraPrefs.getSceneModePref()
 
-    override fun setSceneModePref(sceneMode: String?) {
-        sharedPreferences.edit {
-            putString(PreferenceKeys.SCENE_MODE_PREFERENCE_KEY, sceneMode)
-        }
-    }
+    override fun setSceneModePref(sceneMode: String?) =
+        cameraSettingsInteractor.cameraPrefs.setSceneModePref(sceneMode)
 
-    override fun getColorEffectPref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY,
-            CameraController.COLOR_EFFECT_DEFAULT
-        )!!
-    }
+    override fun getColorEffectPref(): String =
+        cameraSettingsInteractor.cameraPrefs.getColorEffectPref()
 
-    override fun setColorEffectPref(colorEffect: String?) {
-        sharedPreferences.edit {
-            putString(PreferenceKeys.COLOR_EFFECT_PREFERENCE_KEY, colorEffect)
-        }
-    }
+    override fun setColorEffectPref(colorEffect: String?) =
+        cameraSettingsInteractor.cameraPrefs.setColorEffectPref(colorEffect)
 
-    override fun getWhiteBalancePref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY,
-            CameraController.WHITE_BALANCE_DEFAULT
-        )!!
-    }
+    override fun getWhiteBalancePref(): String =
+        cameraSettingsInteractor.cameraPrefs.getWhiteBalancePref()
 
-    override fun setWhiteBalancePref(whiteBalance: String?) {
-        sharedPreferences.edit {
-            putString(PreferenceKeys.WHITE_BALANCE_PREFERENCE_KEY, whiteBalance)
-        }
-    }
+    override fun setWhiteBalancePref(whiteBalance: String?) =
+        cameraSettingsInteractor.cameraPrefs.setWhiteBalancePref(whiteBalance)
 
     override fun getWhiteBalanceTemperaturePref(): Int =
-        sharedPreferences.getInt(PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY, 5000)
+        cameraSettingsInteractor.cameraPrefs.getWhiteBalanceTemperaturePref()
 
-    override fun setWhiteBalanceTemperaturePref(whiteBalanceTemperature: Int) {
-        sharedPreferences.edit {
-            putInt(
-                PreferenceKeys.WHITE_BALANCE_TEMPERATURE_PREFERENCE_KEY,
-                whiteBalanceTemperature
-            )
-        }
-    }
+    override fun setWhiteBalanceTemperaturePref(whiteBalanceTemperature: Int) =
+        cameraSettingsInteractor.cameraPrefs.setWhiteBalanceTemperaturePref(whiteBalanceTemperature)
 
-    override fun getAntiBandingPref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.ANTI_BANDING_PREFERENCE_KEY,
-            CameraController.ANTIBANDING_DEFAULT
-        )!!
-    }
+    override fun getAntiBandingPref(): String =
+        cameraSettingsInteractor.cameraPrefs.getAntiBandingPref()
 
-    override fun getEdgeModePref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.EDGE_MODE_PREFERENCE_KEY,
-            CameraController.EDGE_MODE_DEFAULT
-        )!!
-    }
+    override fun getEdgeModePref(): String =
+        cameraSettingsInteractor.cameraPrefs.getEdgeModePref()
 
-    override fun getCameraNoiseReductionModePref(): String {
-        return sharedPreferences.getString(
-            PreferenceKeys.CAMERA_NOISE_REDUCTION_MODE_PREFERENCE_KEY,
-            CameraController.NOISE_REDUCTION_MODE_DEFAULT
-        )!!
-    }
+    override fun getCameraNoiseReductionModePref(): String =
+        cameraSettingsInteractor.cameraPrefs.getCameraNoiseReductionModePref()
 
     override fun getISOPref(): String {
         return settingsRepository?.getStringPreference(
             PreferenceKeys.ISO_PREFERENCE_KEY,
             CameraController.ISO_DEFAULT
-        ) ?: sharedPreferences.getString(
-            PreferenceKeys.ISO_PREFERENCE_KEY,
-            CameraController.ISO_DEFAULT
-        )!!
+        ) ?: cameraSettingsInteractor.cameraPrefs.getISOPref()
     }
 
     override fun setISOPref(iso: String?) {
@@ -578,37 +540,15 @@ class MyApplicationInterface internal constructor(
                 PreferenceKeys.ISO_PREFERENCE_KEY,
                 iso
             )
-        }
-        sharedPreferences.edit {
-            putString(PreferenceKeys.ISO_PREFERENCE_KEY, iso)
+            cameraSettingsInteractor.cameraPrefs.setISOPref(iso)
         }
     }
 
-    override fun getExposureCompensationPref(): Int {
-        val value =
-            sharedPreferences.getString(PreferenceKeys.EXPOSURE_PREFERENCE_KEY, "0")!!
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "saved exposure value: $value"
-        )
-        var exposure = 0
-        try {
-            exposure = value.toInt()
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "exposure: $exposure"
-            )
-        } catch (_: NumberFormatException) {
-            if (MyDebug.LOG) Log.d(TAG, "exposure invalid format, can't parse to int")
-        }
-        return exposure
-    }
+    override fun getExposureCompensationPref(): Int =
+        cameraSettingsInteractor.cameraPrefs.getExposureCompensationPref()
 
-    override fun setExposureCompensationPref(exposure: Int) {
-        sharedPreferences.edit {
-            putString(PreferenceKeys.EXPOSURE_PREFERENCE_KEY, exposure.toString())
-        }
-    }
+    override fun setExposureCompensationPref(exposure: Int) =
+        cameraSettingsInteractor.cameraPrefs.setExposureCompensationPref(exposure)
 
     override fun getCameraResolutionPref(constraints: CameraResolutionConstraints): Pair<Int, Int>? {
         val photoMode = photoMode
@@ -619,55 +559,10 @@ class MyApplicationInterface internal constructor(
             return Pair(bestSize.width, bestSize.height)
         }
 
-        val resolutionValue = sharedPreferences.getString(
-            PreferenceKeys.getResolutionPreferenceKey(
-                getCameraIdPref(),
-                getCameraIdSPhysicalPref()
-            ), ""
-        )!!
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "resolution_value: $resolutionValue"
+        var result: Pair<Int, Int>? = cameraSettingsInteractor.cameraPrefs.getCameraResolutionPref(
+            getCameraIdPref(),
+            getCameraIdSPhysicalPref()
         )
-        var result: Pair<Int, Int>? = null
-        if (resolutionValue.isNotEmpty()) {
-            // parse the saved size, and make sure it is still valid
-            val index = resolutionValue.indexOf(' ')
-            if (index == -1) {
-                if (MyDebug.LOG) Log.d(TAG, "resolution_value invalid format, can't find space")
-            } else {
-                val resolutionWS = resolutionValue.substring(0, index)
-                val resolutionHS = resolutionValue.substring(index + 1)
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "resolution_w_s: $resolutionWS"
-                    )
-                    Log.d(
-                        TAG,
-                        "resolution_h_s: $resolutionHS"
-                    )
-                }
-                try {
-                    val resolutionW = resolutionWS.toInt()
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "resolution_w: $resolutionW"
-                    )
-                    val resolutionH = resolutionHS.toInt()
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "resolution_h: $resolutionH"
-                    )
-                    result = Pair(resolutionW, resolutionH)
-                } catch (_: NumberFormatException) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "resolution_value invalid format, can't parse w or h to int"
-                    )
-                }
-            }
-        }
 
         if (photoMode == PhotoMode.NoiseReduction || photoMode == PhotoMode.HDR) {
             // set a maximum resolution for modes that require decompressing multiple images for processing,
@@ -684,25 +579,8 @@ class MyApplicationInterface internal constructor(
     }
 
     private val saveImageQualityPref: Int
-        /** getImageQualityPref() returns the image quality used for the Camera Controller for taking a
-         * photo - in some cases, we may set that to a higher value, then perform processing on the
-         * resultant JPEG before resaving. This method returns the image quality setting to be used for
-         * saving the final image (as specified by the user).
-         */
         get() {
-            if (MyDebug.LOG) Log.d(TAG, "getSaveImageQualityPref")
-            val imageQualityS =
-                sharedPreferences.getString(PreferenceKeys.QUALITY_PREFERENCE_KEY, "90")!!
-            var imageQuality: Int
-            try {
-                imageQuality = imageQualityS.toInt()
-            } catch (_: NumberFormatException) {
-                if (MyDebug.LOG) Log.e(
-                    TAG,
-                    "image_quality_s invalid format: $imageQualityS"
-                )
-                imageQuality = 90
-            }
+            var imageQuality = cameraSettingsInteractor.photoPrefs.getImageQualityPref()
             if (isRawOnly) {
                 // if raw only mode, we can set a lower quality for the JPEG, as it isn't going to be saved - only used for
                 // the thumbnail and pause preview option
@@ -718,9 +596,9 @@ class MyApplicationInterface internal constructor(
         // at 100% quality for post-processing, the final image will then be saved at the user requested
         // setting
         val photoMode = photoMode
-        if (mainActivity.preview
-                .isVideo
-        ) ; else if (photoMode == PhotoMode.DRO) return 100
+        if (mainActivity.preview.isVideo) {
+            // do nothing
+        } else if (photoMode == PhotoMode.DRO) return 100
         else if (photoMode == PhotoMode.HDR) return 100
         else if (photoMode == PhotoMode.NoiseReduction) return 100
 
@@ -770,42 +648,35 @@ class MyApplicationInterface internal constructor(
             }
         }
 
-        // Conceivably, we might get in a state where the fps isn't supported at all (e.g., an upgrade changes the available
-        // supported video resolutions/frame-rates).
-        return sharedPreferences.getString(
-            PreferenceKeys.getVideoQualityPreferenceKey(
-                getCameraIdPref(),
-                getCameraIdSPhysicalPref(), fpsIsHighSpeed()
-            ), ""
-        )!!
+        return cameraSettingsInteractor.videoPrefs.getVideoQualityPref(
+            getCameraIdPref(),
+            getCameraIdSPhysicalPref(),
+            fpsIsHighSpeed()
+        )
     }
 
     override fun setVideoQualityPref(videoQuality: String?) {
-        sharedPreferences.edit {
-            putString(
-                PreferenceKeys.getVideoQualityPreferenceKey(
-                    getCameraIdPref(),
-                    getCameraIdSPhysicalPref(), fpsIsHighSpeed()
-                ), videoQuality
+        if (videoQuality != null) {
+            cameraSettingsInteractor.videoPrefs.setVideoQualityPref(
+                getCameraIdPref(),
+                getCameraIdSPhysicalPref(),
+                fpsIsHighSpeed(),
+                videoQuality
             )
         }
     }
 
     override fun getVideoStabilizationPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.VIDEO_STABILIZATION_PREFERENCE_KEY, false)
+        cameraSettingsInteractor.videoPrefs.getVideoStabilizationPref()
 
-    override fun getForce4KPref(): Boolean = getCameraIdPref() == 0 && sharedPreferences.getBoolean(
-        PreferenceKeys.FORCE_VIDEO_4_K_PREFERENCE_KEY,
-        false
-    ) && mainActivity.supportsForceVideo4K()
+    override fun getForce4KPref(): Boolean =
+        cameraSettingsInteractor.videoPrefs.getForce4KPref(getCameraIdPref()) && mainActivity.supportsForceVideo4K()
 
-    override fun getRecordVideoOutputFormatPref(): String = sharedPreferences.getString(
-        PreferenceKeys.VIDEO_FORMAT_PREFERENCE_KEY,
-        "preference_video_output_format_default"
-    )!!
+    override fun getRecordVideoOutputFormatPref(): String =
+        cameraSettingsInteractor.videoPrefs.getRecordVideoOutputFormatPref()
 
     override fun getVideoBitratePref(): String =
-        sharedPreferences.getString(PreferenceKeys.VIDEO_BITRATE_PREFERENCE_KEY, "default")!!
+        cameraSettingsInteractor.videoPrefs.getVideoBitratePref()
 
     override fun getVideoFPSPref(): String {
         // if check for EXTRA_VIDEO_QUALITY, if set, best to fall back to default FPS - see corresponding code in getVideoQualityPref
@@ -858,12 +729,10 @@ class MyApplicationInterface internal constructor(
             Log.e(TAG, "can't find valid fps for slow motion")
             return "default"
         }
-        return sharedPreferences.getString(
-            PreferenceKeys.getVideoFPSPreferenceKey(
-                getCameraIdPref(),
-                getCameraIdSPhysicalPref()
-            ), "default"
-        )!!
+        return cameraSettingsInteractor.videoPrefs.getVideoFPSPref(
+            getCameraIdPref(),
+            getCameraIdSPhysicalPref()
+        )
     }
 
     override fun getVideoCaptureRateFactor(): Float {
@@ -1018,39 +887,11 @@ class MyApplicationInterface internal constructor(
                 return intentDurationLimit * 1000L
             }
         }
-
-        val videoMaxDurationValue =
-            sharedPreferences.getString(PreferenceKeys.VIDEO_MAX_DURATION_PREFERENCE_KEY, "0")!!
-        var videoMaxDuration: Long
-        try {
-            videoMaxDuration = videoMaxDurationValue.toInt().toLong() * 1000
-        } catch (e: NumberFormatException) {
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "failed to parse preference_video_max_duration value: $videoMaxDurationValue"
-            )
-            e.printStackTrace()
-            videoMaxDuration = 0
-        }
-        return videoMaxDuration
+        return cameraSettingsInteractor.videoPrefs.getVideoMaxDurationPref()
     }
 
-    override fun getVideoRestartTimesPref(): Int {
-        val restartValue =
-            sharedPreferences.getString(PreferenceKeys.VIDEO_RESTART_PREFERENCE_KEY, "0")!!
-        var remainingRestartVideo: Int
-        try {
-            remainingRestartVideo = restartValue.toInt()
-        } catch (e: NumberFormatException) {
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "failed to parse preference_video_restart value: $restartValue"
-            )
-            e.printStackTrace()
-            remainingRestartVideo = 0
-        }
-        return remainingRestartVideo
-    }
+    override fun getVideoRestartTimesPref(): Int =
+        cameraSettingsInteractor.videoPrefs.getVideoRestartTimesPref()
 
     val videoMaxFileSizeUserPref: Long
         get() {
@@ -1069,28 +910,7 @@ class MyApplicationInterface internal constructor(
                 }
             }
 
-            val videoMaxFilesizeValue =
-                sharedPreferences.getString(
-                    PreferenceKeys.VIDEO_MAX_FILE_SIZE_PREFERENCE_KEY,
-                    "0"
-                )!!
-            var videoMaxFilesize: Long
-            try {
-                videoMaxFilesize = videoMaxFilesizeValue.toLong()
-            } catch (e: NumberFormatException) {
-                if (MyDebug.LOG) Log.e(
-                    TAG,
-                    "failed to parse preference_video_max_filesize value: $videoMaxFilesizeValue"
-                )
-                e.printStackTrace()
-                videoMaxFilesize = 0
-            }
-            //videoMaxFilesize = 1024*1024; // test
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "video_max_filesize: $videoMaxFilesize"
-            )
-            return videoMaxFilesize
+            return cameraSettingsInteractor.videoPrefs.getVideoMaxFileSizePref().maxFilesize
         }
 
     private val videoRestartMaxFileSizeUserPref: Boolean
@@ -1103,10 +923,7 @@ class MyApplicationInterface internal constructor(
                 }
             }
 
-            return sharedPreferences.getBoolean(
-                PreferenceKeys.VIDEO_RESTART_MAX_FILE_SIZE_PREFERENCE_KEY,
-                true
-            )
+            return cameraSettingsInteractor.videoPrefs.getVideoMaxFileSizePref().autoRestart
         }
 
     @Throws(NoFreeStorageException::class)
@@ -1196,56 +1013,40 @@ class MyApplicationInterface internal constructor(
     }
 
     override fun getVideoFlashPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.VIDEO_FLASH_PREFERENCE_KEY, false)
+        cameraSettingsInteractor.videoPrefs.getVideoFlashPref()
 
     override fun getVideoLowPowerCheckPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.VIDEO_LOW_POWER_CHECK_PREFERENCE_KEY, true)
+        cameraSettingsInteractor.videoPrefs.getVideoLowPowerCheckPref()
 
-    override fun getPreviewSizePref(): String = sharedPreferences.getString(
-        PreferenceKeys.PREVIEW_SIZE_PREFERENCE_KEY,
-        "preference_preview_size_wysiwyg"
-    )!!
+    override fun getPreviewSizePref(): String =
+        cameraSettingsInteractor.uiHudPrefs.getPreviewSizePref()
 
     override fun getLockOrientationPref(): String {
         if (photoMode == PhotoMode.Panorama) return "portrait" // for now panorama only supports portrait
-
-        return sharedPreferences.getString(
-            PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY,
-            "none"
-        )!!
+        return cameraSettingsInteractor.uiHudPrefs.getLockOrientationPref()
     }
 
-    override fun getTouchCapturePref(): Boolean {
-        val value =
-            sharedPreferences.getString(PreferenceKeys.TOUCH_CAPTURE_PREFERENCE_KEY, "none")!!
-        return value == "single"
-    }
+    override fun getTouchCapturePref(): Boolean =
+        cameraSettingsInteractor.uiHudPrefs.getTouchCapturePref()
 
-    override fun getDoubleTapCapturePref(): Boolean {
-        val value =
-            sharedPreferences.getString(PreferenceKeys.TOUCH_CAPTURE_PREFERENCE_KEY, "none")!!
-        return value == "double"
-    }
+    override fun getDoubleTapCapturePref(): Boolean =
+        cameraSettingsInteractor.uiHudPrefs.getDoubleTapCapturePref()
 
     override fun getPausePreviewPref(): Boolean {
         if (mainActivity.preview.isVideoRecording) {
             // don't pause preview when taking photos while recording video!
             return false
         } else if (mainActivity.lastContinuousFastBurst()) {
-            // Don't use pause preview mode when doing a continuous fast burst
-            // Firstly due to not using background thread for pause preview mode, this will be
-            // sluggish anyway, but even when this is fixed, I'm not sure if it makes sense to use
-            // pause preview in this mode.
             return false
         } else if (photoMode == PhotoMode.Panorama) {
             // don't pause preview when taking photos for panorama mode
             return false
         }
-        return sharedPreferences.getBoolean(PreferenceKeys.PAUSE_PREVIEW_PREFERENCE_KEY, false)
+        return cameraSettingsInteractor.uiHudPrefs.getPausePreviewPref()
     }
 
     override fun getShowToastsPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.SHOW_TOASTS_PREFERENCE_KEY, true)
+        cameraSettingsInteractor.uiHudPrefs.getShowToastsPref()
 
     val thumbnailAnimationPref: Boolean
         get() = sharedPreferences.getBoolean(
@@ -1255,58 +1056,24 @@ class MyApplicationInterface internal constructor(
 
     override fun getShutterSoundPref(): Boolean {
         if (photoMode == PhotoMode.Panorama) return false
-        return sharedPreferences.getBoolean(PreferenceKeys.SHUTTER_SOUND_PREFERENCE_KEY, true)
+        return cameraSettingsInteractor.uiHudPrefs.getShutterSoundPref()
     }
 
     override fun getStartupFocusPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.STARTUP_FOCUS_PREFERENCE_KEY, true)
+        cameraSettingsInteractor.uiHudPrefs.getStartupFocusPref()
 
     override fun getTimerPref(): Long {
-        if (photoMode == PhotoMode.Panorama) return 0 // don't support timer with panorama
-
-        val timerValue =
-            sharedPreferences.getString(PreferenceKeys.TIMER_PREFERENCE_KEY, "0")!!
-        var timerDelay: Long
-        try {
-            timerDelay = timerValue.toInt().toLong() * 1000
-        } catch (e: NumberFormatException) {
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "failed to parse preference_timer value: $timerValue"
-            )
-            e.printStackTrace()
-            timerDelay = 0
-        }
-        return timerDelay
+        if (photoMode == PhotoMode.Panorama) return 0L // don't support timer with panorama
+        return cameraSettingsInteractor.uiHudPrefs.getTimerPref()
     }
 
     override fun getRepeatPref(): String {
         if (photoMode == PhotoMode.Panorama) return "1" // don't support repeat with panorama
-
-        return sharedPreferences.getString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1")!!
+        return cameraSettingsInteractor.photoPrefs.getRepeatPref()
     }
 
-    override fun getRepeatIntervalPref(): Long {
-        val timerValue =
-            sharedPreferences.getString(PreferenceKeys.REPEAT_INTERVAL_PREFERENCE_KEY, "0")!!
-        var timerDelay: Long
-        try {
-            val timerDelayS = timerValue.toFloat()
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "timer_delay_s: $timerDelayS"
-            )
-            timerDelay = (timerDelayS * 1000).toLong()
-        } catch (e: NumberFormatException) {
-            if (MyDebug.LOG) Log.e(
-                TAG,
-                "failed to parse repeat interval value: $timerValue"
-            )
-            e.printStackTrace()
-            timerDelay = 0
-        }
-        return timerDelay
-    }
+    override fun getRepeatIntervalPref(): Long =
+        cameraSettingsInteractor.photoPrefs.getRepeatIntervalPref()
 
     private val removeDeviceExifPref: ImageSaver.Request.RemoveDeviceExif
         get() {
@@ -1321,26 +1088,22 @@ class MyApplicationInterface internal constructor(
         }
 
     override fun getGeotaggingPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
+        cameraSettingsInteractor.locationPrefs.getGeotaggingPref()
 
     override fun getRequireLocationPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.REQUIRE_LOCATION_PREFERENCE_KEY, false)
+        cameraSettingsInteractor.locationPrefs.getRequireLocationPref()
 
     val geodirectionPref: Boolean
-        get() = sharedPreferences.getBoolean(PreferenceKeys.GPS_DIRECTION_PREFERENCE_KEY, false)
+        get() = cameraSettingsInteractor.locationPrefs.getGeodirectionPref()
 
     override fun getRecordAudioPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.RECORD_AUDIO_PREFERENCE_KEY, true)
+        cameraSettingsInteractor.videoPrefs.getRecordAudioPref()
 
-    override fun getRecordAudioChannelsPref(): String = sharedPreferences.getString(
-        PreferenceKeys.RECORD_AUDIO_CHANNELS_PREFERENCE_KEY,
-        "audio_default"
-    )!!
+    override fun getRecordAudioChannelsPref(): String =
+        cameraSettingsInteractor.videoPrefs.getRecordAudioChannelsPref()
 
-    override fun getRecordAudioSourcePref(): String = sharedPreferences.getString(
-        PreferenceKeys.RECORD_AUDIO_SOURCE_PREFERENCE_KEY,
-        "audio_src_camcorder"
-    )!!
+    override fun getRecordAudioSourcePref(): String =
+        cameraSettingsInteractor.videoPrefs.getRecordAudioSourcePref()
 
     val focusPeakingPref: Boolean
         get() {
@@ -1396,28 +1159,16 @@ class MyApplicationInterface internal constructor(
         }
 
     val stampPref: String
-        get() = sharedPreferences.getString(
-            PreferenceKeys.STAMP_PREFERENCE_KEY,
-            "preference_stamp_no"
-        )!!
+        get() = cameraSettingsInteractor.photoPrefs.getStampPref()
 
     private val stampDateFormatPref: String
-        get() = sharedPreferences.getString(
-            PreferenceKeys.STAMP_DATE_FORMAT_PREFERENCE_KEY,
-            "preference_stamp_dateformat_default"
-        )!!
+        get() = cameraSettingsInteractor.photoPrefs.getStampDateFormatPref()
 
     private val stampTimeFormatPref: String
-        get() = sharedPreferences.getString(
-            PreferenceKeys.STAMP_TIME_FORMAT_PREFERENCE_KEY,
-            "preference_stamp_timeformat_default"
-        )!!
+        get() = cameraSettingsInteractor.photoPrefs.getStampTimeFormatPref()
 
     private val stampGPSFormatPref: String
-        get() = sharedPreferences.getString(
-            PreferenceKeys.STAMP_GPS_FORMAT_PREFERENCE_KEY,
-            "preference_stamp_gpsformat_default"
-        )!!
+        get() = cameraSettingsInteractor.photoPrefs.getStampGPSFormatPref()
 
     private val unitsDistancePref: String
         /*private String getStampGeoAddressPref() {
@@ -1429,37 +1180,16 @@ class MyApplicationInterface internal constructor(
         )!!
 
     val textStampPref: String
-        get() = sharedPreferences.getString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, "")!!
+        get() = cameraSettingsInteractor.photoPrefs.getStampCustomText()
 
     private val textStampFontSizePref: Int
-        get() {
-            var fontSize = 12
-            val value =
-                sharedPreferences.getString(PreferenceKeys.STAMP_FONT_SIZE_PREFERENCE_KEY, "12")!!
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "saved font size: $value"
-            )
-            try {
-                fontSize = value.toInt()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "font_size: $fontSize"
-                )
-            } catch (_: NumberFormatException) {
-                if (MyDebug.LOG) Log.d(TAG, "font size invalid format, can't parse to int")
-            }
-            return fontSize
-        }
+        get() = cameraSettingsInteractor.photoPrefs.getStampFontSizePref()
 
     private fun getVideoSubtitlePref(videoMethod: VideoMethod): String {
         if (videoMethod === VideoMethod.MEDIASTORE && !mediastoreSupportsVideoSubtitles()) {
             return "preference_video_subtitle_no"
         }
-        return sharedPreferences.getString(
-            PreferenceKeys.VIDEO_SUBTITLE_PREF,
-            "preference_video_subtitle_no"
-        )!!
+        return cameraSettingsInteractor.videoPrefs.getVideoSubtitlePref()
     }
 
     override fun getZoomPref(): Int {
@@ -1985,12 +1715,7 @@ class MyApplicationInterface internal constructor(
             if (isRaw == true) {
                 return RawPref.RAWPREF_JPEG_DNG
             }
-            when (sharedPreferences.getString(
-                PreferenceKeys.RAW_PREFERENCE_KEY,
-                "preference_raw_no"
-            )) {
-                "preference_raw_yes", "preference_raw_only" -> return RawPref.RAWPREF_JPEG_DNG
-            }
+            return cameraSettingsInteractor.photoPrefs.getRawPref()
         }
         return RawPref.RAWPREF_JPEG_ONLY
     }
@@ -2201,14 +1926,14 @@ class MyApplicationInterface internal constructor(
             "setNextPanoramaPoint : $x , $y , $z"
         )
 
-        val targetAngle = 1.0f * 0.01745329252f
+        val targetAngle = (1.0 * (PI / 180.0)).toFloat()
         //final float targetAngle = 0.5f * 0.01745329252f;
         // good to not allow too small an angle for uprightAngleTol - as sometimes the device may
         // get in a state where what we think is upright isn't quite right, and frustrating for users
         // to be told they have to tilt to not be upright
-        val uprightAngleTol = 3.0f * 0.017452406437f
+        val uprightAngleTol = (3.0 * (PI / 180.0)).toFloat()
         //final float uprightAngleTol = 2.0f * 0.017452406437f;
-        val tooFarAngle = 45.0f * 0.01745329252f
+        val tooFarAngle = (45.0 * (PI / 180.0)).toFloat()
         gyroSensor.setTarget(
             x,
             y,
@@ -3228,21 +2953,12 @@ class MyApplicationInterface internal constructor(
             // in Panorama mode we'll have set a different resolution to the user setting, so don't want that to then be saved!
             return
         }
-        val resolutionValue = "$width $height"
-        if (MyDebug.LOG) {
-            Log.d(
-                TAG,
-                "save new resolution_value: $resolutionValue"
-            )
-        }
-        sharedPreferences.edit {
-            putString(
-                PreferenceKeys.getResolutionPreferenceKey(
-                    getCameraIdPref(),
-                    getCameraIdSPhysicalPref()
-                ), resolutionValue
-            )
-        }
+        cameraSettingsInteractor.cameraPrefs.setCameraResolutionPref(
+            getCameraIdPref(),
+            getCameraIdSPhysicalPref(),
+            width,
+            height
+        )
     }
 
     override fun requestCameraPermission() {
@@ -4207,6 +3923,13 @@ class MyApplicationInterface internal constructor(
         }
         this.mainActivity = mainActivity
         this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
+        this.cameraSettingsInteractor = settingsInteractor ?: CameraSettingsInteractor(
+            CameraPreferencesRepository(sharedPreferences),
+            VideoPreferencesRepository(sharedPreferences),
+            PhotoPreferencesRepository(sharedPreferences),
+            LocationPreferencesRepository(sharedPreferences),
+            UiHudPreferencesRepository(sharedPreferences)
+        )
         this.locationSupplier = LocationSupplier(mainActivity)
         if (MyDebug.LOG) Log.d(
             TAG,
