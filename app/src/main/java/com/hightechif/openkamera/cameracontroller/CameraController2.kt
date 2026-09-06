@@ -1075,73 +1075,7 @@ class CameraController2(
      * than 16 or in some cases 32 points?! OnePlus 3T meanwhile has more gradual behavior where it gets better at 64 points.
      */
     private fun enforceMinTonemapCurvePoints(inValues: FloatArray): FloatArray {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "enforceMinTonemapCurvePoints: " + inValues.contentToString())
-            Log.d(TAG, "length: " + inValues.size / 2)
-        }
-        var minPointsC = 64
-        if (isSamsung) {
-            // Unfortunately odd bug on Samsung devices (at least S7 and S10e) where if more than 32 control points,
-            // the maximum brightness value is reduced (can best be seen with 64 points, and using gamma==1.0).
-            // Also note that Samsung devices also need at least 16 control points, or in some cases 32, due to problem
-            // where things come out almost all black with some white. So choose 32!
-            //minPointsC = 16;
-            minPointsC = 32
-        }
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "min_points_c: $minPointsC"
-        )
-        if (inValues.size >= 2 * minPointsC) {
-            if (MyDebug.LOG) Log.d(TAG, "already enough points")
-            return inValues // fine
-        }
-        val points: MutableList<Pair<Float, Float>> = ArrayList()
-        for (i in 0..<inValues.size / 2) {
-            val point = Pair(
-                inValues[2 * i],
-                inValues[2 * i + 1]
-            )
-            points.add(point)
-        }
-        if (points.size < 2) {
-            Log.e(TAG, "less than 2 points?!")
-            return inValues
-        }
-
-        while (points.size < minPointsC) {
-            // find largest interval, and subdivide
-            var largestIndx = 0
-            var largestDist = 0.0f
-            for (i in 0..<points.size - 1) {
-                val p0 = points[i]
-                val p1 = points[i + 1]
-                val dist = p1.first - p0.first
-                if (dist > largestDist) {
-                    largestIndx = i
-                    largestDist = dist
-                }
-            }
-            /*if( MyDebug.LOG )
-                Log.d(TAG, "largest indx " + largestIndx + " dist: " + largestDist);*/
-            val p0 = points[largestIndx]
-            val p1 = points[largestIndx + 1]
-            val midX = 0.5f * (p0.first + p1.first)
-            val midY = 0.5f * (p0.second + p1.second)
-            /*if( MyDebug.LOG )
-                Log.d(TAG, "    insert: " + midX + " , " + midY);*/
-            points.add(largestIndx + 1, Pair(midX, midY))
-        }
-
-        val outValues = FloatArray(2 * points.size)
-        for (i in points.indices) {
-            val point = points[i]
-            outValues[2 * i] = point.first
-            outValues[2 * i + 1] = point.second
-            /*if( MyDebug.LOG )
-                Log.d(TAG, "out point[" + i + "]: " + point.first + " , " + point.second);*/
-        }
-        return outValues
+        return Camera2RequestBuilderHelper.enforceMinTonemapCurvePoints(inValues, isSamsung)
     }
 
     private fun closePictureImageReader() {
@@ -1152,61 +1086,10 @@ class CameraController2(
     }
 
     private fun convertFocusModesToValues(supportedFocusModesArr: IntArray): MutableList<String>? {
-        if (MyDebug.LOG) {
-            Log.d(TAG, "convertFocusModesToValues()")
-            Log.d(TAG, "supported_focus_modes_arr: " + supportedFocusModesArr.contentToString())
-        }
-        if (supportedFocusModesArr.isEmpty()) {
-            if (MyDebug.LOG) Log.d(TAG, "no supported focus modes")
-            return null
-        }
-        val supportedFocusModes: MutableList<Int> = ArrayList()
-        for (supportedFocusMode in supportedFocusModesArr) supportedFocusModes.add(
-            supportedFocusMode
+        return Camera2CapabilitiesResolver.convertFocusModesToValues(
+            supportedFocusModesArr,
+            minimumFocusDistance
         )
-        val outputModes: MutableList<String> = ArrayList()
-        // also resort as well as converting
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_AUTO)) {
-            outputModes.add("focus_mode_auto")
-            if (MyDebug.LOG) {
-                Log.d(TAG, " supports focus_mode_auto")
-            }
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_MACRO)) {
-            outputModes.add("focus_mode_macro")
-            if (MyDebug.LOG) Log.d(TAG, " supports focus_mode_macro")
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_AUTO)) {
-            outputModes.add("focus_mode_locked")
-            if (MyDebug.LOG) {
-                Log.d(TAG, " supports focus_mode_locked")
-            }
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_OFF)) {
-            outputModes.add("focus_mode_infinity")
-            if (MyDebug.LOG) {
-                Log.d(TAG, " supports focus_mode_infinity")
-            }
-            if (minimumFocusDistance > 0.0f) {
-                outputModes.add("focus_mode_manual2")
-                if (MyDebug.LOG) {
-                    Log.d(TAG, " supports focus_mode_manual2")
-                }
-            }
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_EDOF)) {
-            outputModes.add("focus_mode_edof")
-            if (MyDebug.LOG) Log.d(TAG, " supports focus_mode_edof")
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)) {
-            outputModes.add("focus_mode_continuous_picture")
-            if (MyDebug.LOG) Log.d(TAG, " supports focus_mode_continuous_picture")
-        }
-        if (supportedFocusModes.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)) {
-            outputModes.add("focus_mode_continuous_video")
-            if (MyDebug.LOG) Log.d(TAG, " supports focus_mode_continuous_video")
-        }
-        return outputModes
     }
 
     override val api: String
@@ -1215,1050 +1098,49 @@ class CameraController2(
     @get:Throws(CameraControllerException::class)
     override val cameraFeatures: CameraFeatures
         get() {
-            if (MyDebug.LOG) Log.d(TAG, "getCameraFeatures()")
-            val cameraFeatures = CameraFeatures()
-            /*if( true )
-                 throw new CameraControllerException();*/
-            if (MyDebug.LOG) {
-                val hardwareLevel =
-                    characteristics?.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-                Log.d(
-                    TAG,
-                    "Hardware Level: " + Camera2CapabilitiesResolver.getHardwareLevelDescription(
-                        hardwareLevel
-                    )
-                )
-
-                val nrModes =
-                    characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
-                Log.d(TAG, "nr_modes:")
-                if (nrModes == null) {
-                    Log.d(TAG, "    none")
-                } else {
-                    for (i in nrModes.indices) {
-                        Log.d(TAG, "    " + i + ": " + nrModes[i])
-                    }
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    val capabilities =
-                        characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_EXTENDED_SCENE_MODE_CAPABILITIES)
-                    Log.d(TAG, "capabilities:")
-                    if (capabilities == null) {
-                        Log.d(TAG, "    none")
-                    } else {
-                        for (i in capabilities.indices) {
-                            Log.d(TAG, "    " + i + ": " + capabilities[i].mode)
-                        }
-                    }
-                }
-            }
-
-            val zoomRange = Camera2CapabilitiesResolver.resolveZoomRange(
-                characteristics,
-                cameraIdSPhysical != null
+            val resolved = Camera2CapabilitiesResolver.resolveCameraFeatures(
+                context = context,
+                characteristics = characteristics,
+                cameraIdS = cameraIdS,
+                cameraIdSPhysical = cameraIdSPhysical,
+                facing = facing,
+                cameraFeaturesCache = cameraFeaturesCache,
+                extensionCharacteristics = extensionCharacteristics,
+                useFakePrecapture = useFakePrecapture,
+                allowManualWB = allowManualWB(),
+                isSamsungGalaxyS = isSamsungGalaxyS,
+                isSamsungGalaxyF = isSamsungGalaxyF,
+                jtvideoValuesSize = jtvideoValues.size,
+                jtlogValuesSize = jtlogValues.size,
+                jtlog2ValuesSize = jtlog2Values.size
             )
-            val minZoom = zoomRange.first
-            val maxZoom = zoomRange.second
-            cameraFeatures.isZoomSupported = maxZoom > 0.0f && minZoom > 0.0f
-            if (MyDebug.LOG) {
-                Log.d(TAG, "min_zoom: $minZoom")
-                Log.d(TAG, "max_zoom: $maxZoom")
+            this.zoomValue1x = resolved.zoomValue1x
+            this.fullZoomRatios = resolved.fullZoomRatios
+            this.zoomRatios = resolved.zoomRatios
+            this.supportsFaceDetectModeSimple = resolved.supportsFaceDetectModeSimple
+            this.supportsFaceDetectModeFull = resolved.supportsFaceDetectModeFull
+            this.rawSize = resolved.rawSize
+            this.wantRaw = resolved.wantRaw
+            this.aeFpsRanges = resolved.aeFpsRanges
+            this.hsFpsRanges = resolved.hsFpsRanges ?: ArrayList()
+            this.supportedExtensionsZoom = resolved.supportedExtensionsZoom
+            this.minimumFocusDistance = resolved.minimumFocusDistance
+            this.initialFocusMode = resolved.initialFocusMode
+            this.supportsOpticalStabilization = resolved.supportsOpticalStabilization
+            this.supportsPhotoVideoRecording = resolved.supportsPhotoVideoRecording
+            this.supportsWhiteBalanceTemperature = resolved.supportsWhiteBalanceTemperature
+            this.supportsExposureTime = resolved.supportsExposureTime
+            this.minExposureTime = resolved.minExposureTime
+            this.maxExposureTime = resolved.maxExposureTime
+            this.supportsTonemapPresetCurve = resolved.supportsTonemapPresetCurve
+            if (!resolved.wantJpegR) {
+                this.wantJpegR = false
             }
-            if (cameraFeatures.isZoomSupported) {
-                val ratios: MutableList<Int> = ArrayList()
-                this.zoomValue1x = computeZoomRatios(ratios, minZoom, maxZoom)
-
-                cameraFeatures.zoomRatios = ratios
-                cameraFeatures.maxZoom = (cameraFeatures.zoomRatios?.size ?: 0) - 1
-                if (cameraFeatures.maxZoom == 0) {
-                    // e.g. if max_zoom == 1.0f and min_zoom == 1.0f
-                    cameraFeatures.isZoomSupported = false
-                }
-                this.fullZoomRatios = cameraFeatures.zoomRatios
-                this.zoomRatios = cameraFeatures.zoomRatios
-                if (MyDebug.LOG) {
-                    Log.d(
-                        TAG,
-                        "zoom_ratios: $zoomRatios"
-                    )
-                }
-            } else {
-                this.zoomRatios = null
+            if (resolved.createdCache != null) {
+                cameraFeaturesCaches[cameraIdS] = resolved.createdCache
             }
-
-            val faceModes =
-                characteristics?.get(CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES)
-            cameraFeatures.supportsFaceDetection = false
-            supportsFaceDetectModeSimple = false
-            supportsFaceDetectModeFull = false
-            for (faceMode in faceModes!!) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "face detection mode: $faceMode"
-                )
-                // we currently only make use of the "SIMPLE" features, documented as:
-                // "Return face rectangle and confidence values only."
-                // note that devices that support STATISTICS_FACE_DETECT_MODE_FULL (e.g., Nexus 6) don't return
-                // STATISTICS_FACE_DETECT_MODE_SIMPLE in the list, so we have checked for either
-                if (faceMode == CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_SIMPLE) {
-                    cameraFeatures.supportsFaceDetection = true
-                    supportsFaceDetectModeSimple = true
-                    if (MyDebug.LOG) Log.d(TAG, "supports simple face detection mode")
-                } else if (faceMode == CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_FULL) {
-                    cameraFeatures.supportsFaceDetection = true
-                    supportsFaceDetectModeFull = true
-                    if (MyDebug.LOG) Log.d(TAG, "supports full face detection mode")
-                }
-            }
-            if (cameraFeatures.supportsFaceDetection) {
-                val faceCount =
-                    characteristics?.get(CameraCharacteristics.STATISTICS_INFO_MAX_FACE_COUNT) ?: 0
-                if (faceCount <= 0) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "can't support face detection, as zero max face count"
-                    )
-                    cameraFeatures.supportsFaceDetection = false
-                    supportsFaceDetectModeSimple = false
-                    supportsFaceDetectModeFull = false
-                }
-            }
-            if (cameraFeatures.supportsFaceDetection) {
-                // check we have scene mode CONTROL_SCENE_MODE_FACE_PRIORITY
-                val values2 =
-                    characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES)
-                var hasFacePriority = false
-                for (value2 in values2!!) {
-                    if (value2 == CameraMetadata.CONTROL_SCENE_MODE_FACE_PRIORITY) {
-                        hasFacePriority = true
-                        break
-                    }
-                }
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "has_face_priority: $hasFacePriority"
-                )
-                if (!hasFacePriority) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "can't support face detection, as no CONTROL_SCENE_MODE_FACE_PRIORITY"
-                    )
-                    cameraFeatures.supportsFaceDetection = false
-                    supportsFaceDetectModeSimple = false
-                    supportsFaceDetectModeFull = false
-                }
-            }
-
-            val capabilities =
-                characteristics?.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
-
-            val logicalCharacteristics: CameraCharacteristics?
-            val logicalCapabilities: IntArray?
-            if (cameraIdSPhysical != null) {
-                // If we have a physical camera ID, characteristics refer to the physical camera ID. But for some things,
-                // we want to query the characteristics of the logical camera.
-                val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-                try {
-                    logicalCharacteristics = manager.getCameraCharacteristics(cameraIdS)
-                    logicalCapabilities =
-                        logicalCharacteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
-                } catch (e: CameraAccessException) {
-                    Log.e(
-                        TAG,
-                        "failed to get logical_characteristics for: $cameraIdS"
-                    )
-                    e.printStackTrace()
-                    throw CameraControllerException()
-                }
-                if (MyDebug.LOG) Log.d(TAG, "successfully obtained logical camera characteristics")
-            } else {
-                logicalCharacteristics = characteristics
-                logicalCapabilities = capabilities
-            }
-
-            //boolean capabilitiesManualSensor = false;
-            var capabilitiesManualPostProcessing = false
-            var capabilitiesRaw = false
-            var capabilitiesHighSpeedVideo = false
-            var capabilities10bit = false
-            for (capability in capabilities!!) {
-                /*if( capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR ) {
-                     // At least some Huawei devices (at least, the Huawei device model FIG-LX3, device code-name hi6250) don't
-                     // have REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR, but I had a user complain that HDR mode and manual ISO
-                     // had previously worked for them. Note that we still check below for SENSOR_INFO_SENSITIVITY_RANGE and
-                     // SENSOR_INFO_EXPOSURE_TIME_RANGE, so not checking REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR shouldn't
-                     // enable manual ISO/exposure on devices that don't support it.
-                     // Also, may affect Samsung Galaxy A8(2018).
-                     // Instead we just block LEGACY devices (probably don't need to, again because we check
-                     // SENSOR_INFO_SENSITIVITY_RANGE and SENSOR_INFO_EXPOSURE_TIME_RANGE, but just in case).
-                     capabilitiesManualSensor = true;
-                 }
-                 else*/
-                if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING) {
-                    capabilitiesManualPostProcessing = true
-                } else if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW) {
-                    capabilitiesRaw = true
-                } else if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    // we test for at least Android M just to be safe (this is needed for createConstrainedHighSpeedCaptureSession())
-                    capabilitiesHighSpeedVideo = true
-                } else if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT) {
-                    capabilities10bit = true
-                } else if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (MyDebug.LOG) Log.d(TAG, "camera supports ultra high resolution")
-                }
-            }
-            var capabilitiesLogicalMultiCamera = false
-            for (capability in logicalCapabilities!!) {
-                // to be safe, we check the REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA from the logical camera
-                if (capability == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    // we test for at least Android 9 just to be safe (this is needed for getPhysicalCameraIds())
-                    if (MyDebug.LOG) Log.d(TAG, "camera is a logical multi-camera")
-                    capabilitiesLogicalMultiCamera = true
-                }
-            }
-            // At least some Huawei devices (at least, the Huawei device model FIG-LX3, device code-name hi6250) don't have
-            // REQUEST_AVAILABLE_CAPABILITIES_BURST_CAPTURE, but I had a user complain that NR mode at least had previously
-            // (before 1.45) worked for them. It might be that this can still work, just not at 20fps.
-            // So instead set to true for all LIMITED devices. Still keep block for LEGACY devices (which definitely shouldn't
-            // support fast burst - and which Open Kamera never allowed with Camera2 before 1.45).
-            // Also, may affect Samsung Galaxy A8(2018).
-            cameraFeatures.supportsBurst = CameraControllerManager2.isHardwareLevelSupported(
-                characteristics!!,
-                CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
-            )
-
-            if (MyDebug.LOG) {
-                //Log.d(TAG, "capabilitiesManualSensor?: " + capabilitiesManualSensor);
-                Log.d(
-                    TAG,
-                    "capabilities_manual_post_processing?: $capabilitiesManualPostProcessing"
-                )
-                Log.d(
-                    TAG,
-                    "capabilities_raw?: $capabilitiesRaw"
-                )
-                Log.d(TAG, "supports_burst?: " + cameraFeatures.supportsBurst)
-                Log.d(
-                    TAG,
-                    "capabilities_high_speed_video?: $capabilitiesHighSpeedVideo"
-                )
-                Log.d(
-                    TAG,
-                    "capabilities_10bit?: $capabilities10bit"
-                )
-            }
-
-            val configs: StreamConfigurationMap?
-            try {
-                configs =
-                    characteristics?.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-            } catch (e: IllegalArgumentException) {
-                // have had IllegalArgumentException crashes from Google Play - unclear what the cause is, but at least fail gracefully
-                // similarly for NullPointerException - note, these aren't from characteristics being null, but from
-                // com.android.internal.util.Preconditions.checkArrayElementsNotNull (Preconditions.java:395) - all are from
-                // Nexus 7 (2013)s running Android 8.1, but again better to fail gracefully
-                e.printStackTrace()
-                throw CameraControllerException()
-            } catch (e: NullPointerException) {
-                e.printStackTrace()
-                throw CameraControllerException()
-            }
-
-            val cameraPictureSizes = configs!!.getOutputSizes(ImageFormat.JPEG)
-
-            cameraFeatures.supportsJpegR = false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && capabilities10bit) {
-                var debugTime: Long = 0
-                if (MyDebug.LOG) {
-                    debugTime = System.currentTimeMillis()
-                }
-
-                val jpegRCameraPictureSizes = configs.getOutputSizes(ImageFormat.JPEG_R)
-                if (jpegRCameraPictureSizes != null) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "JPEG_R sizes: " + jpegRCameraPictureSizes.contentToString()
-                    )
-                    cameraFeatures.supportsJpegR = true
-                    // For simplicity, we only support JPEG_R if it has the same support as for JPEG.
-                    // Further checks are done below for getHighResolutionOutputSizes.
-                    // Note that extensions don't support JPEG_R (extension_characteristics.getExtensionSupportedSizes
-                    // is documented that it throws IllegalArgumentException if not JPEG or YUV_420_888).
-                    if (!sizeSubset(cameraPictureSizes, jpegRCameraPictureSizes)) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "don't support JPEG_R: some picture sizes not supported"
-                        )
-                        cameraFeatures.supportsJpegR = false
-                    }
-
-                    if (cameraFeatures.supportsJpegR) {
-                        // documentation says HLG10 must be supported by all devices with REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT,
-                        // but check just to be safe
-                        val profiles =
-                            characteristics?.get(CameraCharacteristics.REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES)
-                        if (profiles == null) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "don't support JPEG_R: no DynamicRangeProfiles"
-                            )
-                            cameraFeatures.supportsJpegR = false
-                        } else if (!profiles.supportedProfiles.contains(DynamicRangeProfiles.HLG10)) {
-                            if (MyDebug.LOG) Log.d(TAG, "don't support JPEG_R: no HLG10")
-                            cameraFeatures.supportsJpegR = false
-                        }
-                    }
-                } else {
-                    if (MyDebug.LOG) Log.d(TAG, "JPEG_R not supported")
-                }
-
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "time for jpeg_r testing: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-
-            cameraFeatures.pictureSizes = ArrayList()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val cameraPictureSizesHires =
-                    configs.getHighResolutionOutputSizes(ImageFormat.JPEG)
-                if (cameraPictureSizesHires != null) {
-                    for (cameraSize in cameraPictureSizesHires) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "high resolution picture size: " + cameraSize.width + " x " + cameraSize.height
-                        )
-                        // Check not already listed? If it's listed in both, we'll add it later on when scanning cameraPictureSizes
-                        // (and we don't want to set supportsBurst to false for such a resolution).
-                        var found = false
-                        for (sz in cameraPictureSizes!!) {
-                            if (sz == cameraSize) {
-                                found = true
-                                break
-                            }
-                        }
-                        if (!found) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "high resolution [non-burst] picture size: " + cameraSize.width + " x " + cameraSize.height
-                            )
-                            val size = Size(cameraSize.width, cameraSize.height)
-                            size.supportsBurst = false
-                            cameraFeatures.pictureSizes.add(size)
-                        }
-                    }
-
-                    if (cameraFeatures.supportsJpegR && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        val cameraPictureSizesHiresJpegR =
-                            configs.getHighResolutionOutputSizes(ImageFormat.JPEG_R)
-                        if (!sizeSubset(
-                                cameraPictureSizesHires,
-                                cameraPictureSizesHiresJpegR
-                            )
-                        ) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "don't support JPEG_R: some high resolution (non-burst) picture sizes not supported"
-                            )
-                            cameraFeatures.supportsJpegR = false
-                        }
-                    }
-                }
-            }
-            if (cameraPictureSizes == null) {
-                // cameraPictureSizes is null on Samsung Galaxy Note 10+ and S20 for camera ID 4!
-                Log.e(TAG, "no picture sizes returned by getOutputSizes")
-                throw CameraControllerException()
-            } else {
-                for (cameraSize in cameraPictureSizes) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "picture size: " + cameraSize.width + " x " + cameraSize.height
-                    )
-                    cameraFeatures.pictureSizes.add(Size(cameraSize.width, cameraSize.height))
-                }
-            }
-            // sizes are usually already sorted from high to low, but sort just in case
-            // note some devices do have sizes in a not fully sorted order (e.g., Nokia 8)
-            Collections.sort(cameraFeatures.pictureSizes, SizeSorter())
-
-            // test high resolution modes not supporting burst:
-            //camera_features.picture_sizes.get(0).supportsBurst = false;
-            rawSize = null
-            if (capabilitiesRaw) {
-                val rawCameraPictureSizes = configs.getOutputSizes(ImageFormat.RAW_SENSOR)
-                if (rawCameraPictureSizes == null) {
-                    if (MyDebug.LOG) Log.d(TAG, "RAW not supported, failed to get RAW_SENSOR sizes")
-                    wantRaw = false // just in case it got set to true somehow
-                } else {
-                    for (size in rawCameraPictureSizes) {
-                        if (rawSize == null || (rawSize != null && (size.width * size.height > rawSize!!.width * rawSize!!.height))) {
-                            rawSize = size
-                        }
-                    }
-                    if (rawSize == null) {
-                        if (MyDebug.LOG) Log.d(TAG, "RAW not supported, failed to find a raw size")
-                        wantRaw = false // just in case it got set to true somehow
-                    } else {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "raw supported, raw size: " + rawSize!!.width + " x " + rawSize!!.height
-                        )
-                        cameraFeatures.supportsRaw = true
-                    }
-                }
-            } else {
-                if (MyDebug.LOG) Log.d(TAG, "RAW capability not supported")
-                wantRaw = false // just in case it got set to true somehow
-            }
-
-            if (MyDebug.LOG) {
-                Log.d(TAG, "output_formats: " + configs.outputFormats.contentToString())
-            }
-
-            aeFpsRanges = ArrayList()
-            for (r in (characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
-                ?: emptyArray<Range<Int>>())) {
-                aeFpsRanges.add(intArrayOf(r.lower ?: 0, r.upper ?: 0))
-            }
-            Collections.sort(aeFpsRanges, RangeSorter())
-            if (MyDebug.LOG) {
-                Log.d(TAG, "Supported AE video fps ranges: ")
-                for (f in aeFpsRanges) {
-                    Log.d(TAG, "   ae range: [" + f[0] + "-" + f[1] + "]")
-                }
-            }
-
-            val cameraVideoSizes = configs.getOutputSizes(
-                MediaRecorder::class.java
-            )
-            cameraFeatures.videoSizes = ArrayList()
-            var minFps = 9999
-            for (r in this.aeFpsRanges) {
-                minFps = min(minFps.toDouble(), r[0].toDouble()).toInt()
-            }
-            if (cameraVideoSizes == null) {
-                // cameraVideoSizes is null on Samsung Galaxy Note 10+ and S20 for camera ID 4!
-                Log.e(TAG, "no video sizes returned by getOutputSizes")
-                throw CameraControllerException()
-            } else {
-                for (cameraSize in cameraVideoSizes) {
-                    if (cameraSize.width > 4096 || cameraSize.height > 2160) continue  // Nexus 6 returns these, even though not supported?!
-
-                    val mfd = configs.getOutputMinFrameDuration(
-                        MediaRecorder::class.java, cameraSize
-                    )
-                    val maxFps = ((1.0 / mfd) * 1000000000L).toInt()
-                    val fr = ArrayList<IntArray>()
-                    fr.add(intArrayOf(minFps, maxFps))
-                    val normalVideoSize = Size(cameraSize.width, cameraSize.height, fr, false)
-                    cameraFeatures.videoSizes.add(normalVideoSize)
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "normal video size: $normalVideoSize"
-                        )
-                    }
-                }
-            }
-            Collections.sort(cameraFeatures.videoSizes, SizeSorter())
-
-            // don't support high speed if physical camera specified - seems unreliable on Pixel 6 Pro and Galaxy S24+
-            if (capabilitiesHighSpeedVideo && cameraIdSPhysical == null) {
-                hsFpsRanges = ArrayList()
-                cameraFeatures.videoSizesHighSpeed = ArrayList()
-
-                for (r in configs.highSpeedVideoFpsRanges) {
-                    // Some devices e.g. Pixel 6 Pro have high-speed fps ranges like [30-120]. We skip these because:
-                    // Firstly we'd risk choosing this for 60fps, when 60fps shouldn't require high-speed.
-                    // Secondly captureSessionHighSpeed.createHighSpeedRequestList() documentation says fps range
-                    // should have min==max, so we don't want to include high speed ranges where this isn't true.
-                    // Without this fix, Slow motion 0.5x (which uses 60fps) fails to start recording on Pixel 6 Pro.
-                    if (r.lower != r.upper) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "skip high speed video fps range: $r"
-                        )
-                        continue
-                    }
-                    hsFpsRanges.add(intArrayOf(r.lower, r.upper))
-                }
-                Collections.sort(hsFpsRanges, RangeSorter())
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "Supported high speed video fps ranges: ")
-                    for (f in hsFpsRanges) {
-                        Log.d(TAG, "   hs range: [" + f[0] + "-" + f[1] + "]")
-                    }
-                }
-
-                val cameraVideoSizesHighSpeed = configs.highSpeedVideoSizes
-                for (cameraSize in cameraVideoSizesHighSpeed) {
-                    val fr = ArrayList<IntArray>()
-                    for (r in configs.getHighSpeedVideoFpsRangesFor(cameraSize)) {
-                        // see comment above for why we require min==max
-                        if (r.lower != r.upper) {
-                            continue
-                        }
-                        val thisFpsRange = intArrayOf(r.lower, r.upper)
-                        // In theory, all fps ranges returned by getHighSpeedVideoFpsRangesFor() should surely be
-                        // a subset of fps ranges returned by getHighSpeedVideoFpsRanges(), but we check just in case
-                        // (when deciding whether slow motion or high speed frame rates are supported, this means we
-                        // only need to check the frame rates of particular video sizes, as done in
-                        // MyApplicationInterface.getSupportedVideoCaptureRates()).
-                        var found = false
-                        for (hsFpsRange in hsFpsRanges) {
-                            if (hsFpsRange.contentEquals(thisFpsRange)) {
-                                found = true
-                                break
-                            }
-                        }
-                        if (!found) {
-                            if (MyDebug.LOG) Log.e(
-                                TAG,
-                                "video size " + cameraSize + " has high speed frame rate " + thisFpsRange.contentToString() + " that wasn't returned by configs.getHighSpeedVideoFpsRanges()"
-                            )
-                            continue
-                        }
-                        fr.add(thisFpsRange)
-                    }
-                    if (cameraSize.width > 4096 || cameraSize.height > 2160) continue  // just in case? see above
-
-                    val hsVideoSize = Size(cameraSize.width, cameraSize.height, fr, true)
-                    if (MyDebug.LOG) {
-                        Log.d(
-                            TAG,
-                            "high speed video size: $hsVideoSize"
-                        )
-                    }
-                    cameraFeatures.videoSizesHighSpeed?.add(hsVideoSize)
-                }
-                cameraFeatures.videoSizesHighSpeed?.let { Collections.sort(it, SizeSorter()) }
-            }
-
-            val cameraPreviewSizes = configs.getOutputSizes(
-                SurfaceTexture::class.java
-            )
-            cameraFeatures.previewSizes = ArrayList()
-            val displaySize = Point()
-            val activity = context as Activity
-            run {
-                val display = activity.windowManager.defaultDisplay
-                display.getRealSize(displaySize)
-                // getRealSize() is adjusted based on the current rotation, so should already be landscape format, but it
-                // would be good to not assume Open Kamera runs in landscape mode (if we ever ran in portrait mode,
-                // we'd still want display_size.x > display_size.y as preview resolutions also have width > height)
-                if (displaySize.x < displaySize.y) {
-                    displaySize[displaySize.y] = displaySize.x
-                }
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "display_size: " + displaySize.x + " x " + displaySize.y
-                )
-            }
-            if (cameraPreviewSizes == null) {
-                // cameraPreviewSizes is null on Samsung Galaxy Note 10+ and S20 for camera ID 4!
-                Log.e(TAG, "no preview sizes returned by getOutputSizes")
-                throw CameraControllerException()
-            } else {
-                for (cameraSize in cameraPreviewSizes) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "preview size: " + cameraSize.width + " x " + cameraSize.height
-                    )
-                    if (cameraSize.width > displaySize.x || cameraSize.height > displaySize.y) {
-                        // Nexus 6 returns these, even though not supported?! (get green corruption lines if we allow these)
-                        // Google Camera filters anything larger than height 1080, with a todo saying to use device's measurements
-                        continue
-                    }
-                    cameraFeatures.previewSizes.add(Size(cameraSize.width, cameraSize.height))
-                }
-            }
-
-            val useCache = true
-            //final boolean useCache = false;
-            if (extensionCharacteristics == null) {
-                // no extension characteristics
-            } else if (useCache && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && cameraFeaturesCache != null) {
-                // read extensions info from cache for performance
-                if (MyDebug.LOG) Log.d(TAG, "read vendor extensions info from cache")
-                if (cameraFeaturesCache!!.supportedExtensions != null) cameraFeatures.supportedExtensions =
-                    ArrayList(
-                        cameraFeaturesCache!!.supportedExtensions!!
-                    )
-                if (cameraFeaturesCache!!.supportedExtensionsZoom != null) cameraFeatures.supportedExtensionsZoom =
-                    ArrayList(
-                        cameraFeaturesCache!!.supportedExtensionsZoom!!
-                    )
-
-                if (cameraFeatures.supportedExtensions != null) {
-                    for (extension in cameraFeatures.supportedExtensions!!) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "vendor extension: $extension"
-                        )
-                        val extensionPictureSizes =
-                            cameraFeaturesCache!!.extensionPictureSizesMap[extension]!!
-                        val extensionPreviewSizes =
-                            cameraFeaturesCache!!.extensionPreviewSizesMap[extension]!!
-                        val hasPictureResolution = updatePictureSizesForExtension(
-                            cameraFeatures.pictureSizes, extensionPictureSizes, extension
-                        )
-                        val hasPreviewResolution = updatePreviewSizesForExtension(
-                            cameraFeatures.previewSizes, extensionPreviewSizes, extension
-                        )
-                        if (hasPictureResolution && hasPreviewResolution) {
-                            // fine
-                        } else {
-                            if (MyDebug.LOG) Log.e(
-                                TAG,
-                                "cached extension not actually supported?!: $extension"
-                            )
-                            cameraFeatures.supportedExtensions?.remove(extension)
-                            cameraFeatures.supportedExtensionsZoom!!.remove(extension)
-                        }
-                    }
-                }
-                if (MyDebug.LOG) Log.d(TAG, "done read vendor extensions info from cache")
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (MyDebug.LOG) Log.d(TAG, "check for vendor extensions")
-                val extensionPictureSizesMap: MutableMap<Int, List<android.util.Size>> =
-                    Hashtable()
-                val extensionPreviewSizesMap: MutableMap<Int, List<android.util.Size>> =
-                    Hashtable()
-
-                var extensions: List<Int>? = null
-                try {
-                    extensions = extensionCharacteristics!!.supportedExtensions
-                } catch (_: Exception) {
-                    // have IllegalArgumentException at least from Google Play crashes
-                    if (MyDebug.LOG) Log.e(TAG, "exception from getSupportedExtensions")
-                }
-                if (extensions != null) {
-                    cameraFeatures.supportedExtensions = ArrayList()
-                    cameraFeatures.supportedExtensionsZoom = ArrayList()
-                    for (extension in extensions) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "vendor extension: $extension"
-                        )
-
-                        try {
-                            // we assume that the allowed extension sizes are a subset of the full sizes - makes things easier to manage
-
-                            val extensionPictureSizes =
-                                extensionCharacteristics!!.getExtensionSupportedSizes(
-                                    extension,
-                                    ImageFormat.JPEG
-                                )
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "    extension_picture_sizes: $extensionPictureSizes"
-                            )
-                            val hasPictureResolution = updatePictureSizesForExtension(
-                                cameraFeatures.pictureSizes, extensionPictureSizes, extension
-                            )
-
-                            val extensionPreviewSizes =
-                                extensionCharacteristics!!.getExtensionSupportedSizes(
-                                    extension,
-                                    SurfaceTexture::class.java
-                                )
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "    extension_preview_sizes: $extensionPreviewSizes"
-                            )
-                            val hasPreviewResolution = updatePreviewSizesForExtension(
-                                cameraFeatures.previewSizes, extensionPreviewSizes, extension
-                            )
-
-                            if (hasPictureResolution && hasPreviewResolution) {
-                                if (MyDebug.LOG) Log.d(
-                                    TAG,
-                                    "    extension is supported: $extension"
-                                )
-                                cameraFeatures.supportedExtensions?.add(extension)
-                                extensionPictureSizesMap[extension] = extensionPictureSizes
-                                extensionPreviewSizesMap[extension] = extensionPreviewSizes
-
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    val extensionSupportedRequestKeys =
-                                        extensionCharacteristics!!.getAvailableCaptureRequestKeys(
-                                            extension
-                                        )
-                                    for (key in extensionSupportedRequestKeys) {
-                                        if (MyDebug.LOG) Log.d(
-                                            TAG,
-                                            "    supported capture request key: " + key.name
-                                        )
-                                        if (key === CaptureRequest.CONTROL_ZOOM_RATIO) {
-                                            cameraFeatures.supportedExtensionsZoom?.add(extension)
-                                        }
-                                    }
-                                    val extensionSupportedResultKeys =
-                                        extensionCharacteristics!!.getAvailableCaptureResultKeys(
-                                            extension
-                                        )
-                                    for (key in extensionSupportedResultKeys) {
-                                        if (MyDebug.LOG) Log.d(
-                                            TAG,
-                                            "    supported capture result key: " + key.name
-                                        )
-                                    }
-                                }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                    if (MyDebug.LOG) {
-                                        Log.d(
-                                            TAG,
-                                            "    isCaptureProcessProgressAvailable: " + extensionCharacteristics!!.isCaptureProcessProgressAvailable(
-                                                extension
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        } catch (_: Exception) {
-                            // have IllegalArgumentException from getExtensionSupportedSizes() and getAvailableCaptureRequestKeys() at least from Google Play crashes
-                            if (MyDebug.LOG) Log.e(
-                                TAG,
-                                "exception trying to query extension: $extension"
-                            )
-                            cameraFeatures.supportedExtensions?.remove(extension)
-                            cameraFeatures.supportedExtensionsZoom?.remove(extension)
-                            extensionPictureSizesMap.remove(extension)
-                            extensionPreviewSizesMap.remove(extension)
-                        }
-                    }
-                }
-
-                // add to cache
-                val cache = CameraFeaturesCache(
-                    cameraFeatures,
-                    extensionPictureSizesMap,
-                    extensionPreviewSizesMap
-                )
-                cameraFeaturesCaches[cameraIdS] = cache
-                if (MyDebug.LOG) Log.d(TAG, "done check for vendor extensions")
-            }
-            // save to local fields:
-            this.supportedExtensionsZoom = cameraFeatures.supportedExtensionsZoom
-
-            if (characteristics?.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true) {
-                val supportedFlashModesArr =
-                    characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES) // Android format
-                if (supportedFlashModesArr != null) {
-                    val supportedFlashModes: MutableList<Int> = ArrayList()
-                    for (supportedFlashMode in supportedFlashModesArr) supportedFlashModes.add(
-                        supportedFlashMode
-                    )
-
-                    cameraFeatures.supportedFlashValues = ArrayList()
-
-                    // also resort as well as converting
-
-                    // documentation for CONTROL_AE_AVAILABLE_MODES says the following modes are always supported:
-                    cameraFeatures.supportedFlashValues!!.add("flash_off")
-                    cameraFeatures.supportedFlashValues!!.add("flash_auto")
-                    cameraFeatures.supportedFlashValues!!.add("flash_on")
-                    cameraFeatures.supportedFlashValues!!.add("flash_torch")
-
-                    if (!useFakePrecapture) {
-                        if (supportedFlashModes.contains(CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE)) {
-                            cameraFeatures.supportedFlashValues!!.add("flash_red_eye")
-                            if (MyDebug.LOG) {
-                                Log.d(TAG, " supports flash_red_eye")
-                            }
-                        }
-                    }
-                }
-            } else if ((facing === Facing.FACING_FRONT)) {
-                cameraFeatures.supportedFlashValues = ArrayList()
-                cameraFeatures.supportedFlashValues!!.add("flash_off")
-                cameraFeatures.supportedFlashValues!!.add("flash_frontscreen_auto")
-                cameraFeatures.supportedFlashValues!!.add("flash_frontscreen_on")
-                cameraFeatures.supportedFlashValues!!.add("flash_frontscreen_torch")
-            }
-
-            val minimumFocusDistanceF =
-                characteristics?.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) // may be null on some devices
-            if (minimumFocusDistanceF != null) {
-                cameraFeatures.minimumFocusDistance = minimumFocusDistanceF
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "minimum_focus_distance: " + cameraFeatures.minimumFocusDistance
-                )
-            } else {
-                cameraFeatures.minimumFocusDistance = 0.0f
-            }
-            // save to local fields:
-            this.minimumFocusDistance = cameraFeatures.minimumFocusDistance
-
-            val supportedFocusModes: IntArray? =
-                characteristics?.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES) // Android format
-            if (supportedFocusModes != null) {
-                // convert to our format (also resorts)
-                cameraFeatures.supportedFocusValues =
-                    convertFocusModesToValues(supportedFocusModes)
-            }
-            if (cameraFeatures.supportedFocusValues != null && cameraFeatures.supportedFocusValues!!.contains(
-                    "focus_mode_manual2"
-                )
-            ) {
-                cameraFeatures.supportsFocusBracketing = true
-            }
-            if (cameraFeatures.supportedFocusValues != null) {
-                // prefer continuous focus mode
-                initialFocusMode =
-                    if (cameraFeatures.supportedFocusValues!!.contains("focus_mode_continuous_picture")) {
-                        "focus_mode_continuous_picture"
-                    } else {
-                        // just go with the first one
-                        cameraFeatures.supportedFocusValues!![0]
-                    }
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "initial_focus_mode: $initialFocusMode"
-                )
-            } else {
-                initialFocusMode = null
-            }
-
-            cameraFeatures.maxNumFocusAreas =
-                characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
-
-            cameraFeatures.isExposureLockSupported = true
-
-            cameraFeatures.isWhiteBalanceLockSupported = true
-
-            cameraFeatures.isOpticalStabilizationSupported = false
-            val supportedOpticalStabilizationModes =
-                characteristics?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
-            if (supportedOpticalStabilizationModes != null) {
-                for (supportedOpticalStabilizationMode in supportedOpticalStabilizationModes) {
-                    if (supportedOpticalStabilizationMode == CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON) {
-                        cameraFeatures.isOpticalStabilizationSupported = true
-                        break
-                    }
-                }
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "is_optical_stabilization_supported: " + cameraFeatures.isOpticalStabilizationSupported
-            )
-            supportsOpticalStabilization = cameraFeatures.isOpticalStabilizationSupported
-
-            cameraFeatures.isVideoStabilizationSupported = false
-            val supportedVideoStabilizationModes =
-                characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
-            if (supportedVideoStabilizationModes != null) {
-                for (supportedVideoStabilizationMode in supportedVideoStabilizationModes) {
-                    if (supportedVideoStabilizationMode == CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON) {
-                        cameraFeatures.isVideoStabilizationSupported = true
-                        break
-                    }
-                }
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "is_video_stabilization_supported: " + cameraFeatures.isVideoStabilizationSupported
-            )
-
-            cameraFeatures.isPhotoVideoRecordingSupported =
-                CameraControllerManager2.isHardwareLevelSupported(
-                    characteristics,
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
-                )
-            supportsPhotoVideoRecording = cameraFeatures.isPhotoVideoRecordingSupported
-
-            val whiteBalanceModes =
-                characteristics?.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
-            if (whiteBalanceModes != null) {
-                for (value in whiteBalanceModes) {
-                    // n.b., Galaxy S10e for front and ultra-wide cameras offers CONTROL_AWB_MODE_OFF despite
-                    // capabilitiesManualPostProcessing==false; if we don't check for capabilitiesManualPostProcessing,
-                    // adjusting white balance temperature seems to work, but seems safest to require
-                    // capabilitiesManualPostProcessing anyway
-                    if (value == CameraMetadata.CONTROL_AWB_MODE_OFF && capabilitiesManualPostProcessing && allowManualWB()) {
-                        cameraFeatures.supportsWhiteBalanceTemperature = true
-                        cameraFeatures.minTemperature = MIN_WHITE_BALANCE_TEMPERATURE_C
-                        cameraFeatures.maxTemperature = MAX_WHITE_BALANCE_TEMPERATURE_C
-                    }
-                }
-            }
-            supportsWhiteBalanceTemperature = cameraFeatures.supportsWhiteBalanceTemperature
-
-            // see note above
-            //if( capabilitiesManualSensor )
-            if (CameraControllerManager2.isHardwareLevelSupported(
-                    characteristics,
-                    CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED
-                )
-            ) {
-                // may be null on some devices
-                val isoRange =
-                    characteristics?.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
-                if (isoRange != null) {
-                    cameraFeatures.supportsIsoRange = true
-                    cameraFeatures.minIso = isoRange.lower
-                    cameraFeatures.maxIso = isoRange.upper
-                    // we only expose exposureTime if isoRange is supported
-                    val exposureTimeRange =
-                        characteristics?.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE) // may be null on some devices
-                    if (exposureTimeRange != null) {
-                        cameraFeatures.supportsExposureTime = true
-                        cameraFeatures.supportsExpoBracketing = true
-                        cameraFeatures.maxExpoBracketingNImages = MAX_EXPO_BRACKETING_N_IMAGES
-                        cameraFeatures.minExposureTime = exposureTimeRange.lower
-                        cameraFeatures.maxExposureTime = exposureTimeRange.upper
-                        if ((isSamsungGalaxyS || isSamsungGalaxyF) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            // seems we can get away with longer exposure on some devices (e.g., Galaxy S10e claims only max of 0.1s, but works with 1/3s)
-                            // but Android 11 on Samsung devices also introduces a bug where manual exposure gets ignored if different to the preview,
-                            // and since the max preview rate is limited to 1/5s (see maxPreviewExposureTimeC), there's no point
-                            // going above this!
-                            // update: as of 1.54, we now can go above the maxPreviewExposureTimeC, by using RequestTagType.RUN_POST_CAPTURE
-                            // (see adjustPreviewToStill())
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "boost max_exposure_time, was: $maxExposureTime"
-                            )
-                            cameraFeatures.maxExposureTime =
-                                cameraFeatures.maxExposureTime.coerceAtLeast(1_000_000_000L / 2)
-                        }
-                    }
-                }
-            }
-            // save to local fields:
-            this.supportsExposureTime = cameraFeatures.supportsExposureTime
-            this.minExposureTime = cameraFeatures.minExposureTime
-            this.maxExposureTime = cameraFeatures.maxExposureTime
-
-            val exposureRange =
-                characteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
-            cameraFeatures.minExposure = exposureRange!!.lower
-            cameraFeatures.maxExposure = exposureRange.upper
-            cameraFeatures.exposureStep =
-                characteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)?.toFloat()
-                    ?: 0f
-
-            cameraFeatures.canDisableShutterSound = true
-
-            if (capabilitiesManualPostProcessing) {
-                val tonemapMaxCurvePoints =
-                    characteristics?.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS)
-                if (tonemapMaxCurvePoints != null) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "tonemap_max_curve_points: $tonemapMaxCurvePoints"
-                    )
-
-                    val tonemapModes =
-                        characteristics?.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)
-                    if (tonemapModes == null) {
-                        // if no tonemap modes, can't support tonemapping
-                        if (MyDebug.LOG) Log.d(TAG, "tonemap_modes is null")
-                    } else {
-                        var supportsTonemapContrastCurve = false
-                        for (tonemapMode in tonemapModes) {
-                            if (tonemapMode == CaptureRequest.TONEMAP_MODE_PRESET_CURVE) {
-                                supportsTonemapPresetCurve = true
-                            } else if (tonemapMode == CaptureRequest.TONEMAP_MODE_CONTRAST_CURVE) {
-                                supportsTonemapContrastCurve = true
-                            }
-                        }
-                        if (MyDebug.LOG) {
-                            Log.d(
-                                TAG,
-                                "supports_tonemap_preset_curve: $supportsTonemapPresetCurve"
-                            )
-                            Log.d(
-                                TAG,
-                                "supports_tonemap_contrast_curve: $supportsTonemapContrastCurve"
-                            )
-                        }
-
-                        // if supportsTonemapContrastCurve==false, don't bother supporting tonemapping (in theory we could support the preset curves alone, but not supported for simplicity)
-                        // if supportsTonemapContrastCurve==true but supportsTonemapPresetCurve==false, we'll still support tonemapping, but always use contrast curves
-                        if (supportsTonemapContrastCurve) {
-                            cameraFeatures.tonemapMaxCurvePoints = tonemapMaxCurvePoints
-                            // for now, we only expose supporting of custom tonemap curves if there are enough curve points for all the
-                            // profiles we support
-                            // remember to divide by 2 if we're comparing against the raw array length!
-                            cameraFeatures.supportsTonemapCurve =
-                                tonemapMaxCurvePoints >= TONEMAP_LOG_MAX_CURVE_POINTS_C && tonemapMaxCurvePoints >= jtvideoValues.size / 2 && tonemapMaxCurvePoints >= jtlogValues.size / 2 && tonemapMaxCurvePoints >= jtlog2Values.size / 2
-                        }
-                    }
-                } else {
-                    if (MyDebug.LOG) Log.d(TAG, "tonemap_max_curve_points is null")
-                }
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "supports_tonemap_curve?: " + cameraFeatures.supportsTonemapCurve
-            )
-
-            val apertures =
-                characteristics?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
-            //float [] apertures = new float[]{1.5f, 1.9f, 2.0f, 2.2f, 2.4f, 4.0f, 8.0f, 16.0f}; // test
-            if (MyDebug.LOG) Log.d(TAG, "apertures: " + apertures.contentToString())
-            // no point supporting if only a single aperture
-            if (apertures != null && apertures.size > 1) {
-                cameraFeatures.apertures = apertures
-            }
-
-            val viewAngle: SizeF = CameraControllerManager2.computeViewAngles(characteristics!!)
-            cameraFeatures.viewAngleX = viewAngle.width
-            cameraFeatures.viewAngleY = viewAngle.height
-
-            if (capabilitiesLogicalMultiCamera && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                // to be safe, read from the logical camera characteristics
-                cameraFeatures.physicalCameraIds = logicalCharacteristics!!.physicalCameraIds
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "physical_camera_ids: " + cameraFeatures.physicalCameraIds
-                )
-                if (cameraFeatures.physicalCameraIds!!.size <= 1) {
-                    // no point supporting
-                    cameraFeatures.physicalCameraIds = null
-                }
-            }
-
-            if (!cameraFeatures.supportsJpegR) {
-                wantJpegR = false // just in case it got set to true somehow
-            }
-
-            return cameraFeatures
+            return resolved.cameraFeatures
         }
-
-    /** For each of the pictureSizes, update the CameraController.Size.supportedExtensions field to record if that resolution
-     * supports the supplied extension.
-     * @param pictureSizes           Picture sizes to update.
-     * @param extensionPictureSizes Picture sizes supported by the extension.
-     * @param extension               Extension to test.
-     * @return                        If false, then none of the pictureSizes are supported by this extension.
-     */
-    private fun updatePictureSizesForExtension(
-        pictureSizes: List<Size>,
-        extensionPictureSizes: List<android.util.Size>,
-        extension: Int
-    ): Boolean {
-        return Camera2VendorTagsExtension.updatePictureSizesForExtension(
-            pictureSizes,
-            extensionPictureSizes,
-            extension
-        )
-    }
-
-    private fun updatePreviewSizesForExtension(
-        previewSizes: List<Size>,
-        extensionPreviewSizes: List<android.util.Size>,
-        extension: Int
-    ): Boolean {
-        return Camera2VendorTagsExtension.updatePreviewSizesForExtension(
-            previewSizes,
-            extensionPreviewSizes,
-            extension
-        )
-    }
 
     override fun shouldCoverPreview(): Boolean {
         return !hasReceivedFrame
@@ -2268,44 +1150,14 @@ class CameraController2(
         this.hasReceivedFrame = false
     }
 
-    private fun convertSceneMode(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.CONTROL_SCENE_MODE_ACTION -> value = "action"
-            CameraMetadata.CONTROL_SCENE_MODE_BARCODE -> value = "barcode"
-            CameraMetadata.CONTROL_SCENE_MODE_BEACH -> value = "beach"
-            CameraMetadata.CONTROL_SCENE_MODE_CANDLELIGHT -> value = "candlelight"
-            CameraMetadata.CONTROL_SCENE_MODE_DISABLED -> value = SCENE_MODE_DEFAULT
-            CameraMetadata.CONTROL_SCENE_MODE_FIREWORKS -> value = "fireworks"
-            CameraMetadata.CONTROL_SCENE_MODE_LANDSCAPE -> value = "landscape"
-            CameraMetadata.CONTROL_SCENE_MODE_NIGHT -> value = "night"
-            CameraMetadata.CONTROL_SCENE_MODE_NIGHT_PORTRAIT -> value = "night-portrait"
-            CameraMetadata.CONTROL_SCENE_MODE_PARTY -> value = "party"
-            CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT -> value = "portrait"
-            CameraMetadata.CONTROL_SCENE_MODE_SNOW -> value = "snow"
-            CameraMetadata.CONTROL_SCENE_MODE_SPORTS -> value = "sports"
-            CameraMetadata.CONTROL_SCENE_MODE_STEADYPHOTO -> value = "steadyphoto"
-            CameraMetadata.CONTROL_SCENE_MODE_SUNSET -> value = "sunset"
-            CameraMetadata.CONTROL_SCENE_MODE_THEATRE -> value = "theatre"
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown scene mode: $value2"
-                )
-                value = null
-            }
-        }
-        return value
-    }
+    private fun convertSceneMode(value2: Int): String? = Camera2RequestBuilderHelper.convertSceneModeToString(value2)
 
     override fun setSceneMode(value: String): SupportedValues? {
         if (MyDebug.LOG) Log.d(TAG, "setSceneMode: $value")
-        // we convert to/from strings to be compatible with original Android Camera API
         val values2 = characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES)
         var hasDisabled = false
         val values: MutableList<String> = ArrayList()
         if (values2 != null) {
-            // CONTROL_AVAILABLE_SCENE_MODES is supposed to always be available, but have had some (rare) crashes from Google Play due to being null
             for (value2 in values2) {
                 if (value2 == CameraMetadata.CONTROL_SCENE_MODE_DISABLED) hasDisabled = true
                 val thisValue = convertSceneMode(value2)
@@ -2319,32 +1171,7 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, SCENE_MODE_DEFAULT)
         if (supportedValues != null) {
-            var selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_DISABLED
-            when (supportedValues.selectedValue) {
-                "action" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_ACTION
-                "barcode" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_BARCODE
-                "beach" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_BEACH
-                "candlelight" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_CANDLELIGHT
-                SCENE_MODE_DEFAULT -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_DISABLED
-                "fireworks" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_FIREWORKS
-                "landscape" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_LANDSCAPE
-                "night" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_NIGHT
-                "night-portrait" -> selectedValue2 =
-                    CameraMetadata.CONTROL_SCENE_MODE_NIGHT_PORTRAIT
-
-                "party" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_PARTY
-                "portrait" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT
-                "snow" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_SNOW
-                "sports" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_SPORTS
-                "steadyphoto" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_STEADYPHOTO
-                "sunset" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_SUNSET
-                "theatre" -> selectedValue2 = CameraMetadata.CONTROL_SCENE_MODE_THEATRE
-                else -> if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown selected_value: " + supportedValues.selectedValue
-                )
-            }
-
+            val selectedValue2 = Camera2RequestBuilderHelper.convertSceneModeToInt(supportedValues.selectedValue)
             cameraSettings.sceneMode = selectedValue2
             if (cameraSettings.setSceneMode(previewBuilder)) {
                 try {
@@ -2370,39 +1197,13 @@ class CameraController2(
         }
 
     override fun sceneModeAffectsFunctionality(): Boolean {
-        // Camera2 API doesn't seem to have any warnings that changing scene mode can affect available functionality
         return false
     }
 
-    private fun convertColorEffect(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.CONTROL_EFFECT_MODE_AQUA -> value = "aqua"
-            CameraMetadata.CONTROL_EFFECT_MODE_BLACKBOARD -> value = "blackboard"
-            CameraMetadata.CONTROL_EFFECT_MODE_MONO -> value = "mono"
-            CameraMetadata.CONTROL_EFFECT_MODE_NEGATIVE -> value = "negative"
-            CameraMetadata.CONTROL_EFFECT_MODE_OFF -> value = COLOR_EFFECT_DEFAULT
-            CameraMetadata.CONTROL_EFFECT_MODE_POSTERIZE -> value = "posterize"
-            CameraMetadata.CONTROL_EFFECT_MODE_SEPIA -> value = "sepia"
-            CameraMetadata.CONTROL_EFFECT_MODE_SOLARIZE -> value = "solarize"
-            CameraMetadata.CONTROL_EFFECT_MODE_WHITEBOARD -> value = "whiteboard"
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown effect mode: $value2"
-                )
-                value = null
-            }
-        }
-        return value
-    }
+    private fun convertColorEffect(value2: Int): String? = Camera2RequestBuilderHelper.convertColorEffectToString(value2)
 
     override fun setColorEffect(value: String): SupportedValues? {
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "setColorEffect: $value"
-        )
-        // we convert to/from strings to be compatible with original Android Camera API
+        if (MyDebug.LOG) Log.d(TAG, "setColorEffect: $value")
         val values2 = characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_EFFECTS)
             ?: return null
         val values: MutableList<String> = ArrayList()
@@ -2414,23 +1215,7 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, COLOR_EFFECT_DEFAULT)
         if (supportedValues != null) {
-            var selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_OFF
-            when (supportedValues.selectedValue) {
-                "aqua" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_AQUA
-                "blackboard" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_BLACKBOARD
-                "mono" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_MONO
-                "negative" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_NEGATIVE
-                COLOR_EFFECT_DEFAULT -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_OFF
-                "posterize" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_POSTERIZE
-                "sepia" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_SEPIA
-                "solarize" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_SOLARIZE
-                "whiteboard" -> selectedValue2 = CameraMetadata.CONTROL_EFFECT_MODE_WHITEBOARD
-                else -> if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown selected_value: " + supportedValues.selectedValue
-                )
-            }
-
+            val selectedValue2 = Camera2RequestBuilderHelper.convertColorEffectToInt(supportedValues.selectedValue)
             cameraSettings.colorEffect = selectedValue2
             if (cameraSettings.setColorEffect(previewBuilder)) {
                 try {
@@ -2455,43 +1240,17 @@ class CameraController2(
             return convertColorEffect(value2)
         }
 
-    private fun convertWhiteBalance(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.CONTROL_AWB_MODE_AUTO -> value = WHITE_BALANCE_DEFAULT
-            CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> value = "cloudy-daylight"
-            CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT -> value = "daylight"
-            CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT -> value = "fluorescent"
-            CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT -> value = "incandescent"
-            CameraMetadata.CONTROL_AWB_MODE_SHADE -> value = "shade"
-            CameraMetadata.CONTROL_AWB_MODE_TWILIGHT -> value = "twilight"
-            CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT -> value = "warm-fluorescent"
-            CameraMetadata.CONTROL_AWB_MODE_OFF -> value = "manual"
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown white balance: $value2"
-                )
-                value = null
-            }
-        }
-        return value
-    }
+    private fun convertWhiteBalance(value2: Int): String? = Camera2RequestBuilderHelper.convertWhiteBalanceToString(value2)
 
     /** Whether we should allow manual white balance, even if the device supports CONTROL_AWB_MODE_OFF.
      */
     private fun allowManualWB(): Boolean {
         val isNexus6 = Build.MODEL.lowercase().contains("nexus 6")
-        // manual white balance doesn't seem to work on Nexus 6!
         return !isNexus6
     }
 
     override fun setWhiteBalance(value: String): SupportedValues? {
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "setWhiteBalance: $value"
-        )
-        // we convert to/from strings to be compatible with original Android Camera API
+        if (MyDebug.LOG) Log.d(TAG, "setWhiteBalance: $value")
         val values2 = characteristics?.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
             ?: return null
         val values: MutableList<String> = ArrayList()
@@ -2506,7 +1265,6 @@ class CameraController2(
             }
         }
         run {
-            // re-order so that auto is first, manual is second
             val hasAuto = values.remove(WHITE_BALANCE_DEFAULT)
             val hasManual = values.remove("manual")
             if (hasManual) values.add(0, "manual")
@@ -2514,27 +1272,7 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, WHITE_BALANCE_DEFAULT)
         if (supportedValues != null) {
-            var selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_AUTO
-            when (supportedValues.selectedValue) {
-                WHITE_BALANCE_DEFAULT -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_AUTO
-                "cloudy-daylight" -> selectedValue2 =
-                    CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT
-
-                "daylight" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT
-                "fluorescent" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT
-                "incandescent" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT
-                "shade" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_SHADE
-                "twilight" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_TWILIGHT
-                "warm-fluorescent" -> selectedValue2 =
-                    CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT
-
-                "manual" -> selectedValue2 = CameraMetadata.CONTROL_AWB_MODE_OFF
-                else -> if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown selected_value: " + supportedValues.selectedValue
-                )
-            }
-
+            val selectedValue2 = Camera2RequestBuilderHelper.convertWhiteBalanceToInt(supportedValues.selectedValue)
             cameraSettings.whiteBalance = selectedValue2
             if (cameraSettings.setWhiteBalance(previewBuilder)) {
                 try {
@@ -2562,19 +1300,14 @@ class CameraController2(
     // Returns whether white balance temperature was modified
     override fun setWhiteBalanceTemperature(temperature: Int): Boolean {
         var newTemperature = temperature
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "setWhiteBalanceTemperature: $newTemperature)"
-        )
+        if (MyDebug.LOG) Log.d(TAG, "setWhiteBalanceTemperature: $newTemperature)")
         if (cameraSettings.whiteBalance == newTemperature) {
             if (MyDebug.LOG) Log.d(TAG, "already set")
             return false
         }
         try {
-            newTemperature =
-                max(newTemperature.toDouble(), MIN_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
-            newTemperature =
-                min(newTemperature.toDouble(), MAX_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
+            newTemperature = max(newTemperature.toDouble(), MIN_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
+            newTemperature = min(newTemperature.toDouble(), MAX_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
             cameraSettings.whiteBalanceTemperature = newTemperature
             if (cameraSettings.setWhiteBalance(previewBuilder)) {
                 setRepeatingRequest()
@@ -2593,33 +1326,12 @@ class CameraController2(
     override val whiteBalanceTemperature: Int
         get() = cameraSettings.whiteBalanceTemperature
 
-    private fun convertAntiBanding(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO -> value = ANTIBANDING_DEFAULT
-            CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ -> value = "50hz"
-            CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ -> value = "60hz"
-            CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF -> value = "off"
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown antibanding: $value2"
-                )
-                value = null
-            }
-        }
-        return value
-    }
+    private fun convertAntiBanding(value2: Int): String? = Camera2RequestBuilderHelper.convertAntiBandingToString(value2)
 
     override fun setAntiBanding(value: String): SupportedValues? {
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "setAntiBanding: $value"
-        )
-        // we convert to/from strings to be compatible with original Android Camera API
-        val values2 =
-            characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES)
-                ?: return null
+        if (MyDebug.LOG) Log.d(TAG, "setAntiBanding: $value")
+        val values2 = characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES)
+            ?: return null
         val values: MutableList<String> = ArrayList()
         for (value2 in values2) {
             val thisValue = convertAntiBanding(value2)
@@ -2629,23 +1341,8 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, ANTIBANDING_DEFAULT)
         if (supportedValues != null) {
-            // for antibanding, if the requested value isn't available, we don't modify it at all
-            // (so we stick with the device's default setting)
             if (supportedValues.selectedValue == value) {
-                var selectedValue2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO
-                when (supportedValues.selectedValue) {
-                    ANTIBANDING_DEFAULT -> selectedValue2 =
-                        CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO
-
-                    "50hz" -> selectedValue2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ
-                    "60hz" -> selectedValue2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ
-                    "off" -> selectedValue2 = CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF
-                    else -> if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "unknown selected_value: " + supportedValues.selectedValue
-                    )
-                }
-
+                val selectedValue2 = Camera2RequestBuilderHelper.convertAntiBandingToInt(supportedValues.selectedValue)
                 cameraSettings.hasAntibanding = true
                 cameraSettings.antibanding = selectedValue2
                 if (cameraSettings.setAntiBanding(previewBuilder)) {
@@ -2673,23 +1370,7 @@ class CameraController2(
         }
 
     private fun convertEdgeMode(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.EDGE_MODE_FAST -> value = "fast"
-            CameraMetadata.EDGE_MODE_HIGH_QUALITY -> value = "high_quality"
-            CameraMetadata.EDGE_MODE_OFF -> value = "off"
-            CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG ->             // we don't make use of zero shutter lag
-                value = null
-
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown edge_mode: $value2"
-                )
-                value = null
-            }
-        }
-        return value
+        return if (value2 == CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertEdgeModeToString(value2)
     }
 
     override fun setEdgeMode(value: String): SupportedValues? {
@@ -2706,33 +1387,12 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, EDGE_MODE_DEFAULT)
         if (supportedValues != null) {
-            // for edge mode, if the requested value isn't available, we don't modify it at all
             if (supportedValues.selectedValue == value) {
                 var hasEdgeMode = false
                 var selectedValue2 = CameraMetadata.EDGE_MODE_FAST
-                // if EDGE_MODE_DEFAULT, this means to stick with the device default
                 if (value != EDGE_MODE_DEFAULT) {
-                    when (supportedValues.selectedValue) {
-                        "fast" -> {
-                            hasEdgeMode = true
-                            selectedValue2 = CameraMetadata.EDGE_MODE_FAST
-                        }
-
-                        "high_quality" -> {
-                            hasEdgeMode = true
-                            selectedValue2 = CameraMetadata.EDGE_MODE_HIGH_QUALITY
-                        }
-
-                        "off" -> {
-                            hasEdgeMode = true
-                            selectedValue2 = CameraMetadata.EDGE_MODE_OFF
-                        }
-
-                        else -> if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "unknown selected_value: " + supportedValues.selectedValue
-                        )
-                    }
+                    hasEdgeMode = true
+                    selectedValue2 = Camera2RequestBuilderHelper.convertEdgeModeToInt(supportedValues.selectedValue)
                 }
 
                 if (cameraSettings.hasEdgeMode != hasEdgeMode || cameraSettings.edgeMode != selectedValue2) {
@@ -2764,34 +1424,13 @@ class CameraController2(
         }
 
     private fun convertNoiseReductionMode(value2: Int): String? {
-        val value: String?
-        when (value2) {
-            CameraMetadata.NOISE_REDUCTION_MODE_FAST -> value = "fast"
-            CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY -> value = "high_quality"
-            CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL -> value = "minimal"
-            CameraMetadata.NOISE_REDUCTION_MODE_OFF -> value = "off"
-            CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG ->             // we don't make use of zero shutter lag
-                value = null
-
-            else -> {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "unknown noise_reduction_mode: $value2"
-                )
-                value = null
-            }
-        }
-        return value
+        return if (value2 == CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertNoiseReductionModeToString(value2)
     }
 
     override fun setNoiseReductionMode(value: String): SupportedValues? {
-        if (MyDebug.LOG) Log.d(
-            TAG,
-            "setNoiseReductionMode: $value"
-        )
-        val values2 =
-            characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
-                ?: return null
+        if (MyDebug.LOG) Log.d(TAG, "setNoiseReductionMode: $value")
+        val values2 = characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
+            ?: return null
         val values: MutableList<String> = ArrayList()
         values.add(NOISE_REDUCTION_MODE_DEFAULT)
         for (value2 in values2) {
@@ -2802,44 +1441,12 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, NOISE_REDUCTION_MODE_DEFAULT)
         if (supportedValues != null) {
-            // for noise reduction, if the requested value isn't available, we don't modify it at all
             if (supportedValues.selectedValue == value) {
                 var hasNoiseReductionMode = false
                 var selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST
-                // if NOISE_REDUCTION_MODE_DEFAULT, this means to stick with the device default
                 if (value != NOISE_REDUCTION_MODE_DEFAULT) {
-                    when (supportedValues.selectedValue) {
-                        "fast" -> {
-                            hasNoiseReductionMode = true
-                            selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST
-                        }
-
-                        "high_quality" -> {
-                            hasNoiseReductionMode = true
-                            selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY
-                        }
-
-                        "minimal" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            hasNoiseReductionMode = true
-                            selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL
-                        } else {
-                            // shouldn't ever be here, as NOISE_REDUCTION_MODE_MINIMAL shouldn't be a supported value!
-                            // treat as fast instead
-                            Log.e(TAG, "noise reduction minimal, but pre-Android M!")
-                            hasNoiseReductionMode = true
-                            selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST
-                        }
-
-                        "off" -> {
-                            hasNoiseReductionMode = true
-                            selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_OFF
-                        }
-
-                        else -> if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "unknown selected_value: " + supportedValues.selectedValue
-                        )
-                    }
+                    hasNoiseReductionMode = true
+                    selectedValue2 = Camera2RequestBuilderHelper.convertNoiseReductionModeToInt(supportedValues.selectedValue)
                 }
 
                 if (cameraSettings.hasNoiseReductionMode != hasNoiseReductionMode || cameraSettings.noiseReductionMode != selectedValue2) {

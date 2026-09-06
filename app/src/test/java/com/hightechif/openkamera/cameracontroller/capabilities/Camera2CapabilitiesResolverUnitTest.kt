@@ -134,4 +134,23 @@ class Camera2CapabilitiesResolverUnitTest {
         assertTrue(Camera2CapabilitiesResolver.sizeSubset(widthsA, heightsA, widthsB, heightsB))
         assertFalse(Camera2CapabilitiesResolver.sizeSubset(widthsB, heightsB, widthsA, heightsA))
     }
+
+    @Test
+    fun testConvertFocusModesToValues() {
+        val modes = intArrayOf(
+            android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE_AUTO,
+            android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE_MACRO,
+            android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE,
+            android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE_OFF
+        )
+        val resultWithManual = Camera2CapabilitiesResolver.convertFocusModesToValues(modes, 5.0f)
+        assertTrue(resultWithManual!!.contains("focus_mode_auto"))
+        assertTrue(resultWithManual.contains("focus_mode_macro"))
+        assertTrue(resultWithManual.contains("focus_mode_continuous_picture"))
+        assertTrue(resultWithManual.contains("focus_mode_infinity"))
+        assertTrue(resultWithManual.contains("focus_mode_manual2"))
+
+        val resultNoManual = Camera2CapabilitiesResolver.convertFocusModesToValues(modes, 0.0f)
+        assertFalse(resultNoManual!!.contains("focus_mode_manual2"))
+    }
 }

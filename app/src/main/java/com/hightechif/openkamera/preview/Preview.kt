@@ -60,6 +60,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.TakePhoto
+import com.hightechif.openkamera.preview.faces.PreviewFaceDetectionEngine
+import com.hightechif.openkamera.preview.setup.PreviewCameraSetupHelper
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
@@ -468,6 +470,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var supportsFaceDetection = false
     private var usingFaceDetection = false
     private var _facesDetected: Array<CameraController.Face?> = emptyArray()
+    val faceDetectionEngine = PreviewFaceDetectionEngine()
     private val faceRect = RectF()
     private var supportsOpticalStabilization = false
     private var supportsVideoStabilization = false
@@ -538,15 +541,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         0 // time when focusSetForTargetDistance last changed
         private set
 
-    internal enum class FaceLocation {
-        FACELOCATION_UNSET,
-        FACELOCATION_UNKNOWN,
-        FACELOCATION_LEFT,
-        FACELOCATION_RIGHT,
-        FACELOCATION_TOP,
-        FACELOCATION_BOTTOM,
-        FACELOCATION_CENTRE
-    }
+
 
     // for testing; must be volatile for test project reading the state
     private var isTest = false // whether called from OpenKamera.test testing
@@ -2017,15 +2012,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 // also filter unsupported flash modes
                 if (supportedFlashValues != null) {
                     if (MyDebug.LOG) Log.d(TAG, "restrict flash modes for extension session")
-                    val newSupportedFlashValues: MutableList<String> = ArrayList()
-                    for (supportedFlashValue in supportedFlashValues!!) {
-                        when (supportedFlashValue) {
-                            "flash_off", "flash_frontscreen_torch" -> newSupportedFlashValues.add(
-                                supportedFlashValue
-                            )
-                        }
-                    }
-                    supportedFlashValues = newSupportedFlashValues
+                    supportedFlashValues = PreviewCameraSetupHelper.filterExtensionFlashModes(supportedFlashValues)
                 }
 
                 // also disallow focus modes
@@ -2135,46 +2122,15 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                             "current_size: " + currentSize.width + " x " + currentSize.height + " supports_burst? " + currentSize.supportsBurst
                         )
                     }
-                    if (!currentSize.supportsRequirements(isBurst, isExtension, extension)) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "current picture size doesn't support required burst and/or extension"
-                        )
-                        // set to next largest that supports what we need
-                        var newSize: CameraController.Size? = null
-                        for (i in photoSizes!!.indices) {
-                            val size: CameraController.Size = photoSizes!![i]
-                            if (size.supportsRequirements(
-                                    isBurst,
-                                    isExtension,
-                                    extension
-                                ) && size.width * size.height <= currentSize.width * currentSize.height
-                            ) {
-                                if (newSize == null || size.width * size.height > newSize.width * newSize.height) {
-                                    currentSizeIndex = i
-                                    newSize = size
-                                }
-                            }
-                        }
-                        if (newSize == null) {
-                            Log.e(
-                                TAG,
-                                "can't find supporting picture size smaller than the current picture size"
-                            )
-                            // just find largest that supports requirements
-                            for (i in photoSizes!!.indices) {
-                                val size: CameraController.Size = photoSizes!![i]
-                                if (size.supportsRequirements(isBurst, isExtension, extension)) {
-                                    if (newSize == null || size.width * size.height > newSize.width * newSize.height) {
-                                        currentSizeIndex = i
-                                        newSize = size
-                                    }
-                                }
-                            }
-                            if (newSize == null) {
-                                Log.e(TAG, "can't find supporting picture size")
-                            }
-                        }
+                    val bestSupportingIndex = PreviewCameraSetupHelper.findBestSupportingPictureSizeIndex(
+                        photoSizes,
+                        currentSize,
+                        isBurst,
+                        isExtension,
+                        extension
+                    )
+                    if (bestSupportingIndex != null) {
+                        currentSizeIndex = bestSupportingIndex
                         // if we set a new size, we don't save this to applicationinterface (so that if user switches to a burst mode or extension mode and back
                         // when the original resolution doesn't support burst/extension we revert to the original resolution)
                     }
@@ -2281,12 +2237,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     private fun find1xZoom(): Int {
-        for (i in zoomRatios!!.indices) {
-            if (zoomRatios!![i] == 100) {
-                return i
-            }
-        }
-        return 0 // shouldn't happen but just in case, choose smallest zoom value
+        return PreviewCameraSetupHelper.find1xZoom(zoomRatios)
     }
 
     fun setupBurstMode() {
@@ -2456,36 +2407,31 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 )
             }
             if (this.usingFaceDetection) {
-                class MyFaceDetectionListener : CameraController.FaceDetectionListener {
-                    private val handler = Handler()
-                    private var lastNFaces = -1
-                    private var lastFaceLocation = FaceLocation.FACELOCATION_UNSET
-
-                    /** Note, at least for Camera2 API, onFaceDetection() isn't called on UI thread.
-                     */
+                cameraController!!.setFaceDetectionListener(object : CameraController.FaceDetectionListener {
                     override fun onFaceDetection(faces: Array<CameraController.Face?>) {
                         if (MyDebug.LOG) Log.d(
                             TAG,
                             "onFaceDetection: " + faces.size + " : " + faces.contentToString()
                         )
                         if (cameraController == null) {
-                            // can get a crash in some cases when switching camera when face detection is on (at least for Camera2)
                             val activity = this@Preview.context as Activity
                             activity.runOnUiThread { _facesDetected = emptyArray() }
                             return
                         }
 
-                        // don't assign to facesDetected yet, as that has to be done on the UI thread
-
-                        // We don't synchronize on facesDetected, as the array may be passed to other
-                        // classes via getFacesDetected(). Although that function could copy instead,
-                        // that would mean an allocation in every frame in DrawPreview.
-                        // Easier to just do the assignment on the UI thread.
                         val activity = this@Preview.context as Activity
                         activity.runOnUiThread {
-                            reportFaces(faces)
+                            faceDetectionEngine.reportFaces(
+                                faces = faces,
+                                context = this@Preview.context,
+                                view = this@Preview.view,
+                                matrix = getCameraToPreviewMatrix(),
+                                viewWidth = cameraSurface.view.width,
+                                viewHeight = cameraSurface.view.height,
+                                uiRotation = uiRotation,
+                                tempRect = faceRect
+                            )
                             if (_facesDetected.isEmpty() || _facesDetected.size != faces.size) {
-                                // avoid unnecessary reallocations
                                 if (MyDebug.LOG) Log.d(
                                     TAG,
                                     "allocate new faces_detected"
@@ -2495,133 +2441,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                             System.arraycopy(faces, 0, _facesDetected, 0, faces.size)
                         }
                     }
-
-                    /** Accessibility: report number of faces for talkback etc.
-                     */
-                    fun reportFaces(localFaces: Array<CameraController.Face?>) {
-                        run {
-                            val nFaces = localFaces.size
-                            var faceLocation = FaceLocation.FACELOCATION_UNKNOWN
-                            if (nFaces > 0) {
-                                // set faceLocation
-                                var avgX = 0f
-                                var avgY = 0f
-                                val bdryFracC = 0.35f
-                                var allCentre = true
-                                val matrix = getCameraToPreviewMatrix()
-                                for (face in localFaces) {
-                                    if (face != null) {
-                                        //float faceX = face.rect.centerX();
-                                        //float faceY = face.rect.centerY();
-                                        // convert to screen space coordinates
-                                        faceRect.set(face.rect)
-                                        matrix.mapRect(faceRect)
-                                        var faceX = faceRect.centerX()
-                                        var faceY = faceRect.centerY()
-
-                                        faceX /= cameraSurface.view.width.toFloat()
-                                        faceY /= cameraSurface.view.height.toFloat()
-                                        if (allCentre) {
-                                            if (faceX < bdryFracC || faceX > 1.0f - bdryFracC || faceY < bdryFracC || faceY > 1.0f - bdryFracC) allCentre =
-                                                false
-                                        }
-                                        avgX += faceX
-                                        avgY += faceY
-                                    }
-                                }
-                                avgX /= nFaces.toFloat()
-                                avgY /= nFaces.toFloat()
-                                if (MyDebug.LOG) {
-                                    Log.d(TAG, "    avg_x: $avgX")
-                                    Log.d(TAG, "    avg_y: $avgY")
-                                    Log.d(
-                                        TAG,
-                                        "    ui_rotation: $uiRotation"
-                                    )
-                                }
-                                if (allCentre) {
-                                    faceLocation = FaceLocation.FACELOCATION_CENTRE
-                                } else {
-                                    when (uiRotation) {
-                                        0 -> {}
-                                        90 -> {
-                                            val temp = avgX
-                                            avgX = avgY
-                                            avgY = 1.0f - temp
-                                        }
-
-                                        180 -> {
-                                            avgX = 1.0f - avgX
-                                            avgY = 1.0f - avgY
-                                        }
-
-                                        270 -> {
-                                            val temp = avgX
-                                            avgX = 1.0f - avgY
-                                            avgY = temp
-                                        }
-                                    }
-                                    if (MyDebug.LOG) {
-                                        Log.d(TAG, "    avg_x: $avgX")
-                                        Log.d(TAG, "    avg_y: $avgY")
-                                    }
-                                    if (avgX < bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_LEFT
-                                    else if (avgX > 1.0f - bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_RIGHT
-                                    else if (avgY < bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_TOP
-                                    else if (avgY > 1.0f - bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_BOTTOM
-                                }
-                            }
-                            if (nFaces != lastNFaces || faceLocation != lastFaceLocation) {
-                                if (nFaces == 0 && lastNFaces == -1) {
-                                    // only say 0 faces detected if previously the number was non-zero
-                                } else {
-                                    var string = "$nFaces " + this@Preview.context.resources
-                                        .getString(if (nFaces == 1) R.string.face_detected else R.string.faces_detected)
-                                    if (nFaces > 0 && faceLocation != FaceLocation.FACELOCATION_UNKNOWN) {
-                                        when (faceLocation) {
-                                            FaceLocation.FACELOCATION_CENTRE -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.centre_of_screen)
-
-                                            FaceLocation.FACELOCATION_LEFT -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.left_of_screen)
-
-                                            FaceLocation.FACELOCATION_RIGHT -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.right_of_screen)
-
-                                            FaceLocation.FACELOCATION_TOP -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.top_of_screen)
-
-                                            FaceLocation.FACELOCATION_BOTTOM -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.bottom_of_screen)
-
-                                            else -> {}
-                                        }
-                                    }
-                                    val stringF = string
-                                    if (MyDebug.LOG) Log.d(TAG, string)
-                                    // to avoid having a big queue of saying "one face detected, two faces detected" etc., we only report
-                                    // after a delay, cancelling any that were previously queued
-                                    handler.removeCallbacksAndMessages(null)
-                                    handler.postDelayed({
-                                        if (MyDebug.LOG) Log.d(
-                                            TAG,
-                                            "announceForAccessibility: $stringF"
-                                        )
-                                        this@Preview.view.announceForAccessibility(stringF)
-                                    }, 500)
-                                }
-
-                                lastNFaces = nFaces
-                                lastFaceLocation = faceLocation
-                            }
-                        }
-                    }
-                }
-                cameraController!!.setFaceDetectionListener(MyFaceDetectionListener())
+                })
             } else {
                 cameraController!!.setFaceDetectionListener(null)
             }
@@ -8515,18 +8335,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
          */
         get() {
             if (_facesDetected.isNotEmpty()) {
-                // note, we don't store the screen coordinates, as they may become out of date in the
-                // screen orientation changes (if MainActivity.lockToLandscape==false)
                 val matrix = getCameraToPreviewMatrix()
-                for (face in _facesDetected) {
-                    if (face != null) {
-                        faceRect.set(face.rect)
-                        matrix.mapRect(faceRect)
-                        faceRect.round(face.temp)
-                    }
-                }
+                faceDetectionEngine.mapFacesToScreenCoordinates(_facesDetected, matrix, faceRect)
             }
-            // FindBugs warns about returning the array directly, but in fact we need to return direct access rather than copying, so that the on-screen display of faces rectangles updates
             return _facesDetected.filterNotNull().toTypedArray()
         }
 
