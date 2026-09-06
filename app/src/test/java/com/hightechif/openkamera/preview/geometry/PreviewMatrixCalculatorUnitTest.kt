@@ -27,7 +27,7 @@ class PreviewMatrixCalculatorUnitTest {
             previewHeight = 1080,
             displayRotationDegrees = 0,
             cameraOrientation = 90,
-            displayOrientation = 90,
+            displayOrientation = 0, // In Camera2, displayOrientation is 0 / unused
             isCameraFacingFront = false,
             isUsingCamera2 = true
         )
@@ -43,6 +43,58 @@ class PreviewMatrixCalculatorUnitTest {
     }
 
     @Test
+    fun testCameraToPreviewMatrix_Camera2_IgnoresDisplayOrientation() {
+        // Dimensions with displayOrientation = 0
+        val dim1 = ViewportDimensions(
+            surfaceWidth = 1080,
+            surfaceHeight = 1920,
+            previewWidth = 1920,
+            previewHeight = 1080,
+            displayRotationDegrees = 0,
+            cameraOrientation = 90,
+            displayOrientation = 0,
+            isCameraFacingFront = false,
+            isUsingCamera2 = true
+        )
+        // Dimensions with arbitrary displayOrientation
+        val dim2 = dim1.copy(displayOrientation = 180)
+
+        val matrix1 = PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dim1)
+        val matrix2 = PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dim2)
+
+        val pt1 = floatArrayOf(100f, 200f)
+        val pt2 = floatArrayOf(100f, 200f)
+        matrix1.mapPoints(pt1)
+        matrix2.mapPoints(pt2)
+
+        assertEquals(pt1[0], pt2[0], 0.001f)
+        assertEquals(pt1[1], pt2[1], 0.001f)
+    }
+
+    @Test
+    fun testCameraToPreviewMatrix_Camera1_UsesDisplayOrientation() {
+        val dimensions = ViewportDimensions(
+            surfaceWidth = 1080,
+            surfaceHeight = 1920,
+            previewWidth = 1920,
+            previewHeight = 1080,
+            displayRotationDegrees = 0,
+            cameraOrientation = 90,
+            displayOrientation = 90,
+            isCameraFacingFront = false,
+            isUsingCamera2 = false
+        )
+
+        val matrix = PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dimensions)
+        assertNotNull(matrix)
+
+        val center = floatArrayOf(0f, 0f)
+        matrix.mapPoints(center)
+        assertEquals(540f, center[0], 0.1f)
+        assertEquals(960f, center[1], 0.1f)
+    }
+
+    @Test
     fun testCameraToPreviewMatrix_Camera2_FrontCamera_Mirroring() {
         val dimensions = ViewportDimensions(
             surfaceWidth = 1080,
@@ -51,7 +103,7 @@ class PreviewMatrixCalculatorUnitTest {
             previewHeight = 1080,
             displayRotationDegrees = 0,
             cameraOrientation = 270,
-            displayOrientation = 270,
+            displayOrientation = 0,
             isCameraFacingFront = true,
             isUsingCamera2 = true
         )

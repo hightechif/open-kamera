@@ -54,7 +54,7 @@ class UiHudPreferencesRepository(
     }
 
     fun getPausePreviewPref(): Boolean {
-        return sharedPreferences.getBoolean(PreferenceKeys.PAUSE_PREVIEW_PREFERENCE_KEY, true)
+        return sharedPreferences.getBoolean(PreferenceKeys.PAUSE_PREVIEW_PREFERENCE_KEY, false)
     }
 
     fun getShowToastsPref(): Boolean {

@@ -9,8 +9,13 @@ package com.hightechif.openkamera.test
 
 import android.preference.PreferenceManager
 import android.util.Log
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.ViewMatchers
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface.RawPref
+import org.hamcrest.Matchers.anyOf
+import org.hamcrest.Matchers.endsWith
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -18,6 +23,35 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Camera2InstrumentedTest : BaseInstrumentedTest() {
+
+    @Test
+    fun testCamera2TouchToFocus() {
+        Log.d(TAG, "testCamera2TouchToFocus")
+        setToDefault()
+
+        val isCamera2 = getActivityValue { it.preview.usingCamera2API() }
+        if (!isCamera2) {
+            Log.d(TAG, "Camera2 API not active")
+            return
+        }
+
+        Thread.sleep(1000)
+
+        // Perform click on preview surface to trigger touch-to-focus and matrix calculation
+        onView(
+            anyOf(
+                ViewMatchers.withClassName(endsWith("MySurfaceView")),
+                ViewMatchers.withClassName(endsWith("MyTextureView"))
+            )
+        ).perform(click())
+
+        Thread.sleep(500)
+
+        onActivity { activity ->
+            assertNotNull(activity.preview.cameraController)
+            assertTrue(activity.preview.openCameraAttempted())
+        }
+    }
 
     @Test
     fun testCamera2ManualISO() {

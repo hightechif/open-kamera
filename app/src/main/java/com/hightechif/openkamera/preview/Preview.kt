@@ -612,32 +612,32 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     // and/or set "Rotate preview" option to 180 degrees.
     private fun calculateCameraToPreviewMatrix() {
         if (MyDebug.LOG) Log.d(TAG, "calculateCameraToPreviewMatrix")
-        if (cameraController == null) return
+        val controller = cameraController ?: return
         val dimensions = ViewportDimensions(
             surfaceWidth = cameraSurface.view.width,
             surfaceHeight = cameraSurface.view.height,
             previewWidth = previewW,
             previewHeight = previewH,
             displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = cameraController!!.cameraOrientation,
-            displayOrientation = cameraController!!.displayOrientation,
-            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
+            cameraOrientation = controller.cameraOrientation,
+            displayOrientation = if (usingAndroidL) 0 else controller.displayOrientation,
+            isCameraFacingFront = (controller.facing === Facing.FACING_FRONT),
             isUsingCamera2 = usingAndroidL
         )
         _cameraToPreviewMatrix.set(PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dimensions))
     }
 
     private fun calculatePreviewToCameraMatrix() {
-        if (cameraController == null) return
+        val controller = cameraController ?: return
         val dimensions = ViewportDimensions(
             surfaceWidth = cameraSurface.view.width,
             surfaceHeight = cameraSurface.view.height,
             previewWidth = previewW,
             previewHeight = previewH,
             displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = cameraController!!.cameraOrientation,
-            displayOrientation = cameraController!!.displayOrientation,
-            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
+            cameraOrientation = controller.cameraOrientation,
+            displayOrientation = if (usingAndroidL) 0 else controller.displayOrientation,
+            isCameraFacingFront = (controller.facing === Facing.FACING_FRONT),
             isUsingCamera2 = usingAndroidL
         )
         _previewToCameraMatrix.set(PreviewMatrixCalculator.calculatePreviewToCameraMatrix(dimensions))

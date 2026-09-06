@@ -29,7 +29,7 @@ class UiHudPreferencesRepositoryTest {
         assertEquals(UiHudPreferencesRepository.DEFAULT_LOCK_ORIENTATION, repository.getLockOrientationPref())
         assertFalse(repository.getTouchCapturePref())
         assertFalse(repository.getDoubleTapCapturePref())
-        assertTrue(repository.getPausePreviewPref())
+        assertFalse(repository.getPausePreviewPref())
         assertTrue(repository.getShowToastsPref())
         assertTrue(repository.getShutterSoundPref())
         assertTrue(repository.getStartupFocusPref())
