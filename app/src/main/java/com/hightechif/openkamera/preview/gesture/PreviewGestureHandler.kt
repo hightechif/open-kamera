@@ -147,5 +147,61 @@ object PreviewGestureHandler {
 
         return Pair(newZoomFactor, newSmoothZoom)
     }
+
+    /**
+     * Calculates vertical swipe exposure adjustment steps.
+     * Swiping up (deltaY < 0) increases exposure, swiping down (deltaY > 0) decreases exposure.
+     */
+    fun calculateVerticalSwipeExposure(
+        deltaY: Float,
+        viewHeight: Float,
+        minExposure: Int,
+        maxExposure: Int,
+        currentExposure: Int,
+        sensitivity: Float = 1.0f
+    ): Int {
+        if (viewHeight <= 0f) return currentExposure
+        val totalRange = (maxExposure - minExposure).coerceAtLeast(1)
+        val normalizedDelta = -deltaY / viewHeight
+        val stepChange = (normalizedDelta * totalRange * sensitivity).roundToInt()
+        return (currentExposure + stepChange).coerceIn(minExposure, maxExposure)
+    }
+
+    /**
+     * Determines whether a swipe gesture satisfies unlock fling requirements based on distance and velocity.
+     */
+    fun isUnlockSwipe(
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float,
+        velocityX: Float,
+        velocityY: Float,
+        minDistance: Float,
+        minVelocity: Float
+    ): Boolean {
+        val diffX = startX - endX
+        val diffY = startY - endY
+        val dist2 = diffX * diffX + diffY * diffY
+        val vel2 = velocityX * velocityX + velocityY * velocityY
+        return dist2 > minDistance * minDistance && vel2 > minVelocity * minVelocity
+    }
+
+    /**
+     * Converts raw screen pixel touch coordinates to normalized [0.0, 1.0] viewport coordinates.
+     */
+    fun calculateTapNormalizedCoordinates(
+        touchX: Float,
+        touchY: Float,
+        viewWidth: Float,
+        viewHeight: Float
+    ): android.graphics.PointF {
+        if (viewWidth <= 0f || viewHeight <= 0f) {
+            return android.graphics.PointF(0.5f, 0.5f)
+        }
+        val normX = (touchX / viewWidth).coerceIn(0.0f, 1.0f)
+        val normY = (touchY / viewHeight).coerceIn(0.0f, 1.0f)
+        return android.graphics.PointF(normX, normY)
+    }
 }
 

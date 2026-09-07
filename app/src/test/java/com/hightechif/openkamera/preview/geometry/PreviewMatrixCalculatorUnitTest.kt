@@ -188,4 +188,62 @@ class PreviewMatrixCalculatorUnitTest {
         assertEquals(900, rectBottomRight.top)
         assertEquals(1000, rectBottomRight.bottom)
     }
+
+    @Test
+    fun testMapScreenToSensor_and_MapSensorToScreen_RoundTrip() {
+        val dimensions = ViewportDimensions(
+            surfaceWidth = 1080,
+            surfaceHeight = 1920,
+            previewWidth = 1920,
+            previewHeight = 1080,
+            displayRotationDegrees = 0,
+            cameraOrientation = 90,
+            isCameraFacingFront = false,
+            isUsingCamera2 = true
+        )
+
+        // Center tap (540, 960) -> sensor space should be (0, 0)
+        val sensorCenter = PreviewMatrixCalculator.mapScreenToSensor(540f, 960f, dimensions)
+        assertEquals(0f, sensorCenter[0], 0.1f)
+        assertEquals(0f, sensorCenter[1], 0.1f)
+
+        // Sensor center (0, 0) -> screen space should be (540, 960)
+        val screenCenter = PreviewMatrixCalculator.mapSensorToScreen(0f, 0f, dimensions)
+        assertEquals(540f, screenCenter[0], 0.1f)
+        assertEquals(960f, screenCenter[1], 0.1f)
+
+        // Out-of-bounds screen points clamp properly in sensor space [-1000, 1000]
+        val extremePoint = PreviewMatrixCalculator.mapScreenToSensor(-5000f, 5000f, dimensions)
+        assertEquals(true, extremePoint[0] >= -1000f && extremePoint[0] <= 1000f)
+        assertEquals(true, extremePoint[1] >= -1000f && extremePoint[1] <= 1000f)
+    }
+
+    @Test
+    fun testCalculateCropRect_AspectFittingAndZoom() {
+        // Full sensor 4000x3000 (4:3) with 1x zoom
+        val fullCrop = ViewportTransformHelper.calculateCropRect(
+            sensorWidth = 4000,
+            sensorHeight = 3000,
+            aspectRatio = 4.0 / 3.0,
+            zoomRatio = 1.0f
+        )
+        assertEquals(0, fullCrop.left)
+        assertEquals(0, fullCrop.top)
+        assertEquals(4000, fullCrop.right)
+        assertEquals(3000, fullCrop.bottom)
+
+        // 2x zoom on 4000x3000
+        val zoom2x = ViewportTransformHelper.calculateCropRect(
+            sensorWidth = 4000,
+            sensorHeight = 3000,
+            aspectRatio = 4.0 / 3.0,
+            zoomRatio = 2.0f
+        )
+        assertEquals(1000, zoom2x.left)
+        assertEquals(750, zoom2x.top)
+        assertEquals(3000, zoom2x.right)
+        assertEquals(2250, zoom2x.bottom)
+        assertEquals(2000, zoom2x.width())
+        assertEquals(1500, zoom2x.height())
+    }
 }

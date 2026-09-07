@@ -9,7 +9,12 @@ package com.hightechif.openkamera.preview
 import com.hightechif.openkamera.preview.gesture.PreviewGestureHandler
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class PreviewGestureHandlerTest {
 
     @Test
@@ -79,6 +84,110 @@ class PreviewGestureHandlerTest {
         )
         assertEquals(1, factorOut)
         assertEquals(1.5f, smoothOut, 0.001f)
+    }
+
+    @Test
+    fun calculateVerticalSwipeExposure_adjustsExposureWithinLimits() {
+        val minExp = -4
+        val maxExp = 4
+        val currentExp = 0
+        val viewHeight = 1000f
+
+        // Swipe up (-250px) should increase exposure
+        val swipeUpExp = PreviewGestureHandler.calculateVerticalSwipeExposure(
+            deltaY = -250f,
+            viewHeight = viewHeight,
+            minExposure = minExp,
+            maxExposure = maxExp,
+            currentExposure = currentExp
+        )
+        assertEquals(2, swipeUpExp)
+
+        // Swipe down (+500px) should decrease exposure
+        val swipeDownExp = PreviewGestureHandler.calculateVerticalSwipeExposure(
+            deltaY = 500f,
+            viewHeight = viewHeight,
+            minExposure = minExp,
+            maxExposure = maxExp,
+            currentExposure = currentExp
+        )
+        assertEquals(-4, swipeDownExp) // Clamped to min
+
+        // Over-swipe up should clamp to max
+        val overSwipeUpExp = PreviewGestureHandler.calculateVerticalSwipeExposure(
+            deltaY = -1500f,
+            viewHeight = viewHeight,
+            minExposure = minExp,
+            maxExposure = maxExp,
+            currentExposure = currentExp
+        )
+        assertEquals(4, overSwipeUpExp)
+    }
+
+    @Test
+    fun isUnlockSwipe_validatesDistanceAndVelocity() {
+        val minDistance = 100f
+        val minVelocity = 500f
+
+        // Valid swipe: distance = 150, velocity = 600
+        val isValid = PreviewGestureHandler.isUnlockSwipe(
+            startX = 200f,
+            startY = 300f,
+            endX = 350f,
+            endY = 300f,
+            velocityX = 600f,
+            velocityY = 0f,
+            minDistance = minDistance,
+            minVelocity = minVelocity
+        )
+        assertEquals(true, isValid)
+
+        // Short swipe: distance = 50 < 100
+        val isShort = PreviewGestureHandler.isUnlockSwipe(
+            startX = 200f,
+            startY = 300f,
+            endX = 250f,
+            endY = 300f,
+            velocityX = 600f,
+            velocityY = 0f,
+            minDistance = minDistance,
+            minVelocity = minVelocity
+        )
+        assertEquals(false, isShort)
+
+        // Slow swipe: velocity = 200 < 500
+        val isSlow = PreviewGestureHandler.isUnlockSwipe(
+            startX = 200f,
+            startY = 300f,
+            endX = 350f,
+            endY = 300f,
+            velocityX = 200f,
+            velocityY = 0f,
+            minDistance = minDistance,
+            minVelocity = minVelocity
+        )
+        assertEquals(false, isSlow)
+    }
+
+    @Test
+    fun calculateTapNormalizedCoordinates_normalizesAndClamps() {
+        val viewWidth = 1080f
+        val viewHeight = 1920f
+
+        // Center tap
+        val center = PreviewGestureHandler.calculateTapNormalizedCoordinates(540f, 960f, viewWidth, viewHeight)
+        assertEquals(0.5f, center.x, 0.001f)
+        assertEquals(0.5f, center.y, 0.001f)
+
+        // Top-left
+        val topLeft = PreviewGestureHandler.calculateTapNormalizedCoordinates(0f, 0f, viewWidth, viewHeight)
+        assertEquals(0.0f, topLeft.x, 0.001f)
+        assertEquals(0.0f, topLeft.y, 0.001f)
+
+        // Out of bounds clamp
+        val clamped = PreviewGestureHandler.calculateTapNormalizedCoordinates(-50f, 2500f, viewWidth, viewHeight)
+        assertEquals(0.0f, clamped.x, 0.001f)
+        assertEquals(1.0f, clamped.y, 0.001f)
     }
 }
 

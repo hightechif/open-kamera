@@ -26,6 +26,7 @@ interface PreviewTouchCallback {
     fun shouldTakePhotoOnDoubleTap(): Boolean
     fun isTouchCaptureEnabled(): Boolean
     fun onClearFakeToast()
+    fun onVerticalSwipeExposure(stepDelta: Int) {}
 }
 
 /**
@@ -37,6 +38,25 @@ class PreviewTouchGestureCoordinator(
 ) {
     companion object {
         private const val TAG = "PreviewTouchGesture"
+    }
+
+    /**
+     * Calculates a normalized focus and metering area around the touch coordinate transformed to sensor space.
+     */
+    fun computeFocusArea(
+        touchX: Float,
+        touchY: Float,
+        previewToCameraMatrix: android.graphics.Matrix,
+        areaSize: Int = 100
+    ): com.hightechif.openkamera.preview.geometry.FocusMeteringArea {
+        val coords = PreviewGestureHandler.mapTouchToSensorCoords(touchX, touchY, previewToCameraMatrix)
+        val rect = android.graphics.Rect(
+            (coords[0] - areaSize).toInt().coerceIn(-1000, 1000),
+            (coords[1] - areaSize).toInt().coerceIn(-1000, 1000),
+            (coords[0] + areaSize).toInt().coerceIn(-1000, 1000),
+            (coords[1] + areaSize).toInt().coerceIn(-1000, 1000)
+        )
+        return com.hightechif.openkamera.preview.geometry.FocusMeteringArea(rect)
     }
 
     private var touchWasMultitouch = false

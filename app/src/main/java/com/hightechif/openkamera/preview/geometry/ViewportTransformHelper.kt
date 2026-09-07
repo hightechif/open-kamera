@@ -83,4 +83,35 @@ object ViewportTransformHelper {
 
         return matrix
     }
+
+    /**
+     * Calculates crop rectangle for digital zoom or aspect ratio fitting on camera sensor bounds.
+     */
+    fun calculateCropRect(
+        sensorWidth: Int,
+        sensorHeight: Int,
+        aspectRatio: Double,
+        zoomRatio: Float = 1.0f
+    ): android.graphics.Rect {
+        if (sensorWidth <= 0 || sensorHeight <= 0) {
+            return android.graphics.Rect(0, 0, 0, 0)
+        }
+
+        val clampedZoom = zoomRatio.coerceAtLeast(1.0f)
+        var cropWidth = (sensorWidth / clampedZoom).toInt()
+        var cropHeight = (sensorHeight / clampedZoom).toInt()
+
+        if (aspectRatio > 0.0) {
+            val currentAspect = cropWidth.toDouble() / cropHeight.toDouble()
+            if (currentAspect > aspectRatio) {
+                cropWidth = (cropHeight * aspectRatio).toInt()
+            } else {
+                cropHeight = (cropWidth / aspectRatio).toInt()
+            }
+        }
+
+        val cropLeft = (sensorWidth - cropWidth) / 2
+        val cropTop = (sensorHeight - cropHeight) / 2
+        return android.graphics.Rect(cropLeft, cropTop, cropLeft + cropWidth, cropTop + cropHeight)
+    }
 }
