@@ -80,4 +80,42 @@ class ImageSavePipelineTest {
 
         pipeline.destroy()
     }
+
+    @Test
+    fun testPipelineErrorRecovery() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val successfulTasks = AtomicInteger(0)
+        var shouldThrow = true
+
+        val pipeline = ImageSavePipeline(
+            queueCapacity = 10,
+            maxConcurrentWorkers = 1,
+            defaultDispatcher = testDispatcher,
+            ioDispatcher = testDispatcher,
+            taskExecutor = {
+                if (shouldThrow) {
+                    shouldThrow = false
+                    throw RuntimeException("Simulated IO disk write failure")
+                } else {
+                    successfulTasks.incrementAndGet()
+                    true
+                }
+            }
+        )
+
+        val failingTask = SaveTask.Dummy()
+        val successTask = SaveTask.Dummy()
+
+        pipeline.submit(failingTask)
+        pipeline.submit(successTask)
+        assertEquals(2, pipeline.currentPendingCount)
+
+        advanceUntilIdle()
+
+        assertEquals(1, successfulTasks.get())
+        assertEquals(0, pipeline.currentPendingCount)
+        assertFalse(pipeline.queueStateFlow.value.isProcessing)
+
+        pipeline.destroy()
+    }
 }

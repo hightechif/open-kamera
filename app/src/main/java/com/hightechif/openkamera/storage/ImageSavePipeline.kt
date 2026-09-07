@@ -26,6 +26,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
@@ -113,7 +114,9 @@ class ImageSavePipeline(
             updateState()
             try {
                 if (MyDebug.LOG) Log.d(TAG, "Worker $workerIndex executing task: $task")
-                taskExecutor?.invoke(task)
+                withContext(ioDispatcher) {
+                    taskExecutor?.invoke(task)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing task $task on worker $workerIndex", e)
             } finally {

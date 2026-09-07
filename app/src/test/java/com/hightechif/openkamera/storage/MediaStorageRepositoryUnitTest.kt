@@ -24,6 +24,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
+import androidx.exifinterface.media.ExifInterface
+import com.hightechif.openkamera.domain.engine.IImageProcessor
+import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MediaStorageRepositoryUnitTest {
 
@@ -95,15 +101,115 @@ class MediaStorageRepositoryUnitTest {
     }
 
     @Test
+    fun mediaProcessingWorker_processesDeferredHdrTask() = runTest(testDispatcher) {
+        val fakeMediaRepository = FakeMediaRepository()
+        val fakeProcessor = FakeImageProcessor().apply {
+            hdrResult = Result.success(byteArrayOf(10, 20, 30))
+        }
+
+        val worker = MediaProcessingWorker(
+            mediaRepository = fakeMediaRepository,
+            workerScope = this,
+            ioDispatcher = testDispatcher,
+            defaultDispatcher = testDispatcher,
+            imageProcessor = fakeProcessor
+        )
+
+        var completedResult: Result<PhotoResult>? = null
+        val job = worker.enqueueDeferredHdr(
+            frames = listOf(byteArrayOf(1), byteArrayOf(2)),
+            config = CaptureConfig(),
+            customFilename = "hdr_photo",
+            onComplete = { completedResult = it }
+        )
+        job.join()
+
+        assertTrue(completedResult?.isSuccess == true)
+        assertEquals(3L, completedResult?.getOrNull()?.fileSizeBytes)
+    }
+
+    @Test
+    fun mediaProcessingWorker_processesDeferredPanoramaTask() = runTest(testDispatcher) {
+        val fakeMediaRepository = FakeMediaRepository()
+        val fakeProcessor = FakeImageProcessor().apply {
+            panoResult = Result.success(byteArrayOf(40, 50, 60, 70))
+        }
+
+        val worker = MediaProcessingWorker(
+            mediaRepository = fakeMediaRepository,
+            workerScope = this,
+            ioDispatcher = testDispatcher,
+            defaultDispatcher = testDispatcher,
+            imageProcessor = fakeProcessor
+        )
+
+        var completedResult: Result<PhotoResult>? = null
+        val job = worker.enqueueDeferredPanorama(
+            frames = listOf(byteArrayOf(1), byteArrayOf(2)),
+            config = CaptureConfig(),
+            customFilename = "pano_photo",
+            onComplete = { completedResult = it }
+        )
+        job.join()
+
+        assertTrue(completedResult?.isSuccess == true)
+        assertEquals(4L, completedResult?.getOrNull()?.fileSizeBytes)
+    }
+
+    @Test
+    fun mediaStorageRepository_emitsLatestThumbnailUriOnSave() = runTest(testDispatcher) {
+        val fakeMediaRepository = FakeMediaRepository()
+        fakeMediaRepository.latestMediaThumbnailFlow.test {
+            assertEquals(null, awaitItem())
+
+            fakeMediaRepository.savePhoto(
+                jpegBytes = byteArrayOf(1, 2, 3),
+                config = CaptureConfig()
+            )
+
+            val updatedUri = awaitItem()
+            org.junit.Assert.assertNotNull(updatedUri)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun exifUtils_metadataMapping_handlesRotationAndLocation() {
         val config = CaptureConfig(
             rotationDegrees = 270,
-            location = LocationCoordinates(12.34, 56.78, 100.0)
+            location = LocationCoordinates(12.34, 56.78, 100.0),
+            iso = 400,
+            aperture = 1.8f
         )
         assertEquals(270, config.rotationDegrees)
         assertEquals(12.34, config.location?.latitude ?: 0.0, 0.001)
         assertEquals(56.78, config.location?.longitude ?: 0.0, 0.001)
         assertEquals(100.0, config.location?.altitude ?: 0.0, 0.001)
+        assertEquals(400, config.iso)
+        assertEquals(1.8f, config.aperture ?: 0.0f, 0.001f)
+
+        val mockExif = mockk<ExifInterface>(relaxed = true)
+        ExifUtils.writeMetadataToExif(mockExif, config)
+
+        verify {
+            mockExif.setAttribute(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_ROTATE_270.toString()
+            )
+        }
+        verify {
+            mockExif.setAttribute(
+                ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+                "400"
+            )
+        }
+        verify {
+            mockExif.setAttribute(
+                ExifInterface.TAG_F_NUMBER,
+                "1.8"
+            )
+        }
+        verify { mockExif.setGpsInfo(any()) }
     }
 }
 
@@ -153,7 +259,9 @@ class FakeMediaRepository : IMediaRepository {
     }
 
     override suspend fun createVideoOutputFile(extension: String): Result<File> {
-        return Result.success(File.createTempFile("VID_TEST", ".$extension"))
+        return Result.success(withContext(Dispatchers.IO) {
+            File.createTempFile("VID_TEST", ".$extension")
+        })
     }
 
     override suspend fun finalizeVideoFile(
@@ -176,4 +284,13 @@ class FakeMediaRepository : IMediaRepository {
     }
 
     override suspend fun getLatestMediaUri(): Uri? = _latestThumbnail.value
+}
+
+class FakeImageProcessor : IImageProcessor {
+    var hdrResult: Result<ByteArray> = Result.success(byteArrayOf(10, 20, 30))
+    var panoResult: Result<ByteArray> = Result.success(byteArrayOf(40, 50, 60, 70))
+
+    override suspend fun processHdr(frames: List<ByteArray>): Result<ByteArray> = hdrResult
+    override suspend fun processPanorama(frames: List<ByteArray>): Result<ByteArray> = panoResult
+    override suspend fun processNoiseReduction(frame: ByteArray): Result<ByteArray> = Result.success(frame)
 }

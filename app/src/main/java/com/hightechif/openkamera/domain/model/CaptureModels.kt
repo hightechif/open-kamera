@@ -21,7 +21,9 @@ data class CaptureConfig(
     val enableRaw: Boolean = false,
     val burstExposures: List<Int> = emptyList(), // e.g. [-2, 0, 2] for HDR
     val rotationDegrees: Int = 0,
-    val location: LocationCoordinates? = null
+    val location: LocationCoordinates? = null,
+    val iso: Int? = null,
+    val aperture: Float? = null
 )
 
 data class PhotoResult(

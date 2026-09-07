@@ -37,6 +37,8 @@ import com.hightechif.openkamera.utils.ImageUtils
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.PostProcessing
 import com.hightechif.openkamera.utils.Preshots
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -175,7 +177,9 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) {
                 mainActivity.runOnUiThread { mainActivity.imageQueueChanged() }
             },
             taskExecutor = { task ->
-                executeSaveTask(task)
+                withContext(Dispatchers.IO) {
+                    executeSaveTask(task)
+                }
             }
         )
     }

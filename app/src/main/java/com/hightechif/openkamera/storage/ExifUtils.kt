@@ -68,6 +68,14 @@ object ExifUtils {
         config.location?.let { loc ->
             setLocationOnExif(exif, loc)
         }
+
+        config.iso?.let { iso ->
+            exif.setAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY, iso.toString())
+        }
+
+        config.aperture?.let { aperture ->
+            exif.setAttribute(ExifInterface.TAG_F_NUMBER, aperture.toString())
+        }
     }
 
     fun setLocationOnExif(exif: ExifInterface, loc: LocationCoordinates) {

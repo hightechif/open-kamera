@@ -17,11 +17,12 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.graphics.createBitmap
 
 @Singleton
 class ImageProcessorImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
+    @param:ApplicationContext private val context: Context,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
 ) : IImageProcessor {
 
     private val hdrProcessor: HDRProcessor by lazy {
@@ -52,7 +53,7 @@ class ImageProcessorImpl @Inject constructor(
                 }
 
                 val first = bitmaps.first()
-                val outBitmap = Bitmap.createBitmap(first.width, first.height, Bitmap.Config.ARGB_8888)
+                val outBitmap = createBitmap(first.width, first.height)
 
                 val success = if (NativeImageProcessorBridge.isAvailable() && bitmaps.size >= 2) {
                     NativeImageProcessorBridge.processHdrFusion(
@@ -60,7 +61,7 @@ class ImageProcessorImpl @Inject constructor(
                         offsetsX = IntArray(bitmaps.size),
                         offsetsY = IntArray(bitmaps.size),
                         paramsA = FloatArray(bitmaps.size) { 1.0f },
-                        paramsB = FloatArray(bitmaps.size) { 0.0f },
+                        paramsB = FloatArray(bitmaps.size),
                         outBitmap = outBitmap,
                         tonemapAlgorithm = 2, // Reinhard
                         tonemapScale = 1.0f,
@@ -106,7 +107,7 @@ class ImageProcessorImpl @Inject constructor(
 
                 val first = bitmaps.first()
                 val second = bitmaps.getOrNull(1) ?: first
-                val outBitmap = Bitmap.createBitmap(first.width, first.height, Bitmap.Config.ARGB_8888)
+                val outBitmap = createBitmap(first.width, first.height)
 
                 val success = if (NativeImageProcessorBridge.isAvailable() && bitmaps.size >= 2) {
                     NativeImageProcessorBridge.blendPyramidSeam(
