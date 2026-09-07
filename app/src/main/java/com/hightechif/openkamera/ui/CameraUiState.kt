@@ -16,6 +16,7 @@ import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.FocusState
 import com.hightechif.openkamera.domain.model.GridType
 import com.hightechif.openkamera.domain.model.HorizonAngle
+import com.hightechif.openkamera.domain.model.LocationCoordinates
 
 /**
  * Immutable state representation for the Camera UI, adhering to MVVM / Unidirectional Data Flow.
@@ -35,6 +36,7 @@ data class CameraUiState(
     val latestThumbnailUri: Uri? = null,
     val horizonAngle: HorizonAngle? = null,
     val compassDegrees: Float = 0.0f,
+    val location: LocationCoordinates? = null,
     val frameMetadata: CameraFrameMetadata? = null,
     val isRawEnabled: Boolean = false,
     val timerSecondsRemaining: Int = 0,
@@ -43,6 +45,10 @@ data class CameraUiState(
 
 sealed interface CameraUiEvent {
     object OnShutterClicked : CameraUiEvent
+    object OnShutterKeyPressed : CameraUiEvent
+    data class OnVolumeKeyPressed(val keyCode: Int) : CameraUiEvent
+    object OnFocusKeyPressed : CameraUiEvent
+    object OnRemoteCaptureTriggered : CameraUiEvent
     object OnRecordVideoClicked : CameraUiEvent
     object OnSwitchCameraClicked : CameraUiEvent
     object OnFlashModeToggleClicked : CameraUiEvent

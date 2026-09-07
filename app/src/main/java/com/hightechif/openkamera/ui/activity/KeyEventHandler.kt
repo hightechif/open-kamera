@@ -18,6 +18,7 @@ import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.preferences.PreferenceKeys
+import com.hightechif.openkamera.ui.CameraUiEvent
 import com.hightechif.openkamera.utils.MyDebug
 
 /**
@@ -56,36 +57,44 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
         when (keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP,
             KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_HEADSETHOOK,
             KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_STOP -> {
                 if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) keydownVolumeUp = true
                 else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) keydownVolumeDown = true
 
                 val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-                val volumeKeys = sharedPreferences.getString(
+                val rawVolumeKeys = sharedPreferences.getString(
                     PreferenceKeys.VOLUME_KEYS_PREFERENCE_KEY,
                     "volume_take_photo"
-                ) ?: "volume_take_photo"
+                )
+                val volumeKeys = if (rawVolumeKeys.isNullOrEmpty()) "volume_take_photo" else rawVolumeKeys
 
-                if ((keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
-                            keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
-                            keyCode == KeyEvent.KEYCODE_MEDIA_STOP) &&
-                    volumeKeys != "volume_take_photo"
-                ) {
+                if (isMediaKey(keyCode) && volumeKeys != "volume_take_photo") {
                     val audioManager = mainActivity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                     if (audioManager != null && !audioManager.isWiredHeadsetOn) return false
                 }
 
+                if (isVolumeKey(keyCode)) {
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnVolumeKeyPressed(keyCode))
+                } else if (isMediaKey(keyCode) && volumeKeys == "volume_take_photo") {
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
+                }
                 return processVolumeKeyAction(volumeKeys, keyCode, event, sharedPreferences)
             }
 
             KeyEvent.KEYCODE_MENU -> {
+                mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnSettingsClicked)
                 mainActivity.openSettings()
                 return true
             }
 
             KeyEvent.KEYCODE_CAMERA -> {
+                mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                 if (event.repeatCount == 0) {
                     mainActivity.takePicture(false)
                     return true
@@ -98,6 +107,7 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
             }
 
             KeyEvent.KEYCODE_FOCUS -> {
+                mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnFocusKeyPressed)
                 if (event.downTime == event.eventTime && !mainActivity.preview.isFocusWaiting) {
                     if (MyDebug.LOG) Log.d(TAG, "request focus due to focus key")
                     mainActivity.preview.requestAutoFocus()
@@ -131,6 +141,7 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                     mainActivity.pauseVideo()
                 }
                 if (!done) {
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                     mainActivity.takePicture(false)
                 }
                 return true
@@ -201,6 +212,20 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
             "volume_really_nothing" -> return true
         }
         return false
+    }
+
+    fun isVolumeKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+    }
+
+    fun isMediaKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_HEADSETHOOK ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_STOP
     }
 
     companion object {

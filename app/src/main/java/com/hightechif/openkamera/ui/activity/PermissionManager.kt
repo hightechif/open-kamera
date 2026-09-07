@@ -57,6 +57,34 @@ class PermissionManager(private val mainActivity: MainActivity) {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun shouldShowRequestPermissionRationale(permission: String): Boolean {
+        return androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(mainActivity, permission)
+    }
+
+    fun showPermissionRationaleDialog(
+        messageRes: Int,
+        onProceed: () -> Unit
+    ) {
+        mainActivity.dialogCoordinator.showPermissionRationaleDialog(
+            messageRes = messageRes,
+            onProceed = onProceed
+        )
+    }
+
+    fun showSettingsRedirectDialog(messageRes: Int) {
+        mainActivity.dialogCoordinator.showSettingsRedirectDialog(
+            messageRes = messageRes,
+            onOpenSettings = {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                ).apply {
+                    data = android.net.Uri.fromParts("package", mainActivity.packageName, null)
+                }
+                mainActivity.startActivity(intent)
+            }
+        )
+    }
+
     fun requestCameraPermission() {
         permissionHandler.requestCameraPermission()
     }

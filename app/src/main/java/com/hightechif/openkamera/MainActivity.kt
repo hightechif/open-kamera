@@ -14,14 +14,12 @@ import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.app.Fragment
-import android.app.KeyguardManager
 import android.content.ActivityNotFoundException
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -51,16 +49,12 @@ import android.provider.MediaStore
 import android.renderscript.RenderScript
 import android.speech.tts.TextToSpeech
 import android.text.Html
-import android.text.InputFilter
-import android.text.InputType
-import android.text.Spanned
 import android.util.Log
 import android.util.SizeF
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
-import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MotionEvent
 import android.view.OrientationEventListener
@@ -74,7 +68,6 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
@@ -83,7 +76,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -164,10 +156,13 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
     @Inject
     lateinit var settingsRepository: ISettingsRepository
+
     @Inject
     lateinit var mediaRepository: IMediaRepository
+
     @Inject
     lateinit var locationRepository: ILocationRepository
+
     @Inject
     lateinit var sensorRepository: ISensorRepository
 
@@ -1327,7 +1322,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && activityCount == 0) {
             // See note in HDRProcessor.onDestroy() - but from Android M, renderscript contexts are released with releaseAllContexts()
             // doc for releaseAllContexts() says "If no contexts have been created this function does nothing"
-            // Important to only do so if no other activities are running (see activityCount). Otherwise risk
+            // Important to only do so if no other activities are running (see activityCount). Otherwise, risk
             // of crashes if one activity is destroyed when another instance is still using Renderscript. I've
             // been unable to reproduce this, though such RSInvalidStateException crashes from Google Play.
             if (MyDebug.LOG) Log.d(TAG, "release renderscript contexts")
@@ -4815,12 +4810,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                         )!!
                         if (uri.isEmpty()) {
                             if (MyDebug.LOG) Log.d(TAG, "no SAF ghost image was set")
-                            val editor = sharedPreferences.edit()
-                            editor.putString(
-                                PreferenceKeys.GHOST_IMAGE_PREFERENCE_KEY,
-                                "preference_ghost_image_off"
-                            )
-                            editor.apply()
+                            sharedPreferences.edit {
+                                putString(
+                                    PreferenceKeys.GHOST_IMAGE_PREFERENCE_KEY,
+                                    "preference_ghost_image_off"
+                                )
+                            }
                         }
                     }
                 } else {
@@ -4833,12 +4828,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
                     )!!
                     if (uri.isEmpty()) {
                         if (MyDebug.LOG) Log.d(TAG, "no SAF ghost image was set")
-                        val editor = sharedPreferences.edit()
-                        editor.putString(
-                            PreferenceKeys.GHOST_IMAGE_PREFERENCE_KEY,
-                            "preference_ghost_image_off"
-                        )
-                        editor.apply()
+                        sharedPreferences.edit {
+                            putString(
+                                PreferenceKeys.GHOST_IMAGE_PREFERENCE_KEY,
+                                "preference_ghost_image_off"
+                            )
+                        }
                     }
                 }
 
@@ -5033,8 +5028,6 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         val history: SaveLocationHistory = if (applicationInterface.storageUtils.isUsingSAF)
             saveLocationHistorySaf!! else saveLocationHistory
         showPreview(false)
-        val alertDialog = AlertDialog.Builder(this)
-        alertDialog.setTitle(R.string.choose_save_location)
         val items = arrayOfNulls<CharSequence>(history.size() + 2)
         var index = 0
         // history is stored in order most-recent-last
@@ -5047,86 +5040,87 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         items[index++] = resources.getString(R.string.clear_folder_history)
         val newIndex = index
         items[index++] = resources.getString(R.string.choose_another_folder)
-        //alertDialog.setItems(items, new DialogInterface.OnClickListener() {
-        alertDialog.setSingleChoiceItems(
-            items, 0
-        ) { dialog, which ->
-            if (which == clearIndex) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "selected clear save history"
-                )
-                dialogCoordinator.showClearFolderHistoryConfirmationDialog(
-                    onConfirmed = {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "confirmed clear save history"
-                        )
-                        if (applicationInterface.storageUtils.isUsingSAF) clearFolderHistorySAF()
-                        else clearFolderHistory()
-                        setWindowFlagsForCamera()
-                        showPreview(true)
-                    },
-                    onDismissOrCancel = {
-                        setWindowFlagsForCamera()
-                        showPreview(true)
-                    }
-                )
-            } else if (which == newIndex) {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "selected choose new folder"
-                )
-                if (applicationInterface.storageUtils.isUsingSAF) {
-                    openFolderChooserDialogSAF(false)
-                } else {
-                    openFolderChooserDialog()
-                }
-            } else {
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "selected: $which"
-                )
-                if (which >= 0 && which < history.size()) {
-                    val saveFolder: String = history[history.size() - 1 - which]
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "changed save_folder from history to: $saveFolder"
-                    )
-                    val saveFolderName = getHumanReadableSaveFolder(saveFolder)
-                    preview.showToast(
-                        null,
-                        """
-                            ${resources.getString(R.string.changed_save_location)}
-                            $saveFolderName
-                            """.trimIndent()
-                    )
-                    val sharedPreferences =
-                        PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
-                    val editor = sharedPreferences.edit()
-                    if (applicationInterface.storageUtils.isUsingSAF) editor.putString(
-                        PreferenceKeys.SAVE_LOCATION_SAF_PREFERENCE_KEY,
-                        saveFolder
-                    )
-                    else editor.putString(PreferenceKeys.SAVE_LOCATION_PREFERENCE_KEY, saveFolder)
-                    editor.apply()
-                    history.updateFolderHistory(
-                        saveFolder,
-                        true
-                    ) // to move new selection to most recent
-                }
+        setWindowFlagsForSettings()
+        dialogCoordinator.showSaveLocationHistoryDialog(
+            items = items,
+            selectedIndex = 0,
+            onDismissOrCancel = {
                 setWindowFlagsForCamera()
                 showPreview(true)
+            },
+            onItemSelected = { which ->
+                if (which == clearIndex) {
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "selected clear save history"
+                    )
+                    dialogCoordinator.showClearFolderHistoryConfirmationDialog(
+                        onConfirmed = {
+                            if (MyDebug.LOG) Log.d(
+                                TAG,
+                                "confirmed clear save history"
+                            )
+                            if (applicationInterface.storageUtils.isUsingSAF) clearFolderHistorySAF()
+                            else clearFolderHistory()
+                            setWindowFlagsForCamera()
+                            showPreview(true)
+                        },
+                        onDismissOrCancel = {
+                            setWindowFlagsForCamera()
+                            showPreview(true)
+                        }
+                    )
+                } else if (which == newIndex) {
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "selected choose new folder"
+                    )
+                    if (applicationInterface.storageUtils.isUsingSAF) {
+                        openFolderChooserDialogSAF(false)
+                    } else {
+                        openFolderChooserDialog()
+                    }
+                } else {
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "selected: $which"
+                    )
+                    if (which >= 0 && which < history.size()) {
+                        val saveFolder: String = history[history.size() - 1 - which]
+                        if (MyDebug.LOG) Log.d(
+                            TAG,
+                            "changed save_folder from history to: $saveFolder"
+                        )
+                        val saveFolderName = getHumanReadableSaveFolder(saveFolder)
+                        preview.showToast(
+                            null,
+                            """
+                                ${resources.getString(R.string.changed_save_location)}
+                                $saveFolderName
+                                """.trimIndent()
+                        )
+                        val sharedPreferences =
+                            PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
+                        sharedPreferences.edit {
+                            if (applicationInterface.storageUtils.isUsingSAF) putString(
+                                PreferenceKeys.SAVE_LOCATION_SAF_PREFERENCE_KEY,
+                                saveFolder
+                            )
+                            else putString(
+                                PreferenceKeys.SAVE_LOCATION_PREFERENCE_KEY,
+                                saveFolder
+                            )
+                        }
+                        history.updateFolderHistory(
+                            saveFolder,
+                            true
+                        ) // to move new selection to most recent
+                    }
+                    setWindowFlagsForCamera()
+                    showPreview(true)
+                }
             }
-            dialog.dismiss() // need to explicitly dismiss for setSingleChoiceItems
-        }
-        alertDialog.setOnCancelListener {
-            setWindowFlagsForCamera()
-            showPreview(true)
-        }
-        //getWindow().setLayout(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT)
-        setWindowFlagsForSettings()
-        showAlert(alertDialog.create())
+        )
     }
 
     /** Clears the non-SAF folder history.

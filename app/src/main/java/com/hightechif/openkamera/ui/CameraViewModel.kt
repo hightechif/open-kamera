@@ -16,6 +16,7 @@ import com.hightechif.openkamera.domain.engine.ICameraEngine
 import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.GridType
+import com.hightechif.openkamera.domain.repository.ILocationRepository
 import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
@@ -56,7 +57,8 @@ class CameraViewModel @Inject constructor(
     private val getCameraCapabilitiesUseCase: GetCameraCapabilitiesUseCase,
     private val settingsRepository: ISettingsRepository,
     private val mediaRepository: IMediaRepository,
-    private val sensorRepository: ISensorRepository
+    private val sensorRepository: ISensorRepository,
+    private val locationRepository: ILocationRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -94,6 +96,14 @@ class CameraViewModel @Inject constructor(
                         horizonAngle = orientation.horizonAngle,
                         compassDegrees = orientation.compassDegrees
                     )
+                }
+            }
+        }
+
+        locationRepository?.let { locRepo ->
+            viewModelScope.launch {
+                locRepo.currentLocationFlow.collectLatest { loc ->
+                    _uiState.update { it.copy(location = loc) }
                 }
             }
         }
@@ -185,7 +195,15 @@ class CameraViewModel @Inject constructor(
 
     fun onEvent(event: CameraUiEvent) {
         when (event) {
-            is CameraUiEvent.OnShutterClicked -> handleShutterClicked()
+            is CameraUiEvent.OnShutterClicked,
+            is CameraUiEvent.OnShutterKeyPressed,
+            is CameraUiEvent.OnRemoteCaptureTriggered -> handleShutterClicked()
+            is CameraUiEvent.OnFocusKeyPressed -> {
+                // Focus key triggers autofocus or focus lock
+            }
+            is CameraUiEvent.OnVolumeKeyPressed -> {
+                // Volume key action dispatched based on configured preference
+            }
             is CameraUiEvent.OnRecordVideoClicked -> handleRecordVideoClicked()
             is CameraUiEvent.OnSwitchCameraClicked -> handleSwitchCameraClicked()
             is CameraUiEvent.OnFlashModeToggleClicked -> handleFlashToggleClicked()

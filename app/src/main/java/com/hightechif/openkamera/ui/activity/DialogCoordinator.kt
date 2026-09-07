@@ -143,6 +143,140 @@ class DialogCoordinator(private val mainActivity: MainActivity) {
             .show()
     }
 
+    fun showResetSettingsConfirmationDialog(onConfirmed: () -> Unit) {
+        AlertDialog.Builder(mainActivity)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setTitle(R.string.preference_reset)
+            .setMessage(R.string.preference_reset_question)
+            .setPositiveButton(android.R.string.yes) { _, _ ->
+                onConfirmed()
+            }
+            .setNegativeButton(android.R.string.no, null)
+            .show()
+    }
+
+    fun showMultiCameraChooserDialog(
+        items: Array<CharSequence?>,
+        selectedIndex: Int,
+        onItemSelected: (Int) -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(R.string.choose_camera)
+            .setSingleChoiceItems(items, selectedIndex) { dialog, which ->
+                dialog.dismiss()
+                onItemSelected(which)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    fun showCalibrationDialog(
+        titleRes: Int,
+        messageRes: Int,
+        onCalibrate: () -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(titleRes)
+            .setMessage(messageRes)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                onCalibrate()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    fun showSaveLocationHistoryDialog(
+        items: Array<CharSequence?>,
+        selectedIndex: Int = 0,
+        onDismissOrCancel: () -> Unit = {},
+        onItemSelected: (Int) -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(R.string.choose_save_location)
+            .setSingleChoiceItems(items, selectedIndex) { dialog, which ->
+                dialog.dismiss()
+                onItemSelected(which)
+            }
+            .setOnCancelListener {
+                onDismissOrCancel()
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                onDismissOrCancel()
+            }
+            .show()
+    }
+
+    fun showPermissionRationaleDialog(
+        titleRes: Int = R.string.permission_rationale_title,
+        messageRes: Int,
+        onProceed: () -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(titleRes)
+            .setMessage(messageRes)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                dialog.dismiss()
+                onProceed()
+            }
+            .setOnDismissListener {
+                onProceed()
+            }
+            .show()
+    }
+
+    fun showSettingsRedirectDialog(
+        titleRes: Int = R.string.permission_rationale_title,
+        messageRes: Int,
+        onOpenSettings: () -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(titleRes)
+            .setMessage(messageRes)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .setPositiveButton(R.string.permission_rationale_title) { _, _ ->
+                onOpenSettings()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    fun showGhostImageSelectionDialog(
+        items: Array<CharSequence>,
+        selectedIndex: Int,
+        onItemSelected: (Int) -> Unit
+    ) {
+        AlertDialog.Builder(mainActivity)
+            .setTitle(R.string.preference_ghost_image)
+            .setSingleChoiceItems(items, selectedIndex) { dialog, which ->
+                dialog.dismiss()
+                onItemSelected(which)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    fun showAudioTriggerThresholdDialog(
+        currentThreshold: Int,
+        onThresholdConfirmed: (Int) -> Unit
+    ) {
+        val dialogView = LayoutInflater.from(mainActivity).inflate(R.layout.alertdialog_edittext, null)
+        val editText = dialogView.findViewById<EditText>(R.id.edit_text)
+        editText.hint = "Threshold (dB)"
+        editText.inputType = InputType.TYPE_CLASS_NUMBER
+        editText.setText(currentThreshold.toString())
+
+        AlertDialog.Builder(mainActivity)
+            .setTitle(R.string.preference_audio_noise_control_sensitivity)
+            .setView(dialogView)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val threshold = editText.text.toString().toIntOrNull() ?: currentThreshold
+                onThresholdConfirmed(threshold)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     companion object {
         private const val TAG = "DialogCoordinator"
     }

@@ -17,12 +17,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class KeyEventHandlerTest {
 
     private lateinit var mockActivity: MainActivity
     private lateinit var mockPreview: Preview
     private lateinit var mockMainUi: MainUI
+    private lateinit var mockCameraViewModel: com.hightechif.openkamera.ui.CameraViewModel
     private lateinit var keyEventHandler: KeyEventHandler
 
     @Before
@@ -30,9 +36,11 @@ class KeyEventHandlerTest {
         mockActivity = mockk(relaxed = true)
         mockPreview = mockk(relaxed = true)
         mockMainUi = mockk(relaxed = true)
+        mockCameraViewModel = mockk(relaxed = true)
 
         every { mockActivity.preview } returns mockPreview
         every { mockActivity.mainUI } returns mockMainUi
+        every { mockActivity.cameraViewModel } returns mockCameraViewModel
         every { mockActivity.isCameraInBackground } returns false
 
         keyEventHandler = KeyEventHandler(mockActivity)
@@ -78,5 +86,51 @@ class KeyEventHandlerTest {
 
         assertTrue(handled)
         verify { mockPreview.requestAutoFocus() }
+    }
+
+    @Test
+    fun headsetHook_triggersTakePhoto() {
+        val mockEvent = mockk<KeyEvent>(relaxed = true)
+        val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_HEADSETHOOK, mockEvent)
+
+        assertTrue(handled)
+        verify { mockActivity.takePicture(false) }
+    }
+
+    @Test
+    fun mediaPlayPause_triggersTakePhoto() {
+        val mockEvent = mockk<KeyEvent>(relaxed = true)
+        val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, mockEvent)
+
+        assertTrue(handled)
+        verify { mockActivity.takePicture(false) }
+    }
+
+    @Test
+    fun isMediaKey_correctlyIdentifiesMediaKeys() {
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_HEADSETHOOK))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_PAUSE))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT))
+        assertTrue(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_MEDIA_STOP))
+        assertFalse(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_VOLUME_UP))
+        assertFalse(keyEventHandler.isMediaKey(KeyEvent.KEYCODE_CAMERA))
+    }
+
+    @Test
+    fun isVolumeKey_correctlyIdentifiesVolumeKeys() {
+        assertTrue(keyEventHandler.isVolumeKey(KeyEvent.KEYCODE_VOLUME_UP))
+        assertTrue(keyEventHandler.isVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN))
+        assertFalse(keyEventHandler.isVolumeKey(KeyEvent.KEYCODE_CAMERA))
+        assertFalse(keyEventHandler.isVolumeKey(KeyEvent.KEYCODE_HEADSETHOOK))
+    }
+
+    @Test
+    fun onKeyUp_resetsVolumeState() {
+        val mockEvent = mockk<KeyEvent>(relaxed = true)
+        val handled = keyEventHandler.onKeyUp(KeyEvent.KEYCODE_VOLUME_UP, mockEvent)
+        assertFalse(handled)
     }
 }
