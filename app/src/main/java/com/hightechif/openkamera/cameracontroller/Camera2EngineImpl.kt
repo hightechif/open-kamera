@@ -64,10 +64,10 @@ import kotlin.math.roundToInt
 
 @Singleton
 class Camera2EngineImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val previewSurfaceManager: PreviewSurfaceManager,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
 ) : ICameraEngine {
 
     private val cameraManager: CameraManager? =
@@ -534,6 +534,14 @@ class Camera2EngineImpl @Inject constructor(
             _engineStateFlow.value = CameraEngineState.Recording
             Result.success(Unit)
         }
+
+    override suspend fun pauseVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
+        Result.success(Unit)
+    }
+
+    override suspend fun resumeVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
+        Result.success(Unit)
+    }
 
     override suspend fun stopVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
         _engineStateFlow.value = CameraEngineState.Ready

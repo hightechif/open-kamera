@@ -58,7 +58,8 @@ android {
             returnDefaultValues = true
             includeAndroidResources = true
             all {
-                jvmArgs '-noverify'
+                jvmArgs '-noverify', '-Xmx2048m'
+                forkEvery = 100
             }
         }
     }

@@ -64,6 +64,8 @@ interface ICameraEngine {
 
     suspend fun captureStillImage(config: CaptureConfig): Flow<CaptureProgress>
     suspend fun startVideoRecording(outputFile: File): Result<Unit>
+    suspend fun pauseVideoRecording(): Result<Unit> = Result.success(Unit)
+    suspend fun resumeVideoRecording(): Result<Unit> = Result.success(Unit)
     suspend fun stopVideoRecording(): Result<Unit>
 
     suspend fun setZoom(zoomRatio: Float)

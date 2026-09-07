@@ -38,16 +38,19 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CameraViewModelUnitTest {
@@ -76,6 +79,7 @@ class CameraViewModelUnitTest {
     private val exposureCompensationFlow = MutableStateFlow(ExposureCompensation())
     private val currentZoomRatioFlow = MutableStateFlow(1.0f)
     private val maxZoomRatioFlow = MutableStateFlow(10.0f)
+    private val engineStateFlow = MutableStateFlow<CameraEngineState>(CameraEngineState.Ready)
 
     private lateinit var viewModel: CameraViewModel
 
@@ -83,7 +87,7 @@ class CameraViewModelUnitTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
-        every { mockCameraEngine.engineStateFlow } returns MutableStateFlow(CameraEngineState.Ready)
+        every { mockCameraEngine.engineStateFlow } returns engineStateFlow
         every { mockSettingsRepository.flashModeFlow } returns flashModeFlow
         every { mockSettingsRepository.gridTypeFlow } returns gridTypeFlow
         every { mockSettingsRepository.captureModeFlow } returns captureModeFlow
@@ -186,5 +190,125 @@ class CameraViewModelUnitTest {
         viewModel.adjustExposure(2)
         advanceUntilIdle()
         coVerify { mockAdjustExposureUseCase(2) }
+    }
+
+    @Test
+    fun videoRecording_startAndStopLifecycle_togglesRecordingState() = runTest(testDispatcher) {
+        val mockFile = mockk<File>(relaxed = true)
+        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockFile)
+        coEvery { mockRecordVideoUseCase.stopRecording(any(), any()) } returns Result.success(mockk(relaxed = true))
+
+        viewModel.toggleVideoRecording()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isRecording)
+        coVerify { mockRecordVideoUseCase.startRecording() }
+
+        viewModel.toggleVideoRecording()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isRecording)
+        coVerify { mockRecordVideoUseCase.stopRecording(any(), any()) }
+    }
+
+    @Test
+    fun videoRecording_pauseAndResume_updatesPausedState() = runTest(testDispatcher) {
+        coEvery { mockRecordVideoUseCase.pauseRecording() } returns Result.success(Unit)
+        coEvery { mockRecordVideoUseCase.resumeRecording() } returns Result.success(Unit)
+
+        viewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isVideoPaused)
+        coVerify { mockRecordVideoUseCase.pauseRecording() }
+
+        viewModel.onEvent(CameraUiEvent.OnResumeVideoRecordingClicked)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isVideoPaused)
+        coVerify { mockRecordVideoUseCase.resumeRecording() }
+    }
+
+    @Test
+    fun videoRecording_flashToggle_cyclesTorchModeDuringRecording() = runTest(testDispatcher) {
+        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockk(relaxed = true))
+        coEvery { mockToggleFlashUseCase(FlashMode.TORCH) } returns FlashMode.TORCH
+        coEvery { mockToggleFlashUseCase(FlashMode.OFF) } returns FlashMode.OFF
+
+        viewModel.toggleVideoRecording()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isRecording)
+
+        // Toggling flash during recording should target TORCH
+        viewModel.onEvent(CameraUiEvent.OnFlashModeToggleClicked)
+        advanceUntilIdle()
+        assertEquals(FlashMode.TORCH, viewModel.uiState.value.flashMode)
+        coVerify { mockToggleFlashUseCase(FlashMode.TORCH) }
+
+        // Toggling flash again during recording should target OFF
+        viewModel.onEvent(CameraUiEvent.OnFlashModeToggleClicked)
+        advanceUntilIdle()
+        assertEquals(FlashMode.OFF, viewModel.uiState.value.flashMode)
+        coVerify { mockToggleFlashUseCase(FlashMode.OFF) }
+    }
+
+    @Test
+    fun videoRecording_lowStorage_blocksRecordingWhenSpaceCritical() = runTest(testDispatcher) {
+        // Critical threshold is 10MB; supply 5MB
+        coEvery { mockMediaRepository.getAvailableStorageBytes() } returns 5L * 1024 * 1024
+
+        viewModel.uiEffect.test {
+            viewModel.toggleVideoRecording()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isStorageLow)
+            assertFalse(viewModel.uiState.value.isRecording)
+            coVerify(exactly = 0) { mockRecordVideoUseCase.startRecording() }
+
+            val effect = awaitItem()
+            assertTrue(effect is CameraUiEffect.ShowToast)
+            assertEquals("Cannot record: Low storage space", (effect as CameraUiEffect.ShowToast).message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun videoRecording_lowStorageInterruption_stopsActiveRecording() = runTest(testDispatcher) {
+        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockk(relaxed = true))
+        coEvery { mockRecordVideoUseCase.stopRecording(any(), any()) } returns Result.success(mockk(relaxed = true))
+
+        viewModel.toggleVideoRecording()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isRecording)
+
+        viewModel.uiEffect.test {
+            viewModel.onEvent(CameraUiEvent.OnLowStorageDetected)
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isRecording)
+            assertTrue(viewModel.uiState.value.isStorageLow)
+            coVerify { mockRecordVideoUseCase.stopRecording(any(), any()) }
+
+            val effect = awaitItem()
+            assertTrue(effect is CameraUiEffect.ShowToast)
+            assertEquals("Recording stopped: Low storage space", (effect as CameraUiEffect.ShowToast).message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun videoRecording_timerIncrementsWhileRecording() = runTest(testDispatcher) {
+        // Engine state transition into Recording triggers ticker
+        engineStateFlow.value = CameraEngineState.Recording
+        testScheduler.runCurrent()
+
+        assertTrue(viewModel.uiState.value.isRecording)
+        assertEquals(0L, viewModel.uiState.value.recordingDurationSeconds)
+
+        advanceTimeBy(3000.milliseconds)
+        testScheduler.runCurrent()
+        assertEquals(3L, viewModel.uiState.value.recordingDurationSeconds)
+
+        // Transition back to Ready stops and resets duration
+        engineStateFlow.value = CameraEngineState.Ready
+        testScheduler.runCurrent()
+        assertFalse(viewModel.uiState.value.isRecording)
+        assertEquals(0L, viewModel.uiState.value.recordingDurationSeconds)
     }
 }

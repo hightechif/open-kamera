@@ -18,6 +18,13 @@ class RecordVideoUseCase @Inject constructor(
 ) {
     private var activeVideoFile: File? = null
     private var recordingStartTimeMs: Long = 0L
+    private var isPaused: Boolean = false
+
+    val isRecording: Boolean
+        get() = activeVideoFile != null
+
+    val isCurrentlyPaused: Boolean
+        get() = isPaused
 
     suspend fun startRecording(): Result<File> {
         val fileResult = mediaRepository.createVideoOutputFile("mp4")
@@ -28,6 +35,7 @@ class RecordVideoUseCase @Inject constructor(
         return if (engineResult.isSuccess) {
             activeVideoFile = file
             recordingStartTimeMs = System.currentTimeMillis()
+            isPaused = false
             Result.success(file)
         } else {
             Result.failure(
@@ -35,6 +43,28 @@ class RecordVideoUseCase @Inject constructor(
                     ?: IllegalStateException("Failed to start video recording")
             )
         }
+    }
+
+    suspend fun pauseRecording(): Result<Unit> {
+        if (activeVideoFile == null) {
+            return Result.failure(IllegalStateException("No active recording to pause"))
+        }
+        val result = cameraEngine.pauseVideoRecording()
+        if (result.isSuccess) {
+            isPaused = true
+        }
+        return result
+    }
+
+    suspend fun resumeRecording(): Result<Unit> {
+        if (activeVideoFile == null) {
+            return Result.failure(IllegalStateException("No active recording to resume"))
+        }
+        val result = cameraEngine.resumeVideoRecording()
+        if (result.isSuccess) {
+            isPaused = false
+        }
+        return result
     }
 
     suspend fun stopRecording(width: Int = 1920, height: Int = 1080): Result<RecordedVideo> {
@@ -51,6 +81,7 @@ class RecordVideoUseCase @Inject constructor(
         }
 
         activeVideoFile = null
+        isPaused = false
         return mediaRepository.finalizeVideoFile(file, durationMs, width, height)
     }
 }

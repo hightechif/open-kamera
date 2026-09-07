@@ -163,4 +163,41 @@ class VideoRecordingCoordinatorTest {
         assertEquals(output2, sessionManager.activeOutput)
         assertNull(sessionManager.nextOutput)
     }
+
+    @Test
+    fun `test handleMaxFileSizeApproaching when no free space invokes onNoFreeSpace`() {
+        val tempFile = File.createTempFile("space_check", ".mp4")
+        tempFile.deleteOnExit()
+        val output = VideoSessionOutput(videoFilename = tempFile.absolutePath)
+        val profile = VideoProfile().apply { fileExtension = "mp4" }
+
+        coordinator.startRecording(profile, output, 0L, 0L)
+
+        coordinator.handleVideoInfo(
+            what = MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_APPROACHING,
+            extra = 0,
+            autoRestartOnMaxFileSize = true,
+            maxDurationPref = 0L,
+            hasFreeSpaceCheck = { false }
+        )
+
+        verify { mockListener.onNoFreeSpace() }
+        verify(exactly = 0) { mockListener.onCreateNextVideoFile(any()) }
+    }
+
+    @Test
+    fun `test handleVideoError stops recording and dispatches onError`() {
+        val tempFile = File.createTempFile("err_test", ".mp4")
+        tempFile.deleteOnExit()
+        val output = VideoSessionOutput(videoFilename = tempFile.absolutePath)
+        val profile = VideoProfile()
+
+        coordinator.startRecording(profile, output, 0L, 0L)
+        assertTrue(coordinator.isRecording)
+
+        coordinator.handleVideoError(MediaRecorder.MEDIA_RECORDER_ERROR_UNKNOWN, -1)
+
+        assertFalse(coordinator.isRecording)
+        verify { mockListener.onError(MediaRecorder.MEDIA_RECORDER_ERROR_UNKNOWN, -1) }
+    }
 }

@@ -34,6 +34,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -95,10 +96,57 @@ class DomainUseCasesUnitTest {
 
         val startResult = useCase.startRecording()
         assertTrue(startResult.isSuccess)
+        assertTrue(useCase.isRecording)
+        assertFalse(useCase.isCurrentlyPaused)
 
         val stopResult = useCase.stopRecording(1920, 1080)
         assertTrue(stopResult.isSuccess)
+        assertFalse(useCase.isRecording)
         assertTrue(fakeMediaRepository.finalizeVideoCalled)
+    }
+
+    @Test
+    fun recordVideoUseCase_pauseAndResumeLifecycle() = runTest(testDispatcher) {
+        val useCase = RecordVideoUseCase(
+            cameraEngine = mockCameraEngine,
+            mediaRepository = fakeMediaRepository
+        )
+
+        coEvery { mockCameraEngine.startVideoRecording(any()) } returns Result.success(Unit)
+        coEvery { mockCameraEngine.pauseVideoRecording() } returns Result.success(Unit)
+        coEvery { mockCameraEngine.resumeVideoRecording() } returns Result.success(Unit)
+        coEvery { mockCameraEngine.stopVideoRecording() } returns Result.success(Unit)
+
+        useCase.startRecording()
+        assertTrue(useCase.isRecording)
+
+        val pauseResult = useCase.pauseRecording()
+        assertTrue(pauseResult.isSuccess)
+        assertTrue(useCase.isCurrentlyPaused)
+
+        val resumeResult = useCase.resumeRecording()
+        assertTrue(resumeResult.isSuccess)
+        assertFalse(useCase.isCurrentlyPaused)
+
+        val stopResult = useCase.stopRecording(1920, 1080)
+        assertTrue(stopResult.isSuccess)
+    }
+
+    @Test
+    fun recordVideoUseCase_pauseOrResumeWithoutActiveRecording_fails() = runTest(testDispatcher) {
+        val useCase = RecordVideoUseCase(
+            cameraEngine = mockCameraEngine,
+            mediaRepository = fakeMediaRepository
+        )
+
+        val pauseResult = useCase.pauseRecording()
+        assertTrue(pauseResult.isFailure)
+
+        val resumeResult = useCase.resumeRecording()
+        assertTrue(resumeResult.isFailure)
+
+        val stopResult = useCase.stopRecording()
+        assertTrue(stopResult.isFailure)
     }
 
     @Test
