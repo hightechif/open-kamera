@@ -23,6 +23,7 @@ import com.hightechif.openkamera.ui.FolderChooserDialog
 import com.hightechif.openkamera.utils.MyDebug
 import java.io.IOException
 import java.util.Date
+import com.hightechif.openkamera.useScopedStorage
 
 class PreferenceSubSettingsManager : PreferenceSubScreen() {
 
@@ -164,7 +165,7 @@ class PreferenceSubSettingsManager : PreferenceSubScreen() {
             fragment.setModeFolder(false)
             fragment.setExtension(".xml")
             fragment.setStartFolder(mainActivity.storageUtils.settingsFolder)
-            if (MainActivity.useScopedStorage()) {
+            if (useScopedStorage()) {
                 val externalFilesDir = mainActivity.getExternalFilesDir(null)
                 if (externalFilesDir != null) {
                     fragment.setMaxParent(externalFilesDir)

@@ -10,7 +10,7 @@ package com.hightechif.openkamera.ui.renderers
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import com.hightechif.openkamera.MainActivity.SystemOrientation
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.Preview

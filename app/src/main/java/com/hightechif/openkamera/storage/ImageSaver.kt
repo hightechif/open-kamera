@@ -56,6 +56,7 @@ import kotlin.concurrent.Volatile
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import com.hightechif.openkamera.useScopedStorage
 
 /** Handles the saving (and any required processing) of photos.
  */
@@ -1639,7 +1640,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) {
                     extension,
                     request.currentDate
                 )
-            } else if (MainActivity.useScopedStorage()) {
+            } else if (useScopedStorage()) {
                 if (MyDebug.LOG) Log.d(TAG, "use media store")
                 useMediaStore = true
                 val folder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1973,7 +1974,7 @@ class ImageSaver internal constructor(val mainActivity: MainActivity) {
                     "dng",
                     request.currentDate
                 )
-            } else if (MainActivity.useScopedStorage()) {
+            } else if (useScopedStorage()) {
                 if (MyDebug.LOG) Log.d(TAG, "use media store for raw")
                 useMediaStore = true
                 val folder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

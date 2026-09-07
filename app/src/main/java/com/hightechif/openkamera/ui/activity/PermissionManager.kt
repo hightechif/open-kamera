@@ -13,6 +13,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.system.PermissionHandler
+import com.hightechif.openkamera.useScopedStorage
 
 /**
  * High-level manager coordinating runtime permission validation, SAF authorization,
@@ -48,7 +49,7 @@ class PermissionManager(private val mainActivity: MainActivity) {
     }
 
     fun hasStoragePermission(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || MainActivity.useScopedStorage()) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || useScopedStorage()) {
             return true
         }
         return ContextCompat.checkSelfPermission(

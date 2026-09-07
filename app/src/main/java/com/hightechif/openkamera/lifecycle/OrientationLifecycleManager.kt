@@ -20,6 +20,7 @@ import android.view.OrientationEventListener
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.sensors.MagneticSensor
 import com.hightechif.openkamera.utils.MyDebug
+import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
 
 /**
  * Coordinates physical device orientation tracking, display rotation change listening,
@@ -39,7 +40,7 @@ class OrientationLifecycleManager(private val mainActivity: MainActivity) {
     }
 
     fun initOrientationListener() {
-        if (MainActivity.LOCK_TO_LANDSCAPE) {
+        if (LOCK_TO_LANDSCAPE) {
             orientationEventListener = object : OrientationEventListener(mainActivity) {
                 override fun onOrientationChanged(orientation: Int) {
                     mainActivity.mainUI.onOrientationChanged(orientation)

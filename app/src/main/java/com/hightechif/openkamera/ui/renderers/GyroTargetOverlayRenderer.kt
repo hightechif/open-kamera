@@ -15,7 +15,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import androidx.core.graphics.withRotation
-import com.hightechif.openkamera.MainActivity.SystemOrientation
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.sensors.GyroSensor

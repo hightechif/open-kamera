@@ -201,4 +201,11 @@ class PhotoPreferencesRepository(
         )
         return (value?.toLongOrNull() ?: 0L) * 1000L
     }
+
+    fun getRemoveDeviceExifPref(): String {
+        return sharedPreferences.getString(
+            PreferenceKeys.REMOVE_DEVICE_EXIF_PREFERENCE_KEY,
+            "preference_remove_device_exif_off"
+        ) ?: "preference_remove_device_exif_off"
+    }
 }

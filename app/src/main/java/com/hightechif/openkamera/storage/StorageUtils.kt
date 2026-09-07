@@ -44,6 +44,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.concurrent.Volatile
+import com.hightechif.openkamera.useScopedStorage
 
 //import android.content.ContentValues;
 //import android.location.Location;
@@ -323,7 +324,7 @@ class StorageUtils internal constructor(
                 // So we pass the uri back to the caller here.
                 val activity = context as Activity
                 val action = activity.intent.action
-                if (!MainActivity.useScopedStorage() && MediaStore.ACTION_VIDEO_CAPTURE == action) {
+                if (!useScopedStorage() && MediaStore.ACTION_VIDEO_CAPTURE == action) {
                     applicationInterface.finishVideoIntent(uri)
                 }
             }
@@ -1481,7 +1482,7 @@ class StorageUtils internal constructor(
 
     private fun getLatestMedia(uriType: UriType): Media? {
         if (MyDebug.LOG) Log.d(TAG, "getLatestMedia: $uriType")
-        if (!MainActivity.useScopedStorage() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(
+        if (!useScopedStorage() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.READ_EXTERNAL_STORAGE
             ) != PackageManager.PERMISSION_GRANTED
@@ -1521,7 +1522,7 @@ class StorageUtils internal constructor(
 
     val latestMedia: Media?
         get() {
-            if (MainActivity.useScopedStorage() && this.isUsingSAF) {
+            if (useScopedStorage() && this.isUsingSAF) {
                 val treeUri = this.treeUriSAF
                 return getLatestMediaSAF(treeUri)
             }

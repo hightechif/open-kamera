@@ -149,6 +149,42 @@ class VideoPreferencesRepository(
         ) ?: "preference_video_subtitle_no"
     }
 
+    fun isVideoPref(): Boolean {
+        return sharedPreferences.getBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, false)
+    }
+
+    fun setVideoPref(isVideo: Boolean) {
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, isVideo)
+        }
+    }
+
+    fun getVideoTonemapProfile(): com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile {
+        val videoLog = sharedPreferences.getString(PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY, "off") ?: "off"
+        return when (videoLog) {
+            "rec709" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_REC709
+            "srgb" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_SRGB
+            "fine", "low", "medium", "strong", "extra_strong" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_LOG
+            "gamma" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_GAMMA
+            "jtvideo" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_JTVIDEO
+            "jtlog" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG
+            "jtlog2" -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG2
+            else -> com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile.TONEMAPPROFILE_OFF
+        }
+    }
+
+    fun getVideoLogProfileStrength(): Float {
+        val videoLog = sharedPreferences.getString(PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY, "off") ?: "off"
+        return when (videoLog) {
+            "fine" -> 10.0f
+            "low" -> 32.0f
+            "medium" -> 100.0f
+            "strong" -> 224.0f
+            "extra_strong" -> 500.0f
+            else -> 0.0f
+        }
+    }
+
     fun getVideoProfileGamma(): Float {
         val value = sharedPreferences.getString(
             PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY,

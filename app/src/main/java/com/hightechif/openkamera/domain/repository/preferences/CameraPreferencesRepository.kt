@@ -239,4 +239,37 @@ class CameraPreferencesRepository(
             "preference_focus_assist_nothing"
         ) ?: "preference_focus_assist_nothing"
     }
+
+    fun getExposureTimePref(): Long {
+        return sharedPreferences.getLong(
+            PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY,
+            com.hightechif.openkamera.cameracontroller.CameraController.EXPOSURE_TIME_DEFAULT
+        )
+    }
+
+    fun setExposureTimePref(exposureTime: Long) {
+        sharedPreferences.edit {
+            putLong(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY, exposureTime)
+        }
+    }
+
+    fun getFocusDistancePref(isTargetDistance: Boolean): Float {
+        return sharedPreferences.getFloat(
+            if (isTargetDistance) PreferenceKeys.FOCUS_BRACKETING_TARGET_DISTANCE_PREFERENCE_KEY else PreferenceKeys.FOCUS_DISTANCE_PREFERENCE_KEY,
+            0.0f
+        )
+    }
+
+    fun isFocusBracketingSourceAutoPref(): Boolean {
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.FOCUS_BRACKETING_AUTO_SOURCE_DISTANCE_PREFERENCE_KEY,
+            false
+        )
+    }
+
+    fun setFocusBracketingSourceAutoPref(enabled: Boolean) {
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.FOCUS_BRACKETING_AUTO_SOURCE_DISTANCE_PREFERENCE_KEY, enabled)
+        }
+    }
 }

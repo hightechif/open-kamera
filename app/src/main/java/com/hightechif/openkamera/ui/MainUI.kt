@@ -40,7 +40,7 @@ import android.widget.SeekBar
 import androidx.core.content.edit
 import androidx.core.view.isNotEmpty
 import com.hightechif.openkamera.MainActivity
-import com.hightechif.openkamera.MainActivity.SystemOrientation
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.cameracontroller.CameraController
@@ -55,6 +55,8 @@ import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
+import com.hightechif.openkamera.getRotationFromSystemOrientation
 
 /** This contains functionality related to the main UI.
  */
@@ -163,7 +165,7 @@ class MainUI(val mainActivity: MainActivity) {
         if (!viewRotateAnimation) {
             view.rotation = uiRotation
         }
-        if (!MainActivity.LOCK_TO_LANDSCAPE) {
+        if (!LOCK_TO_LANDSCAPE) {
             var startRotation = viewRotateAnimationStart + uiRotation
             if (startRotation >= 360.0f) startRotation -= 360.0f
             view.rotation = startRotation
@@ -243,7 +245,7 @@ class MainUI(val mainActivity: MainActivity) {
         this.uIPlacement = computeUIPlacement()
         if (MyDebug.LOG) Log.d(TAG, "ui_placement: $uIPlacement")
         val relativeOrientation: Int
-        if (MainActivity.LOCK_TO_LANDSCAPE) {
+        if (LOCK_TO_LANDSCAPE) {
             // new code for orientation fixed to landscape
             // the display orientation should be locked to landscape, but how many degrees is that?
             val rotation: Int = mainActivity.windowManager.defaultDisplay.rotation
@@ -1009,7 +1011,7 @@ class MainUI(val mainActivity: MainActivity) {
     private fun setFixedRotation(view: View, left: Int, top: Int, right: Int, bottom: Int) {
         val systemOrientation: SystemOrientation = mainActivity.systemOrientation
         val rotation: Int =
-            (360 - MainActivity.getRotationFromSystemOrientation(systemOrientation)) % 360
+            (360 - getRotationFromSystemOrientation(systemOrientation)) % 360
         view.rotation = rotation.toFloat()
         // set margins due to rotation
         val layoutParams = view.layoutParams as RelativeLayout.LayoutParams
@@ -1269,7 +1271,7 @@ class MainUI(val mainActivity: MainActivity) {
 			Log.d(TAG, "currentOrientation: " + currentOrientation);
 		}*/
         var orientation = orientation
-        if (!MainActivity.LOCK_TO_LANDSCAPE) return
+        if (!LOCK_TO_LANDSCAPE) return
         // if locked to landscape, we need to handle the orientation change ourselves
         if (orientation == OrientationEventListener.ORIENTATION_UNKNOWN) return
         var diff = abs((orientation - currentOrientation).toDouble()).toInt()

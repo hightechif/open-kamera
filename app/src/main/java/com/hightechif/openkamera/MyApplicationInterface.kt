@@ -306,7 +306,7 @@ class MyApplicationInterface internal constructor(
             }
             // if no EXTRA_OUTPUT, we should save to standard location, and will pass back the Uri of that location
             if (MyDebug.LOG) Log.d(TAG, "intent uri not specified")
-            return if (MainActivity.useScopedStorage()) {
+            return if (useScopedStorage()) {
                 // can't use file method with scoped storage
                 VideoMethod.MEDIASTORE
             } else {
@@ -315,7 +315,7 @@ class MyApplicationInterface internal constructor(
             }
         } else if (storageUtils.isUsingSAF) {
             return VideoMethod.SAF
-        } else if (MainActivity.useScopedStorage()) {
+        } else if (useScopedStorage()) {
             return VideoMethod.MEDIASTORE
         } else {
             return VideoMethod.FILE
@@ -486,12 +486,10 @@ class MyApplicationInterface internal constructor(
         }
 
     override fun isVideoPref(): Boolean =
-        sharedPreferences.getBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, false)
+        cameraSettingsInteractor.videoPrefs.isVideoPref()
 
     override fun setVideoPref(isVideo: Boolean) {
-        sharedPreferences.edit {
-            putBoolean(PreferenceKeys.IS_VIDEO_PREFERENCE_KEY, isVideo)
-        }
+        cameraSettingsInteractor.videoPrefs.setVideoPref(isVideo)
     }
 
     override fun getSceneModePref(): String =
@@ -612,7 +610,7 @@ class MyApplicationInterface internal constructor(
             // not supported for camera extensions
             return false
         }
-        return sharedPreferences.getBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, false)
+        return cameraSettingsInteractor.photoPrefs.getFaceDetectionPref()
     }
 
     /** Returns whether the current fps preference is one that requires a "high speed" video size/
@@ -822,37 +820,11 @@ class MyApplicationInterface internal constructor(
             return rates
         }
 
-    override fun getVideoTonemapProfile(): CameraController.TonemapProfile {
-        val videoLog =
-            sharedPreferences.getString(PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY, "off")!!
-        // only return TONEMAPPROFILE_LOG for values recognized by getVideoLogProfileStrength()
-        when (videoLog) {
-            "off" -> return CameraController.TonemapProfile.TONEMAPPROFILE_OFF
-            "rec709" -> return CameraController.TonemapProfile.TONEMAPPROFILE_REC709
-            "srgb" -> return CameraController.TonemapProfile.TONEMAPPROFILE_SRGB
-            "fine", "low", "medium", "strong", "extra_strong" -> return CameraController.TonemapProfile.TONEMAPPROFILE_LOG
-            "gamma" -> return CameraController.TonemapProfile.TONEMAPPROFILE_GAMMA
-            "jtvideo" -> return CameraController.TonemapProfile.TONEMAPPROFILE_JTVIDEO
-            "jtlog" -> return CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG
-            "jtlog2" -> return CameraController.TonemapProfile.TONEMAPPROFILE_JTLOG2
-        }
-        return CameraController.TonemapProfile.TONEMAPPROFILE_OFF
-    }
+    override fun getVideoTonemapProfile(): CameraController.TonemapProfile =
+        cameraSettingsInteractor.videoPrefs.getVideoTonemapProfile()
 
-    override fun getVideoLogProfileStrength(): Float {
-        val videoLog =
-            sharedPreferences.getString(PreferenceKeys.VIDEO_LOG_PREFERENCE_KEY, "off")!!
-        // remember to update getVideoTonemapProfile() if adding/changing modes
-        when (videoLog) {
-            "off", "rec709", "srgb", "gamma", "jtvideo", "jtlog", "jtlog2" -> return 0.0f
-            "fine" -> return 10.0f
-            "low" -> return 32.0f
-            "medium" -> return 100.0f
-            "strong" -> return 224.0f
-            "extra_strong" -> return 500.0f
-        }
-        return 0.0f
-    }
+    override fun getVideoLogProfileStrength(): Float =
+        cameraSettingsInteractor.videoPrefs.getVideoLogProfileStrength()
 
     override fun getVideoProfileGamma(): Float {
         val gammaValue =
@@ -1077,10 +1049,7 @@ class MyApplicationInterface internal constructor(
 
     private val removeDeviceExifPref: ImageSaver.Request.RemoveDeviceExif
         get() {
-            return when (sharedPreferences.getString(
-                PreferenceKeys.REMOVE_DEVICE_EXIF_PREFERENCE_KEY,
-                "preference_remove_device_exif_off"
-            )) {
+            return when (cameraSettingsInteractor.photoPrefs.getRemoveDeviceExifPref()) {
                 "preference_remove_device_exif_on" -> ImageSaver.Request.RemoveDeviceExif.ON
                 "preference_remove_device_exif_keep_datetime" -> ImageSaver.Request.RemoveDeviceExif.KEEP_DATETIME
                 else -> ImageSaver.Request.RemoveDeviceExif.OFF
@@ -1345,31 +1314,21 @@ class MyApplicationInterface internal constructor(
         return rotation
     }
 
-    override fun getExposureTimePref(): Long = sharedPreferences.getLong(
-        PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY,
-        CameraController.EXPOSURE_TIME_DEFAULT
-    )
+    override fun getExposureTimePref(): Long =
+        cameraSettingsInteractor.cameraPrefs.getExposureTimePref()
 
     override fun setExposureTimePref(exposureTime: Long) {
-        sharedPreferences.edit {
-            putLong(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY, exposureTime)
-        }
+        cameraSettingsInteractor.cameraPrefs.setExposureTimePref(exposureTime)
     }
 
     override fun getFocusDistancePref(isTargetDistance: Boolean): Float {
-        return sharedPreferences.getFloat(
-            if (isTargetDistance) PreferenceKeys.FOCUS_BRACKETING_TARGET_DISTANCE_PREFERENCE_KEY else PreferenceKeys.FOCUS_DISTANCE_PREFERENCE_KEY,
-            0.0f
-        )
+        return cameraSettingsInteractor.cameraPrefs.getFocusDistancePref(isTargetDistance)
     }
 
     override fun isFocusBracketingSourceAutoPref(): Boolean {
         if (!mainActivity.supportsFocusBracketingSourceAuto()) return false // not supported
 
-        return sharedPreferences.getBoolean(
-            PreferenceKeys.FOCUS_BRACKETING_AUTO_SOURCE_DISTANCE_PREFERENCE_KEY,
-            false
-        )
+        return cameraSettingsInteractor.cameraPrefs.isFocusBracketingSourceAutoPref()
     }
 
     /** Sets whether in focus bracketing autofocusing mode for source focus distance.
@@ -1377,9 +1336,7 @@ class MyApplicationInterface internal constructor(
      * to set the new manual focus distance.
      */
     fun setFocusBracketingSourceAutoPref(enabled: Boolean) {
-        sharedPreferences.edit {
-            putBoolean(PreferenceKeys.FOCUS_BRACKETING_AUTO_SOURCE_DISTANCE_PREFERENCE_KEY, enabled)
-        }
+        cameraSettingsInteractor.cameraPrefs.setFocusBracketingSourceAutoPref(enabled)
         if (mainActivity.preview.cameraController != null) {
             mainActivity.preview.setFocusPref(true)
         }

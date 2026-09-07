@@ -14,7 +14,7 @@ import android.graphics.RectF
 import android.view.Surface
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withRotation
-import com.hightechif.openkamera.MainActivity.SystemOrientation
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
 import com.hightechif.openkamera.cameracontroller.CameraController

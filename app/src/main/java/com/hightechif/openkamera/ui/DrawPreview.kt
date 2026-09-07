@@ -42,7 +42,7 @@ import androidx.core.graphics.withSave
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import com.hightechif.openkamera.MainActivity
-import com.hightechif.openkamera.MainActivity.SystemOrientation
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
@@ -84,6 +84,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
+import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
+import com.hightechif.openkamera.getRotationFromSystemOrientation
 
 class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicationInterface) {
     private val mainActivity: MainActivity
@@ -3622,11 +3624,11 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
         // apply any orientation ourselves. However, we're we do want to know the true rotation of the
         // device, as it affects how certain elements of the UI are layed out.
         val deviceUiRotation: Int
-        if (MainActivity.LOCK_TO_LANDSCAPE) {
+        if (LOCK_TO_LANDSCAPE) {
             deviceUiRotation = uiRotation
         } else {
             val systemOrientation: SystemOrientation = mainActivity.systemOrientation
-            deviceUiRotation = MainActivity.getRotationFromSystemOrientation(systemOrientation)
+            deviceUiRotation = getRotationFromSystemOrientation(systemOrientation)
         }
 
         if (cameraController != null && takingPicture && !frontScreenFlash && takePhotoBorderPref) {

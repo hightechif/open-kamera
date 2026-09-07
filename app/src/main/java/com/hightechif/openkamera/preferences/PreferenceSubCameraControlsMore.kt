@@ -19,6 +19,7 @@ import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.utils.MyDebug
 import androidx.core.content.edit
+import com.hightechif.openkamera.useScopedStorage
 
 class PreferenceSubCameraControlsMore : PreferenceSubScreen() {
 
@@ -46,7 +47,7 @@ class PreferenceSubCameraControlsMore : PreferenceSubScreen() {
                 if (mainActivity.storageUtils.isUsingSAF) {
                     mainActivity.openFolderChooserDialogSAF(true)
                     true
-                } else if (MainActivity.useScopedStorage()) {
+                } else if (useScopedStorage()) {
                     val alertDialog = mainActivity.createSaveFolderDialog()
                     val alert = alertDialog.create()
                     alert.setOnDismissListener {
