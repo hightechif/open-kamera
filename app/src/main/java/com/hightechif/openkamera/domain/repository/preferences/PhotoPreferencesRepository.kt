@@ -30,6 +30,18 @@ class PhotoPreferencesRepository(
         const val DEFAULT_STAMP_STYLE = "preference_stamp_style_shadowed"
     }
 
+    fun getResolutionPref(cameraId: Int, cameraIdSPhysical: String? = null): String {
+        val key = PreferenceKeys.getResolutionPreferenceKey(cameraId, cameraIdSPhysical)
+        return sharedPreferences.getString(key, "") ?: ""
+    }
+
+    fun setResolutionPref(cameraId: Int, cameraIdSPhysical: String? = null, resolution: String) {
+        val key = PreferenceKeys.getResolutionPreferenceKey(cameraId, cameraIdSPhysical)
+        sharedPreferences.edit {
+            putString(key, resolution)
+        }
+    }
+
     fun getImageQualityPref(): Int {
         val imageQualityString = sharedPreferences.getString(
             PreferenceKeys.QUALITY_PREFERENCE_KEY,

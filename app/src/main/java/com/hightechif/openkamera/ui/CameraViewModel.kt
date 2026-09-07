@@ -151,6 +151,12 @@ class CameraViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            settingsRepository.timerSecondsFlow.collectLatest { timer ->
+                _uiState.update { it.copy(timerSecondsRemaining = timer) }
+            }
+        }
+
+        viewModelScope.launch {
             cameraEngine.engineStateFlow.collectLatest { engineState ->
                 _uiState.update { it.copy(isRecording = engineState is CameraEngineState.Recording) }
             }
