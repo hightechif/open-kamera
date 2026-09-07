@@ -12,6 +12,8 @@ import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.preview.Preview
 
+import com.hightechif.openkamera.ui.HudOverlayState
+
 /**
  * Lightweight per-frame state context provided to [OverlayRenderer] implementations.
  */
@@ -33,7 +35,8 @@ data class DrawPreviewContext(
     var cameraInactiveTimeMs: Long = -1L,
     var hasAutoStabiliseCrop: Boolean = false,
     val autoStabiliseCrop: IntArray = IntArray(2),
-    var previewSizeWysiwygPref: Boolean = false
+    var previewSizeWysiwygPref: Boolean = false,
+    var hudOverlayState: HudOverlayState = HudOverlayState()
 ) {
     val preview: Preview
         get() = mainActivity.preview
@@ -61,6 +64,7 @@ data class DrawPreviewContext(
         if (cameraInactiveTimeMs != other.cameraInactiveTimeMs) return false
         if (hasAutoStabiliseCrop != other.hasAutoStabiliseCrop) return false
         if (previewSizeWysiwygPref != other.previewSizeWysiwygPref) return false
+        if (hudOverlayState != other.hudOverlayState) return false
         if (mainActivity != other.mainActivity) return false
         if (applicationInterface != other.applicationInterface) return false
         if (sharedPreferences != other.sharedPreferences) return false
@@ -85,6 +89,7 @@ data class DrawPreviewContext(
         result = 31 * result + cameraInactiveTimeMs.hashCode()
         result = 31 * result + hasAutoStabiliseCrop.hashCode()
         result = 31 * result + previewSizeWysiwygPref.hashCode()
+        result = 31 * result + hudOverlayState.hashCode()
         result = 31 * result + mainActivity.hashCode()
         result = 31 * result + applicationInterface.hashCode()
         result = 31 * result + sharedPreferences.hashCode()

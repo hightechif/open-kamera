@@ -46,6 +46,7 @@ import com.hightechif.openkamera.R
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface.RawPref
+import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.OnScreenIcons
@@ -1107,6 +1108,53 @@ class MainUI(val mainActivity: MainActivity) {
                 else if (uiRotation == 270) view.translationY = -popupWidth.toFloat()
             }
         }
+    }
+
+    /**
+     * Updates main UI views and icons reactively from immutable [CameraUiState].
+     */
+    fun applyUiState(state: CameraUiState) {
+        val takePhotoButton = mainActivity.findViewById<ImageButton>(R.id.take_photo)
+        if (takePhotoButton != null) {
+            val resource: Int
+            val contentDesc: Int
+            if (state.isRecording) {
+                resource = R.drawable.take_video_recording
+                contentDesc = R.string.stop_video
+            } else if (state.captureMode == CaptureMode.VIDEO) {
+                resource = R.drawable.take_video_selector
+                contentDesc = R.string.start_video
+            } else {
+                resource = R.drawable.take_photo_selector
+                contentDesc = R.string.take_photo
+            }
+            takePhotoButton.setImageResource(resource)
+            takePhotoButton.contentDescription = mainActivity.getString(contentDesc)
+            takePhotoButton.tag = resource
+        }
+
+        val switchVideoButton = mainActivity.findViewById<ImageButton>(R.id.switch_video)
+        if (switchVideoButton != null) {
+            val res = if (state.captureMode == CaptureMode.VIDEO) R.drawable.take_photo else R.drawable.take_video
+            val desc = if (state.captureMode == CaptureMode.VIDEO) R.string.switch_to_photo else R.string.switch_to_video
+            switchVideoButton.setImageResource(res)
+            switchVideoButton.contentDescription = mainActivity.getString(desc)
+            switchVideoButton.tag = res
+        }
+
+        val pauseVideoButton = mainActivity.findViewById<ImageButton>(R.id.pause_video)
+        if (pauseVideoButton != null) {
+            pauseVideoButton.visibility = if (state.isRecording && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) View.VISIBLE else View.GONE
+            if (state.isVideoPaused) {
+                pauseVideoButton.setImageResource(R.drawable.ic_play_circle_outline_white_48dp)
+                pauseVideoButton.contentDescription = mainActivity.getString(R.string.resume_video)
+            } else {
+                pauseVideoButton.setImageResource(R.drawable.ic_pause_circle_outline_white_48dp)
+                pauseVideoButton.contentDescription = mainActivity.getString(R.string.pause_video)
+            }
+        }
+
+        mainActivity.applicationInterface.drawPreview.updateFromUiState(state)
     }
 
     /** Set icons for taking photos vs videos.
@@ -2809,25 +2857,30 @@ class MainUI(val mainActivity: MainActivity) {
 
                 when (volumeKeys) {
                     "volume_take_photo" -> {
+                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnVolumeKeyPressed(keyCode))
                         var done = false
                         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mainActivity.preview
                                 .isVideoRecording
                         ) {
                             done = true
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
                             mainActivity.pauseVideo()
                         }
                         if (!done) {
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
                             mainActivity.takePicture(false)
                         }
                         return true
                     }
 
                     "volume_focus" -> {
+                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnFocusKeyPressed)
                         if (keydownVolumeUp && keydownVolumeDown) {
                             if (MyDebug.LOG) Log.d(
                                 TAG,
                                 "take photo rather than focus, as both volume keys are down"
                             )
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
                             mainActivity.takePicture(false)
                         } else if (mainActivity.preview.currentFocusValue != null
                             && mainActivity.preview.currentFocusValue.equals("focus_mode_manual2")

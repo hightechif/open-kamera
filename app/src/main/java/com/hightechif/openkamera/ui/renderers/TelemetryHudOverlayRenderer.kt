@@ -172,13 +172,13 @@ class TelemetryHudOverlayRenderer(
         val sharedPreferences = context.sharedPreferences
 
         val showTimePref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, false)
+            context.hudOverlayState.showTime || sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, false)
         val showCameraIdPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY, false)
+            context.hudOverlayState.showCameraId || sharedPreferences.getBoolean(PreferenceKeys.SHOW_CAMERA_ID_PREFERENCE_KEY, false)
         val showFreeMemoryPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, false)
+            context.hudOverlayState.showFreeMemory || sharedPreferences.getBoolean(PreferenceKeys.SHOW_FREE_MEMORY_PREFERENCE_KEY, false)
         val showIsoPref =
-            sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, false)
+            context.hudOverlayState.showIso || sharedPreferences.getBoolean(PreferenceKeys.SHOW_ISO_PREFERENCE_KEY, false)
         val storeLocationPref =
             sharedPreferences.getBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, false)
 

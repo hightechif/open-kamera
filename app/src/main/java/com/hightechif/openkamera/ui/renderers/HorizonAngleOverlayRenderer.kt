@@ -66,26 +66,31 @@ class HorizonAngleOverlayRenderer : OverlayRenderer {
         val preview: Preview = context.preview
         val cameraController: CameraController? = preview.cameraController
 
-        showAngleLinePref = context.sharedPreferences.getBoolean(
+        showAngleLinePref = context.hudOverlayState.showAngleLine || context.sharedPreferences.getBoolean(
             PreferenceKeys.SHOW_ANGLE_LINE_PREFERENCE_KEY,
             false
         )
-        showPitchLinesPref = context.sharedPreferences.getBoolean(
+        showPitchLinesPref = context.hudOverlayState.showPitchLines || context.sharedPreferences.getBoolean(
             PreferenceKeys.SHOW_PITCH_LINES_PREFERENCE_KEY,
             false
         )
-        showGeoDirectionLinesPref = context.sharedPreferences.getBoolean(
+        showGeoDirectionLinesPref = context.hudOverlayState.showGeoDirectionLines || context.sharedPreferences.getBoolean(
             PreferenceKeys.SHOW_GEO_DIRECTION_LINES_PREFERENCE_KEY,
             false
         )
-        val angleHighlightColorStr = context.sharedPreferences.getString(
-            PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
-            "#14e715"
-        ) ?: "#14e715"
-        angleHighlightColorPref = try {
-            angleHighlightColorStr.toColorInt()
-        } catch (_: Exception) {
-            Color.GREEN
+        val hudHighlightColor = context.hudOverlayState.angleHighlightColor
+        angleHighlightColorPref = if (hudHighlightColor != 0 && hudHighlightColor != Color.GREEN) {
+            hudHighlightColor
+        } else {
+            val angleHighlightColorStr = context.sharedPreferences.getString(
+                PreferenceKeys.SHOW_ANGLE_HIGHLIGHT_COLOR_PREFERENCE_KEY,
+                "#14e715"
+            ) ?: "#14e715"
+            try {
+                angleHighlightColorStr.toColorInt()
+            } catch (_: Exception) {
+                Color.GREEN
+            }
         }
 
         val systemOrientation: SystemOrientation = context.mainActivity.systemOrientation
@@ -97,7 +102,7 @@ class HorizonAngleOverlayRenderer : OverlayRenderer {
             null
         }
         val horizonAngleState = uiState?.horizonAngle
-        val hasLevelAngle: Boolean = preview.hasLevelAngle() || (horizonAngleState != null)
+        val hasLevelAngle: Boolean = preview.hasLevelAngle() || (horizonAngleState != null) || (context.hudOverlayState.horizonAngle != 0.0)
         val actualShowAngleLinePref =
             if (context.applicationInterface.photoMode === PhotoMode.Panorama) {
                 !context.applicationInterface.gyroSensor.isRecording

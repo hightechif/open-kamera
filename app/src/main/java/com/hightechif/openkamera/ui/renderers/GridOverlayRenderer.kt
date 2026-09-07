@@ -36,14 +36,18 @@ class GridOverlayRenderer : OverlayRenderer {
     override fun draw(canvas: Canvas, context: DrawPreviewContext, timeMs: Long) {
         val preview: Preview = context.preview
         val cameraController: CameraController = preview.cameraController ?: return
-        val gridKey = try {
-            context.mainActivity.cameraViewModel.uiState.value.gridType.key
-        } catch (_: Exception) {
-            context.sharedPreferences.getString(
-                PreferenceKeys.SHOW_GRID_PREFERENCE_KEY,
-                "preference_grid_none"
-            )
-        } ?: "preference_grid_none"
+        val gridKey = if (context.hudOverlayState.gridType != com.hightechif.openkamera.domain.model.GridType.NONE) {
+            context.hudOverlayState.gridType.key
+        } else {
+            try {
+                context.mainActivity.cameraViewModel.uiState.value.gridType.key
+            } catch (_: Exception) {
+                context.sharedPreferences.getString(
+                    PreferenceKeys.SHOW_GRID_PREFERENCE_KEY,
+                    "preference_grid_none"
+                )
+            } ?: "preference_grid_none"
+        }
 
         if (gridKey == "preference_grid_none") {
             return

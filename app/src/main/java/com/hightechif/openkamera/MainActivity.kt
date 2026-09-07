@@ -758,20 +758,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     cameraViewModel.uiState.collect { state ->
-                        // 1. Shutter button / Recording indicator
-                        val takePhotoButton = findViewById<ImageButton>(R.id.take_photo)
-                        if (takePhotoButton != null) {
-                            if (state.isRecording) {
-                                takePhotoButton.setImageResource(R.drawable.take_video_recording)
-                                takePhotoButton.contentDescription = getString(R.string.stop_video)
-                            } else if (state.captureMode == CaptureMode.VIDEO) {
-                                takePhotoButton.setImageResource(R.drawable.take_video_selector)
-                                takePhotoButton.contentDescription = getString(R.string.start_video)
-                            } else {
-                                takePhotoButton.setImageResource(R.drawable.take_photo_selector)
-                                takePhotoButton.contentDescription = getString(R.string.take_photo)
-                            }
-                        }
+                        mainUI.applyUiState(state)
 
                         // 2. Gallery Thumbnail URI
                         state.latestThumbnailUri?.let { uri ->
@@ -2032,6 +2019,11 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
     fun clickedTakePhoto(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhoto")
+        if (preview.isVideo) {
+            cameraViewModel.onEvent(CameraUiEvent.OnRecordVideoClicked)
+        } else {
+            cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
+        }
         this.takePicture(false)
     }
 
@@ -2039,11 +2031,17 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
      */
     fun clickedTakePhotoVideoSnapshot(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhotoVideoSnapshot")
+        cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
         this.takePicture(true)
     }
 
     fun clickedPauseVideo(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedPauseVideo")
+        if (preview.isVideoRecordingPaused) {
+            cameraViewModel.onEvent(CameraUiEvent.OnResumeVideoRecordingClicked)
+        } else {
+            cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
+        }
         pauseVideo()
     }
 
@@ -2592,6 +2590,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
     fun clickedSettings(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedSettings")
+        cameraViewModel.onEvent(CameraUiEvent.OnSettingsClicked)
         KeyguardUtils.requireKeyguard(this) { this.openSettings() }
     }
 
@@ -4529,6 +4528,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
     fun clickedGallery(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedGallery")
+        cameraViewModel.onEvent(CameraUiEvent.OnGalleryThumbnailClicked)
         openGallery()
     }
 

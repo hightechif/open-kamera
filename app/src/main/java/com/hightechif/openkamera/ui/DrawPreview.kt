@@ -99,6 +99,44 @@ class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicatio
     val effectOverlayRenderer: EffectOverlayRenderer
     val drawPreviewContext: DrawPreviewContext
 
+    var hudOverlayState: HudOverlayState = HudOverlayState()
+        private set
+
+    fun updateHudOverlayState(state: HudOverlayState) {
+        this.hudOverlayState = state
+        drawPreviewContext.hudOverlayState = state
+    }
+
+    fun updateFromUiState(uiState: CameraUiState) {
+        val overlay = HudOverlayState(
+            gridType = uiState.gridType,
+            isImmersiveMode = mainActivity.mainUI.inImmersiveMode(),
+            showAngle = showAnglePref,
+            showAngleLine = showAngleLinePref,
+            showPitchLines = showPitchLinesPref,
+            showGeoDirection = showGeoDirectionPref,
+            showGeoDirectionLines = showGeoDirectionLinesPref,
+            horizonAngle = uiState.horizonAngle?.angleDegrees ?: (if (mainActivity.preview.hasLevelAngle()) mainActivity.preview.levelAngle else 0.0),
+            pitchAngle = if (mainActivity.preview.hasPitchAngle()) mainActivity.preview.pitchAngle else 0.0,
+            compassDegrees = uiState.compassDegrees.toDouble(),
+            isLevel = uiState.horizonAngle?.isLevel ?: (abs(mainActivity.preview.levelAngle) <= CLOSE_LEVEL_ANGLE),
+            angleHighlightColor = angleHighlightColorPref,
+            showIso = showIsoPref,
+            iso = uiState.frameMetadata?.iso ?: 0,
+            exposureTimeNs = uiState.frameMetadata?.exposureTimeNs ?: 0L,
+            showBattery = showBatteryPref,
+            showFreeMemory = showFreeMemoryPref,
+            showTime = showTimePref,
+            showCameraId = showCameraIdPref,
+            isRecordingVideo = uiState.isRecording,
+            flashMode = uiState.flashMode,
+            isRawEnabled = uiState.isRawEnabled,
+            focusState = uiState.focusState,
+            timerCountdownSeconds = uiState.timerSecondsRemaining
+        )
+        updateHudOverlayState(overlay)
+    }
+
     // In some cases when reopening the camera or pausing preview, we apply a dimming effect (only
     // supported when using Camera2 API, since we need to know when frames have been received).
     internal enum class DimPreview {
