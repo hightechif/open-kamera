@@ -39,14 +39,17 @@ import android.widget.RelativeLayout
 import android.widget.SeekBar
 import androidx.core.content.edit
 import androidx.core.view.isNotEmpty
+import androidx.core.view.isVisible
+import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
 import com.hightechif.openkamera.MainActivity
-import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.R
+import com.hightechif.openkamera.SystemOrientation
 import com.hightechif.openkamera.cameracontroller.CameraController
+import com.hightechif.openkamera.domain.model.CaptureMode
+import com.hightechif.openkamera.getRotationFromSystemOrientation
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface.RawPref
-import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.preview.Preview
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.OnScreenIcons
@@ -55,8 +58,6 @@ import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
-import com.hightechif.openkamera.getRotationFromSystemOrientation
 
 /** This contains functionality related to the main UI.
  */
@@ -419,7 +420,7 @@ class MainUI(val mainActivity: MainActivity) {
         run {
             // Leave space for the Android 12+ camera privacy indicator, as gallery icon would
             // otherwise overlap when in landscape orientation.
-            // In theory we should use WindowInsets.getPrivacyIndicatorBounds() for this, but it seems
+            // In theory, we should use WindowInsets.getPrivacyIndicatorBounds() for this, but it seems
             // to give a much larger value when required (leaving to a much larger gap), as well as
             // obviously changing depending on orientation - but whilst this is only an issue for
             // landscape orientation, it looks better to keep the position consistent for any
@@ -428,7 +429,7 @@ class MainUI(val mainActivity: MainActivity) {
             // Not needed for UIPLACEMENT_LEFT - although still adjust the right hand side margin
             // for consistency.
             // We do for all Android versions for consistency (avoids testing overhead due to
-            // different behaviour on different Android versions).
+            // different behavior on different Android versions).
             if (uIPlacement != UIPlacement.UIPLACEMENT_LEFT) {
                 // if we did want to do this for UIPLACEMENT_LEFT for consistency, it'd be the
                 // "bottom" margin we need to change.
@@ -527,7 +528,7 @@ class MainUI(val mainActivity: MainActivity) {
                 var firstVisibleView: View? = null
                 var lastVisibleView: View? = null
                 for (thisView in buttonsPermanent) {
-                    if (thisView.visibility == View.VISIBLE) {
+                    if (thisView.isVisible) {
                         if (firstVisibleView == null) firstVisibleView = thisView
                         lastVisibleView = thisView
                         count++
@@ -568,7 +569,7 @@ class MainUI(val mainActivity: MainActivity) {
                         Log.d(TAG, "margin: $margin")
                     }
                     for (thisView in buttonsPermanent) {
-                        if (thisView.visibility == View.VISIBLE) {
+                        if (thisView.isVisible) {
                             if (MyDebug.LOG) {
                                 Log.d(TAG, "set view layout for: " + thisView.contentDescription)
                                 if (thisView === firstVisibleView) {
@@ -1137,8 +1138,10 @@ class MainUI(val mainActivity: MainActivity) {
 
         val switchVideoButton = mainActivity.findViewById<ImageButton>(R.id.switch_video)
         if (switchVideoButton != null) {
-            val res = if (state.captureMode == CaptureMode.VIDEO) R.drawable.take_photo else R.drawable.take_video
-            val desc = if (state.captureMode == CaptureMode.VIDEO) R.string.switch_to_photo else R.string.switch_to_video
+            val res =
+                if (state.captureMode == CaptureMode.VIDEO) R.drawable.take_photo else R.drawable.take_video
+            val desc =
+                if (state.captureMode == CaptureMode.VIDEO) R.string.switch_to_photo else R.string.switch_to_video
             switchVideoButton.setImageResource(res)
             switchVideoButton.contentDescription = mainActivity.getString(desc)
             switchVideoButton.tag = res
@@ -1146,7 +1149,8 @@ class MainUI(val mainActivity: MainActivity) {
 
         val pauseVideoButton = mainActivity.findViewById<ImageButton>(R.id.pause_video)
         if (pauseVideoButton != null) {
-            pauseVideoButton.visibility = if (state.isRecording && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) View.VISIBLE else View.GONE
+            pauseVideoButton.visibility =
+                if (state.isRecording && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) View.VISIBLE else View.GONE
             if (state.isVideoPaused) {
                 pauseVideoButton.setImageResource(R.drawable.ic_play_circle_outline_white_48dp)
                 pauseVideoButton.contentDescription = mainActivity.getString(R.string.resume_video)
@@ -1198,7 +1202,7 @@ class MainUI(val mainActivity: MainActivity) {
             view = mainActivity.findViewById(R.id.switch_video)
             view.contentDescription =
                 mainActivity.getResources().getString(switchVideoContentDescription)
-            resource = if (mainActivity.preview?.isVideo == true) R.drawable.take_photo
+            resource = if (mainActivity.preview.isVideo == true) R.drawable.take_photo
             else R.drawable.take_video
             view.setImageResource(resource)
             view.tag = resource // for testing
@@ -1214,7 +1218,7 @@ class MainUI(val mainActivity: MainActivity) {
             val contentDescription: Int
             val cameraId: Int = mainActivity.nextCameraId
             contentDescription =
-                when (mainActivity.preview.cameraControllerManager?.getFacing(cameraId)) {
+                when (mainActivity.preview.cameraControllerManager.getFacing(cameraId)) {
                     CameraController.Facing.FACING_FRONT -> R.string.switch_to_front_camera
                     CameraController.Facing.FACING_BACK -> R.string.switch_to_back_camera
                     CameraController.Facing.FACING_EXTERNAL -> R.string.switch_to_external_camera
@@ -1235,7 +1239,7 @@ class MainUI(val mainActivity: MainActivity) {
         if (MyDebug.LOG) Log.d(TAG, "setPauseVideoContentDescription()")
         val pauseVideoButton: ImageButton = mainActivity.findViewById(R.id.pause_video)
         val contentDescription: Int
-        if (mainActivity.preview?.isVideoRecordingPaused == true) {
+        if (mainActivity.preview.isVideoRecordingPaused == true) {
             contentDescription = R.string.resume_video
             pauseVideoButton.setImageResource(R.drawable.ic_play_circle_outline_white_48dp)
         } else {
@@ -1252,7 +1256,7 @@ class MainUI(val mainActivity: MainActivity) {
 
     fun updateRemoteConnectionIcon() {
         val remoteConnectedIcon: View = mainActivity.findViewById(R.id.kraken_icon)
-        if (mainActivity.bluetoothRemoteControl?.remoteConnected() == true) {
+        if (mainActivity.bluetoothRemoteControl.remoteConnected() == true) {
             if (MyDebug.LOG) Log.d(TAG, "Remote control connected")
             remoteConnectedIcon.visibility = View.VISIBLE
         } else {
@@ -1307,15 +1311,15 @@ class MainUI(val mainActivity: MainActivity) {
                 val handler = Handler()
                 handler.postDelayed({
                     if (MyDebug.LOG) Log.d(TAG, "onOrientationChanged->postDelayed()")
-                    mainActivity.applicationInterface?.drawPreview?.updateSettings()
+                    mainActivity.applicationInterface.drawPreview.updateSettings()
                 }, (VIEW_ROTATAE_ANIMATION_DURATION + 20).toLong())
             }
         }
     }
 
     fun showExposureLockIcon(): Boolean {
-        if (mainActivity.preview?.supportsExposureLock() != true) return false
-        if (mainActivity.applicationInterface?.isCameraExtensionPref() == true) {
+        if (!mainActivity.preview.supportsExposureLock()) return false
+        if (mainActivity.applicationInterface.isCameraExtensionPref()) {
             // not supported for camera extensions
             return false
         }
@@ -1404,7 +1408,7 @@ class MainUI(val mainActivity: MainActivity) {
         this.immersiveMode = immersiveMode
         mainActivity.runOnUiThread {
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-            // if going into immersive mode, the we should set GONE the ones that are set GONE in showGUI(false)
+            // if going into immersive mode, then we should set GONE the ones that are set GONE in showGUI(false)
             //final int visibilityGone = immersiveMode ? View.GONE : View.VISIBLE;
             val visibility = if (immersiveMode) View.GONE else View.VISIBLE
             if (MyDebug.LOG) Log.d(
@@ -1711,7 +1715,7 @@ class MainUI(val mainActivity: MainActivity) {
         }
 
     /**
-     * Opens or close the exposure settings (ISO, white balance, etc)
+     * Opens or close the exposure settings (ISO, white balance, etc.)
      */
     fun toggleExposureUI() {
         if (MyDebug.LOG) Log.d(TAG, "toggleExposureUI")
@@ -2458,7 +2462,7 @@ class MainUI(val mainActivity: MainActivity) {
 
             popupViewIsOpen = false
             /* Not destroying the popup doesn't really gain any performance.
-             * Also there are still outstanding bugs to fix if we wanted to do this:
+             * Also, there are still outstanding bugs to fix if we wanted to do this:
              *   - Not resetting the popup menu when switching between photo and video mode. See test testVideoPopup().
              *   - When changing options like flash/focus, the new option isn't selected when reopening the popup menu. See test
              *     testPopup().
@@ -2652,7 +2656,7 @@ class MainUI(val mainActivity: MainActivity) {
 
     /**
      * Opens or closes the settings popup on the camera preview. The popup that
-     * differs depending whether we're in photo or video mode
+     * differs depending on whether we're in photo or video mode
      */
     fun togglePopupSettings() {
         val popupContainer: ViewGroup = mainActivity.findViewById(R.id.popup_container)
@@ -2807,7 +2811,7 @@ class MainUI(val mainActivity: MainActivity) {
             val popupContainer: ViewGroup = mainActivity.findViewById(R.id.popup_container)
             val scrollBounds = Rect()
             popupContainer.getDrawingRect(scrollBounds)
-            val inside = popupContainer.getChildAt(0) as LinearLayout ?: return
+            val inside = popupContainer.getChildAt(0) as? LinearLayout ?: return
             // Safety check
 
             var v = inside.getChildAt(mPopupLine)
@@ -2859,17 +2863,19 @@ class MainUI(val mainActivity: MainActivity) {
 
                 when (volumeKeys) {
                     "volume_take_photo" -> {
-                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnVolumeKeyPressed(keyCode))
+                        mainActivity.cameraViewModel.onEvent(
+                            CameraUiEvent.OnVolumeKeyPressed(
+                                keyCode
+                            )
+                        )
                         var done = false
                         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mainActivity.preview
                                 .isVideoRecording
                         ) {
                             done = true
-                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
                             mainActivity.pauseVideo()
                         }
                         if (!done) {
-                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
                             mainActivity.takePicture(false)
                         }
                         return true
@@ -2882,7 +2888,6 @@ class MainUI(val mainActivity: MainActivity) {
                                 TAG,
                                 "take photo rather than focus, as both volume keys are down"
                             )
-                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
                             mainActivity.takePicture(false)
                         } else if (mainActivity.preview.currentFocusValue != null
                             && mainActivity.preview.currentFocusValue.equals("focus_mode_manual2")
@@ -2951,7 +2956,7 @@ class MainUI(val mainActivity: MainActivity) {
                                 true
                             )
                             mainActivity.applicationInterface.drawPreview
-                                .updateSettings() // because we cache the auto-stabilise setting
+                                .updateSettings() // because we cache the auto-stabilize setting
                             this.destroyPopup() // need to recreate popup in order to update the auto-level checkbox
                         } else if (!mainActivity.deviceSupportsAutoStabilise()) {
                             // n.b., need to check deviceSupportsAutoStabilise() - if we're in e.g. Panorama mode, we shouldn't display a toast (as then supportsAutoStabilise() returns false even if auto-level is supported on the device)
@@ -3129,7 +3134,7 @@ class MainUI(val mainActivity: MainActivity) {
     }
 
     /** Returns a (possibly translated) user readable string for a white balance preference value.
-     * If the value is not recognised (this can happen for the old Camera API, some devices can
+     * If the value is not recognized (this can happen for the old Camera API, some devices can
      * have device-specific options), then the received value is returned.
      */
     fun getEntryForWhiteBalance(value: String): String {
@@ -3155,7 +3160,7 @@ class MainUI(val mainActivity: MainActivity) {
     }
 
     /** Returns a (possibly translated) user readable string for a scene mode preference value.
-     * If the value is not recognised (this can happen for the old Camera API, some devices can
+     * If the value is not recognized (this can happen for the old Camera API, some devices can
      * have device-specific options), then the received value is returned.
      */
     fun getEntryForSceneMode(value: String): String {
@@ -3188,7 +3193,7 @@ class MainUI(val mainActivity: MainActivity) {
     }
 
     /** Returns a (possibly translated) user readable string for a color effect preference value.
-     * If the value is not recognised (this can happen for the old Camera API, some devices can
+     * If the value is not recognized (this can happen for the old Camera API, some devices can
      * have device-specific options), then the received value is returned.
      */
     fun getEntryForColorEffect(value: String): String {
@@ -3214,7 +3219,7 @@ class MainUI(val mainActivity: MainActivity) {
     }
 
     /** Returns a (possibly translated) user readable string for an antibanding preference value.
-     * If the value is not recognised, then the received value is returned.
+     * If the value is not recognized, then the received value is returned.
      */
     fun getEntryForAntiBanding(value: String): String {
         var id = -1
@@ -3233,8 +3238,8 @@ class MainUI(val mainActivity: MainActivity) {
         return entry
     }
 
-    /** Returns a (possibly translated) user readable string for an noise reduction mode preference value.
-     * If the value is not recognised, then the received value is returned.
+    /** Returns a (possibly translated) user readable string for a noise reduction mode preference value.
+     * If the value is not recognized, then the received value is returned.
      * Also used for edge mode.
      */
     fun getEntryForNoiseReductionMode(value: String): String {

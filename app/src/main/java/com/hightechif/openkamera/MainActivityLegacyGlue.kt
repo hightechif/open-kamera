@@ -43,7 +43,6 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.preference.Preference
 import android.preference.PreferenceFragment
-import android.preference.PreferenceFragment.OnPreferenceStartFragmentCallback
 import android.preference.PreferenceManager
 import android.provider.MediaStore
 import android.renderscript.RenderScript
@@ -53,7 +52,6 @@ import android.util.Log
 import android.util.SizeF
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
-import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MotionEvent
@@ -73,7 +71,6 @@ import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.viewModels
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
@@ -81,9 +78,6 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.exifinterface.media.ExifInterface
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.hightechif.openkamera.MyApplicationInterface.PhotoMode
 import com.hightechif.openkamera.audio.AudioListener
 import com.hightechif.openkamera.audio.MyAudioTriggerListenerCallback
@@ -115,7 +109,6 @@ import com.hightechif.openkamera.system.MyTileService
 import com.hightechif.openkamera.system.MyTileServiceFrontCamera
 import com.hightechif.openkamera.system.MyTileServiceVideo
 import com.hightechif.openkamera.system.PermissionHandler
-import com.hightechif.openkamera.ui.CameraUiEffect
 import com.hightechif.openkamera.ui.CameraUiEvent
 import com.hightechif.openkamera.ui.CameraViewModel
 import com.hightechif.openkamera.ui.DrawPreview
@@ -131,8 +124,6 @@ import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.SaveLocationHandler
 import com.hightechif.openkamera.utils.TextFormatter
 import com.hightechif.openkamera.utils.ToastBoxer
-import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -140,7 +131,6 @@ import java.text.DecimalFormat
 import java.util.Hashtable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
-import javax.inject.Inject
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -152,7 +142,8 @@ import kotlin.math.min
  * Legacy coordination methods, hardware query helpers, seekbar controllers,
  * and preferences coordination for MainActivity.
  */
-abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.OnPreferenceStartFragmentCallback {
+abstract class MainActivityLegacyGlue : AppCompatActivity(),
+    PreferenceFragment.OnPreferenceStartFragmentCallback {
     val mainActivity: MainActivity get() = this as MainActivity
 
     abstract val cameraViewModel: CameraViewModel
@@ -1913,11 +1904,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
 
     fun clickedTakePhoto(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhoto")
-        if (preview.isVideo) {
-            cameraViewModel.onEvent(CameraUiEvent.OnRecordVideoClicked)
-        } else {
-            cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
-        }
         this.takePicture(false)
     }
 
@@ -1925,17 +1911,11 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
      */
     fun clickedTakePhotoVideoSnapshot(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhotoVideoSnapshot")
-        cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
         this.takePicture(true)
     }
 
     fun clickedPauseVideo(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedPauseVideo")
-        if (preview.isVideoRecordingPaused) {
-            cameraViewModel.onEvent(CameraUiEvent.OnResumeVideoRecordingClicked)
-        } else {
-            cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
-        }
         pauseVideo()
     }
 
@@ -2530,7 +2510,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
             anySignificantChange = false
             anyChange = false
 
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
+            val sharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
             // n.b., registerOnSharedPreferenceChangeListener warns that we must keep a reference to the listener (which
             // is this class) as long as we want to listen for changes, otherwise the listener may be garbage collected!
             sharedPreferences.registerOnSharedPreferenceChangeListener(this)
@@ -2541,7 +2522,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
                 TAG,
                 "stopListening"
             )
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
+            val sharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
             sharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
         }
 
@@ -3403,7 +3385,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
         )
         if (!usingKitKatImmersiveMode()) return
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
+        val sharedPreferences =
+            PreferenceManager.getDefaultSharedPreferences(this@MainActivityLegacyGlue)
         val immersiveMode =
             sharedPreferences.getString(
                 PreferenceKeys.IMMERSIVE_MODE_PREFERENCE_KEY,
@@ -3496,7 +3479,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(), PreferenceFragment.
                     }
 
                     resetCachedSystemOrientation() // don't want to get cached result - this can sometimes happen e.g. on Pixel 6 Pro when switching between landscape and reverse landscape
-                    val systemOrientation: SystemOrientation = this@MainActivityLegacyGlue.systemOrientation
+                    val systemOrientation: SystemOrientation =
+                        this@MainActivityLegacyGlue.systemOrientation
                     val newNavigationGap: Int
                     var newNavigationGapLandscape: Int
                     var newNavigationGapReverseLandscape: Int
@@ -6532,7 +6516,8 @@ $captureRateString${resources.getString(R.string.fps)}${
                 var altFolder: String? = null
                 if (folder.startsWith(baseFolder)) {
                     altFolder = folder.substring(baseFolder.length)
-                    if (altFolder.isNotEmpty() && altFolder[0] == '/') altFolder = altFolder.substring(1)
+                    if (altFolder.isNotEmpty() && altFolder[0] == '/') altFolder =
+                        altFolder.substring(1)
                 }
                 return CheckSaveLocationResult(false, altFolder)
             } else {

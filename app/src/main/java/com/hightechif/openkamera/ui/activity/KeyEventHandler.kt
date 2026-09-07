@@ -72,10 +72,12 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                     PreferenceKeys.VOLUME_KEYS_PREFERENCE_KEY,
                     "volume_take_photo"
                 )
-                val volumeKeys = if (rawVolumeKeys.isNullOrEmpty()) "volume_take_photo" else rawVolumeKeys
+                val volumeKeys =
+                    if (rawVolumeKeys.isNullOrEmpty()) "volume_take_photo" else rawVolumeKeys
 
                 if (isMediaKey(keyCode) && volumeKeys != "volume_take_photo") {
-                    val audioManager = mainActivity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    val audioManager =
+                        mainActivity.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                     if (audioManager != null && !audioManager.isWiredHeadsetOn) return false
                 }
 
@@ -141,7 +143,6 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                     mainActivity.pauseVideo()
                 }
                 if (!done) {
-                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                     mainActivity.takePicture(false)
                 }
                 return true
@@ -149,10 +150,16 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
 
             "volume_focus" -> {
                 if (keydownVolumeUp && keydownVolumeDown) {
-                    if (MyDebug.LOG) Log.d(TAG, "take photo rather than focus, as both volume keys are down")
+                    if (MyDebug.LOG) Log.d(
+                        TAG,
+                        "take photo rather than focus, as both volume keys are down"
+                    )
                     mainActivity.takePicture(false)
                 } else if (mainActivity.preview.currentFocusValue == "focus_mode_manual2") {
-                    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) mainActivity.changeFocusDistance(-1, false)
+                    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) mainActivity.changeFocusDistance(
+                        -1,
+                        false
+                    )
                     else mainActivity.changeFocusDistance(1, false)
                 } else {
                     if (event.downTime == event.eventTime && !mainActivity.preview.isFocusWaiting) {
@@ -195,9 +202,14 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                     sharedPreferences.edit {
                         putBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, autoStabilise)
                     }
-                    val message = mainActivity.resources.getString(R.string.preference_auto_stabilise) + ": " +
-                            mainActivity.resources.getString(if (autoStabilise) R.string.on else R.string.off)
-                    mainActivity.preview.showToast(mainActivity.changedAutoStabiliseToastBoxer, message, true)
+                    val message =
+                        mainActivity.resources.getString(R.string.preference_auto_stabilise) + ": " +
+                                mainActivity.resources.getString(if (autoStabilise) R.string.on else R.string.off)
+                    mainActivity.preview.showToast(
+                        mainActivity.changedAutoStabiliseToastBoxer,
+                        message,
+                        true
+                    )
                     mainActivity.applicationInterface.drawPreview.updateSettings()
                     mainActivity.mainUI.destroyPopup()
                 } else if (!mainActivity.deviceSupportsAutoStabilise()) {
