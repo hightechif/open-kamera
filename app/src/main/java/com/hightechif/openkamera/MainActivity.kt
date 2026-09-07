@@ -1579,6 +1579,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         }
 
         orientationLifecycleManager.onResume(mSensorManager, mSensorAccelerometer, magneticSensor)
+        sensorRepository.startListening()
         window.decorView.addOnLayoutChangeListener(layoutChangeListener)
 
         // if BLE remote control is enabled, then start the background BLE service
@@ -1586,6 +1587,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
         //speechControl.initSpeechRecognizer()
         initLocation()
+        locationRepository.startLocationUpdates()
         initGyroSensors()
         applicationInterface.imageSaver.onResume()
         soundPoolManager.initSound()
@@ -1713,6 +1715,8 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
 
         mainUI.destroyPopup() // important as user could change/reset settings from Android settings when pausing
         orientationLifecycleManager.onPause(mSensorManager, magneticSensor)
+        sensorRepository.stopListening()
+        locationRepository.stopLocationUpdates()
         window.decorView.removeOnLayoutChangeListener(layoutChangeListener)
         bluetoothRemoteControl.stopRemoteControl()
         freeAudioListener(false)
@@ -6467,6 +6471,7 @@ $captureRateString${resources.getString(R.string.fps)}${
             if (MyDebug.LOG) Log.d(TAG, "location permission not available, so request permission")
             permissionManager.requestLocationPermission()
         } else {
+            locationRepository.startLocationUpdates()
             applicationInterface.locationSupplier.setupLocationListener()
         }
     }

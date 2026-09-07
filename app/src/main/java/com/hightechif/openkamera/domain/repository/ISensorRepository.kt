@@ -11,8 +11,14 @@ import kotlinx.coroutines.flow.Flow
 
 interface ISensorRepository {
     val sensorOrientationFlow: Flow<SensorOrientation>
+    val magneticAccuracyFlow: Flow<Int> get() = kotlinx.coroutines.flow.emptyFlow()
+    val hasGyroSensors: Boolean get() = false
+    val hasMagneticSensor: Boolean get() = false
 
     fun startListening()
     fun stopListening()
     fun isSupported(): Boolean
+    fun setCalibratedLevelAngle(angle: Double) {}
+    fun getCalibratedLevelAngle(): Double = 0.0
+    fun setDeviceOrientation(orientation: Int) {}
 }

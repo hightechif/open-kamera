@@ -38,6 +38,8 @@ class LocationRepositoryImpl @Inject constructor(
     override val currentLocationFlow: Flow<LocationCoordinates?> =
         _currentLocationFlow.asStateFlow()
 
+    private var isListening = false
+
     override fun isLocationPermissionGranted(): Boolean {
         val fineGranted = ContextCompat.checkSelfPermission(
             context,
@@ -52,14 +54,61 @@ class LocationRepositoryImpl @Inject constructor(
         return fineGranted || coarseGranted
     }
 
+    @Synchronized
+    override fun startLocationUpdates() {
+        if (isListening || locationManager == null || !isLocationPermissionGranted()) return
+
+        try {
+            val allProviders = locationManager.allProviders
+            if (allProviders.contains(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    1000L,
+                    0f,
+                    this
+                )
+            }
+            if (allProviders.contains(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    1000L,
+                    0f,
+                    this
+                )
+            }
+            isListening = true
+            getLastKnownLocation()
+        } catch (_: SecurityException) {
+            isListening = false
+        }
+    }
+
+    @Synchronized
+    override fun stopLocationUpdates() {
+        if (!isListening || locationManager == null) return
+        try {
+            locationManager.removeUpdates(this)
+        } catch (_: SecurityException) {
+            // Ignore on cleanup
+        } finally {
+            isListening = false
+        }
+    }
+
     override fun getLastKnownLocation(): LocationCoordinates? {
         if (!isLocationPermissionGranted() || locationManager == null) return null
 
         try {
-            val gpsLoc: Location? =
+            val gpsLoc: Location? = try {
                 locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            val netLoc: Location? =
+            } catch (_: SecurityException) {
+                null
+            }
+            val netLoc: Location? = try {
                 locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            } catch (_: SecurityException) {
+                null
+            }
 
             val bestLoc: Location? = when {
                 gpsLoc != null && netLoc != null -> if (gpsLoc.time >= netLoc.time) gpsLoc else netLoc
@@ -82,16 +131,17 @@ class LocationRepositoryImpl @Inject constructor(
     }
 
     override fun onLocationChanged(location: Location) {
-        _currentLocationFlow.value = LocationCoordinates(
-            latitude = location.latitude,
-            longitude = location.longitude,
-            altitude = if (location.hasAltitude()) location.altitude else null
-        )
+        if (location.latitude != 0.0 || location.longitude != 0.0) {
+            _currentLocationFlow.value = LocationCoordinates(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                altitude = if (location.hasAltitude()) location.altitude else null
+            )
+        }
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
-    }
+    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
 
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) {}

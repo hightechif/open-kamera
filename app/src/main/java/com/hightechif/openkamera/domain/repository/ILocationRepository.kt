@@ -14,4 +14,6 @@ interface ILocationRepository {
 
     fun getLastKnownLocation(): LocationCoordinates?
     fun isLocationPermissionGranted(): Boolean
+    fun startLocationUpdates() {}
+    fun stopLocationUpdates() {}
 }
