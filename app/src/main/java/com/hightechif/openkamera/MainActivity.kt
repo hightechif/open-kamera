@@ -166,6 +166,12 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
     @Inject
     lateinit var sensorRepository: ISensorRepository
 
+    @Inject
+    lateinit var remoteInputManager: com.hightechif.openkamera.domain.engine.IRemoteInputManager
+
+    @Inject
+    lateinit var audioController: com.hightechif.openkamera.domain.engine.IAudioController
+
     var isAppPaused: Boolean = true
         internal set
 
@@ -415,7 +421,7 @@ class MainActivity : AppCompatActivity(), OnPreferenceStartFragmentCallback {
         )
 
         // set up components
-        bluetoothRemoteControl = BluetoothRemoteControl(this)
+        bluetoothRemoteControl = BluetoothRemoteControl(this, remoteInputManager)
         permissionManager = PermissionManager(this)
         permissionHandler = permissionManager.permissionHandler
         settingsManager = SettingsManager(this)

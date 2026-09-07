@@ -12,6 +12,8 @@ import app.cash.turbine.test
 import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
 import com.hightechif.openkamera.domain.engine.ICameraEngine
+import com.hightechif.openkamera.domain.engine.RemoteInputType
+import com.hightechif.openkamera.remotecontrol.RemoteInputManagerImpl
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.ExposureCompensation
 import com.hightechif.openkamera.domain.model.FlashMode
@@ -310,5 +312,31 @@ class CameraViewModelUnitTest {
         testScheduler.runCurrent()
         assertFalse(viewModel.uiState.value.isRecording)
         assertEquals(0L, viewModel.uiState.value.recordingDurationSeconds)
+    }
+
+    @Test
+    fun remoteInputManager_shutterButton_triggersPhotoCapture() = runTest(testDispatcher) {
+        val remoteInputManager = RemoteInputManagerImpl()
+        val customViewModel = CameraViewModel(
+            cameraEngine = mockCameraEngine,
+            capturePhotoUseCase = mockCapturePhotoUseCase,
+            recordVideoUseCase = mockRecordVideoUseCase,
+            adjustExposureUseCase = mockAdjustExposureUseCase,
+            toggleFlashUseCase = mockToggleFlashUseCase,
+            setZoomUseCase = mockSetZoomUseCase,
+            tapToFocusUseCase = mockTapToFocusUseCase,
+            switchCameraFacingUseCase = mockSwitchCameraFacingUseCase,
+            getCameraCapabilitiesUseCase = mockGetCameraCapabilitiesUseCase,
+            settingsRepository = mockSettingsRepository,
+            mediaRepository = mockMediaRepository,
+            sensorRepository = mockSensorRepository,
+            remoteInputManager = remoteInputManager
+        )
+        testScheduler.runCurrent()
+
+        remoteInputManager.dispatchInputEvent(RemoteInputType.SHUTTER_BUTTON)
+        testScheduler.runCurrent()
+
+        coVerify(atLeast = 1) { mockCapturePhotoUseCase(any()) }
     }
 }

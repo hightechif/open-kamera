@@ -9,7 +9,10 @@ package com.hightechif.openkamera.domain.engine
 interface IAudioController {
     fun playShutterSound()
     fun playTimerBeep()
-    fun startAudioTriggerListener(onAudioLevelThresholdMet: () -> Unit)
+    fun playTimerAlert()
+    fun startAudioTriggerListener(threshold: Int = 1500, onAudioLevelThresholdMet: () -> Unit)
+    fun startAudioTriggerListener(onAudioLevelThresholdMet: () -> Unit) =
+        startAudioTriggerListener(1500, onAudioLevelThresholdMet)
     fun stopAudioTriggerListener()
     fun release()
 }

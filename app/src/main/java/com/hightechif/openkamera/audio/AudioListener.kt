@@ -14,8 +14,12 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import com.hightechif.openkamera.utils.MyDebug
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.max
 
 /** Sets up a listener to listen for noise level.
  */
@@ -23,11 +27,11 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
     private val cb: AudioListenerCallback
 ) {
     @Volatile
-    private var isRunning = true // should be volatile, as used to communicate between threads
+    private var isRunning = true
     private var bufferSize = -1
-    private var ar: AudioRecord? =
-        null // modification to ar should always be synchronized (on AudioListener.this), as the ar can be released in the AudioListener's own thread
-    private var thread: Thread? = null
+    private var ar: AudioRecord? = null
+    private var job: Job? = null
+    private val defaultScope = CoroutineScope(Dispatchers.IO)
 
     interface AudioListenerCallback {
         fun onAudio(level: Int)
@@ -43,7 +47,6 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
         val audioFormat = AudioFormat.ENCODING_PCM_16BIT
         try {
             bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-            //bufferSize = -1; // test
             if (MyDebug.LOG)
                 Log.d(TAG, "buffer_size: $bufferSize")
             if (bufferSize <= 0) {
@@ -62,10 +65,9 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
                         audioFormat,
                         bufferSize
                     )
-                    (this@AudioListener as Object).notifyAll() // probably not needed currently as no thread should be waiting for creation, but just for consistency
                 }
 
-                // check initialised
+                // check initialized
                 var initialized = false
                 synchronized(this@AudioListener) {
                     val localAr = ar
@@ -77,70 +79,11 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
                         Log.e(TAG, "audiorecord failed to initialise")
                         localAr?.release()
                         ar = null
-                        (this@AudioListener as Object).notifyAll() // again probably not needed, but just in case
                     }
                 }
 
                 if (initialized) {
-                    val buffer = ShortArray(bufferSize)
                     ar?.startRecording()
-
-                    this.thread = object : Thread() {
-                        override fun run() {
-                            /*int sample_delay = (1000 * bufferSize) / sampleRate;
-                            if( MyDebug.LOG )
-                                Log.e(TAG, "sample_delay: " + sample_delay);*/
-
-                            while (isRunning) {
-                                /*try{
-                                    Thread.sleep(sample_delay);
-                                }
-                                catch(InterruptedException e) {
-                                    MyDebug.logStackTrace(TAG, "InterruptedException from sleep", e);
-                                }*/
-                                try {
-                                    val currentAr = ar
-                                    val nRead = currentAr?.read(buffer, 0, bufferSize) ?: -1
-                                    if (nRead > 0) {
-                                        var averageNoise = 0
-                                        var maxNoise = 0
-                                        for (i in 0 until nRead) {
-                                            val value = abs(buffer[i].toInt())
-                                            averageNoise += value
-                                            maxNoise = max(maxNoise, value)
-                                        }
-                                        averageNoise /= nRead
-                                        /*if( MyDebug.LOG ) {
-                                            Log.d(TAG, "n_read: " + nRead);
-                                            Log.d(TAG, "average noise: " + averageNoise);
-                                            Log.d(TAG, "max noise: " + maxNoise);
-                                        }*/
-                                        cb.onAudio(averageNoise)
-                                    } else {
-                                        if (MyDebug.LOG) {
-                                            Log.d(TAG, "n_read: $nRead")
-                                            if (nRead == AudioRecord.ERROR_INVALID_OPERATION)
-                                                Log.e(TAG, "read returned ERROR_INVALID_OPERATION")
-                                            else if (nRead == AudioRecord.ERROR_BAD_VALUE)
-                                                Log.e(TAG, "read returned ERROR_BAD_VALUE")
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    MyDebug.logStackTrace(TAG, "failed to read from audiorecord", e)
-                                }
-                            }
-                            if (MyDebug.LOG)
-                                Log.d(TAG, "stopped running")
-                            synchronized(this@AudioListener) {
-                                if (MyDebug.LOG)
-                                    Log.d(TAG, "release ar")
-                                ar?.release()
-                                ar = null
-                                (this@AudioListener as Object).notifyAll() // notify in case release() is waiting
-                            }
-                        }
-                    }
-                    // n.b., not good practice to start threads in constructors, so we require the caller to call start() instead
                 }
             }
         } catch (e: Exception) {
@@ -161,47 +104,82 @@ internal class AudioListener @RequiresPermission(Manifest.permission.RECORD_AUDI
 
     /** Start listening.
      */
-    fun start() {
+    fun start(scope: CoroutineScope = defaultScope) {
         if (MyDebug.LOG)
             Log.d(TAG, "start")
-        thread?.start()
+        if (job?.isActive == true) return
+
+        val localBufferSize = bufferSize
+        if (localBufferSize <= 0) return
+        val buffer = ShortArray(localBufferSize)
+
+        job = scope.launch(Dispatchers.IO) {
+            while (coroutineContext.isActive && isRunning) {
+                try {
+                    val currentAr = ar
+                    val nRead = currentAr?.read(buffer, 0, localBufferSize) ?: -1
+                    if (nRead > 0) {
+                        val averageNoise = calculateAverageNoise(buffer, nRead)
+                        cb.onAudio(averageNoise)
+                    } else {
+                        if (MyDebug.LOG) {
+                            Log.d(TAG, "n_read: $nRead")
+                            if (nRead == AudioRecord.ERROR_INVALID_OPERATION)
+                                Log.e(TAG, "read returned ERROR_INVALID_OPERATION")
+                            else if (nRead == AudioRecord.ERROR_BAD_VALUE)
+                                Log.e(TAG, "read returned ERROR_BAD_VALUE")
+                        }
+                    }
+                } catch (e: Exception) {
+                    MyDebug.logStackTrace(TAG, "failed to read from audiorecord", e)
+                }
+            }
+            if (MyDebug.LOG)
+                Log.d(TAG, "stopped running")
+            synchronized(this@AudioListener) {
+                if (MyDebug.LOG)
+                    Log.d(TAG, "release ar")
+                ar?.release()
+                ar = null
+            }
+        }
     }
 
     /** Stop listening and release the resources.
      * @param waitUntilDone If true, this method will block until the resource is freed.
      */
-    fun release(waitUntilDone: Boolean) {
+    fun release(waitUntilDone: Boolean = false) {
         if (MyDebug.LOG) {
             Log.d(TAG, "release")
             Log.d(TAG, "wait_until_done: $waitUntilDone")
         }
         isRunning = false
-        thread = null
-        if (waitUntilDone) {
-            if (MyDebug.LOG)
-                Log.d(TAG, "wait until audio listener is freed")
-            synchronized(this@AudioListener) {
-                while (ar != null) {
-                    if (MyDebug.LOG)
-                        Log.d(TAG, "ar still not freed, so wait")
-                    try {
-                        (this@AudioListener as Object).wait()
-                    } catch (e: InterruptedException) {
-                        MyDebug.logStackTrace(
-                            TAG,
-                            "interrupted while waiting for audio recorder to be freed",
-                            e
-                        )
-                    }
-                }
+        job?.cancel()
+        job = null
+        synchronized(this@AudioListener) {
+            try {
+                ar?.release()
+            } catch (_: Exception) {
             }
-            if (MyDebug.LOG)
-                Log.d(TAG, "audio listener is now freed")
+            ar = null
         }
     }
 
     companion object {
         private const val TAG = "AudioListener"
+
+        fun calculateAverageNoise(buffer: ShortArray, readCount: Int): Int {
+            if (readCount <= 0) return 0
+            var sum = 0L
+            for (i in 0 until readCount) {
+                sum += abs(buffer[i].toInt())
+            }
+            return (sum / readCount).toInt()
+        }
+
+        fun isThresholdMet(noiseLevel: Int, threshold: Int): Boolean {
+            return noiseLevel >= threshold
+        }
 
         /**
          * Converts short sample buffer into [com.hightechif.openkamera.domain.model.AudioAmplitudeData] containing RMS and peak decibels.

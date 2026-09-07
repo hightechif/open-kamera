@@ -13,6 +13,8 @@ import androidx.lifecycle.viewModelScope
 import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
 import com.hightechif.openkamera.domain.engine.ICameraEngine
+import com.hightechif.openkamera.domain.engine.IRemoteInputManager
+import com.hightechif.openkamera.domain.engine.RemoteInputType
 import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.FlashMode
@@ -63,7 +65,8 @@ class CameraViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val mediaRepository: IMediaRepository,
     private val sensorRepository: ISensorRepository,
-    private val locationRepository: ILocationRepository? = null
+    private val locationRepository: ILocationRepository? = null,
+    private val remoteInputManager: IRemoteInputManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -197,6 +200,29 @@ class CameraViewModel @Inject constructor(
                             isVideoPaused = false,
                             recordingDurationSeconds = 0L
                         )
+                    }
+                }
+            }
+        }
+
+        remoteInputManager?.let { remoteManager ->
+            remoteManager.startListening()
+            viewModelScope.launch {
+                remoteManager.remoteInputEventFlow.collectLatest { event ->
+                    when (event) {
+                        RemoteInputType.SHUTTER_BUTTON -> onEvent(CameraUiEvent.OnRemoteCaptureTriggered)
+                        RemoteInputType.ZOOM_IN -> onEvent(
+                            CameraUiEvent.OnZoomChanged(
+                                (_uiState.value.zoomRatio + 0.1f).coerceAtMost(_uiState.value.maxZoomRatio)
+                            )
+                        )
+                        RemoteInputType.ZOOM_OUT -> onEvent(
+                            CameraUiEvent.OnZoomChanged(
+                                (_uiState.value.zoomRatio - 0.1f).coerceAtLeast(1.0f)
+                            )
+                        )
+                        RemoteInputType.SWITCH_CAMERA -> onEvent(CameraUiEvent.OnSwitchCameraClicked)
+                        RemoteInputType.FOCUS_BUTTON -> onEvent(CameraUiEvent.OnFocusKeyPressed)
                     }
                 }
             }

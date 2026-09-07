@@ -59,4 +59,57 @@ class RemoteInputManagerTest {
         val result = remoteInputManager.dispatchInputEvent(RemoteInputType.FOCUS_BUTTON)
         assertFalse(result)
     }
+
+    @Test
+    fun onBleConnectionStateChanged_updatesConnectionStateFlow() = runTest {
+        remoteInputManager.connectionStateFlow.test {
+            assertEquals(com.hightechif.openkamera.domain.engine.BleConnectionState.Disconnected, awaitItem())
+
+            remoteInputManager.onBleConnectionStateChanged(com.hightechif.openkamera.domain.engine.BleConnectionState.Connecting)
+            assertEquals(com.hightechif.openkamera.domain.engine.BleConnectionState.Connecting, awaitItem())
+
+            remoteInputManager.onBleConnectionStateChanged(com.hightechif.openkamera.domain.engine.BleConnectionState.Connected)
+            assertEquals(com.hightechif.openkamera.domain.engine.BleConnectionState.Connected, awaitItem())
+
+            remoteInputManager.onBleConnectionStateChanged(com.hightechif.openkamera.domain.engine.BleConnectionState.Error("Timeout"))
+            assertEquals(com.hightechif.openkamera.domain.engine.BleConnectionState.Error("Timeout"), awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun onRemoteCommandReceived_dispatchesMappedEvents() = runTest {
+        remoteInputManager.startListening()
+
+        remoteInputManager.remoteInputEventFlow.test {
+            remoteInputManager.onRemoteCommandReceived(BluetoothLeService.COMMAND_SHUTTER)
+            assertEquals(RemoteInputType.SHUTTER_BUTTON, awaitItem())
+
+            remoteInputManager.onRemoteCommandReceived(BluetoothLeService.COMMAND_UP)
+            assertEquals(RemoteInputType.ZOOM_IN, awaitItem())
+
+            remoteInputManager.onRemoteCommandReceived(BluetoothLeService.COMMAND_DOWN)
+            assertEquals(RemoteInputType.ZOOM_OUT, awaitItem())
+
+            remoteInputManager.onRemoteCommandReceived(BluetoothLeService.COMMAND_AFMF)
+            assertEquals(RemoteInputType.FOCUS_BUTTON, awaitItem())
+
+            remoteInputManager.onRemoteCommandReceived(BluetoothLeService.COMMAND_MODE)
+            assertEquals(RemoteInputType.SWITCH_CAMERA, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun onRemoteCommandReceived_unknownCommand_ignored() = runTest {
+        remoteInputManager.startListening()
+
+        remoteInputManager.remoteInputEventFlow.test {
+            remoteInputManager.onRemoteCommandReceived(9999)
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
