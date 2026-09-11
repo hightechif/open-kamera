@@ -55,4 +55,29 @@ class Camera2SessionManagerTest {
         assertNull(sessionManager.captureSession)
         assertEquals(CaptureSessionState.Closed, sessionManager.sessionState)
     }
+
+    @Test
+    fun clearCaptureSession_resetsWithoutClosing() {
+        val mockSession = mockk<CameraCaptureSession>(relaxed = true)
+        sessionManager.onSessionConfigured(mockSession)
+
+        sessionManager.clearCaptureSession()
+
+        verify(exactly = 0) { mockSession.close() }
+        assertNull(sessionManager.captureSession)
+        assertEquals(CaptureSessionState.Closed, sessionManager.sessionState)
+    }
+
+    @Test
+    fun clearExtensionSession_resetsWithoutAffectingCaptureSession() {
+        val mockSession = mockk<CameraCaptureSession>(relaxed = true)
+        sessionManager.onSessionConfigured(mockSession)
+        sessionManager.onExtensionSessionConfigured(Any())
+
+        sessionManager.clearExtensionSession()
+
+        assertNull(sessionManager.extensionSession)
+        assertEquals(mockSession, sessionManager.captureSession)
+        verify(exactly = 0) { mockSession.close() }
+    }
 }

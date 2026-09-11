@@ -171,7 +171,7 @@ class CameraController2(
             if (value != null) {
                 sessionManager.onSessionConfigured(value)
             } else {
-                sessionManager.closeCaptureSession()
+                sessionManager.clearCaptureSession()
             }
         }
 
@@ -182,7 +182,7 @@ class CameraController2(
             if (value != null) {
                 sessionManager.onExtensionSessionConfigured(value)
             } else {
-                sessionManager.closeCaptureSession()
+                sessionManager.clearExtensionSession()
             }
         }
     private var cameraExtension = 0 // used if sessionType == SESSIONTYPE_EXTENSION
@@ -5590,6 +5590,7 @@ class CameraController2(
                         }
 
                         this@CameraController2.camera = cam
+                        sessionManager.onCameraOpened(cam)
 
                         // note, this won't start the preview yet, but we create the previewBuilder in order to start setting camera parameters
                         createPreviewRequest()
