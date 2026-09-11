@@ -1,0 +1,2048 @@
+{
+  "app/build.gradle": {
+    "mtime": 1788765046.5997639,
+    "seen": 1789100586.231562,
+    "ast_hash": "b86e5cb5173eb1efcdde35e5464c0d0d",
+    "semantic_hash": "b86e5cb5173eb1efcdde35e5464c0d0d"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/intents/CameraIntentsInstrumentedTest.kt": {
+    "mtime": 1787223166.8560238,
+    "seen": 1789100586.231565,
+    "ast_hash": "8c7a9ecf3ec6614a61cdc949dde498c4",
+    "semantic_hash": "8c7a9ecf3ec6614a61cdc949dde498c4"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/lifecycle/OrientationLifecycleInstrumentedTest.kt": {
+    "mtime": 1787223166.8564525,
+    "seen": 1789100586.2315662,
+    "ast_hash": "81c218fbec2b745adf65224b23488919",
+    "semantic_hash": "81c218fbec2b745adf65224b23488919"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/preferences/PreferencesActivityInstrumentedTest.kt": {
+    "mtime": 1787223166.8568757,
+    "seen": 1789100586.2315671,
+    "ast_hash": "7d1f5e11256bfa05bb64ddaa80cb5398",
+    "semantic_hash": "7d1f5e11256bfa05bb64ddaa80cb5398"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/storage/StorageAccessFrameworkInstrumentedTest.kt": {
+    "mtime": 1787223166.857152,
+    "seen": 1789100586.2315671,
+    "ast_hash": "5b39382fdaee3bb7c6ca3065c703372b",
+    "semantic_hash": "5b39382fdaee3bb7c6ca3065c703372b"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/BaseInstrumentedTest.kt": {
+    "mtime": 1788156972.6434543,
+    "seen": 1789100586.2315671,
+    "ast_hash": "b68271c3ab69f7601bdd90024d4f7de8",
+    "semantic_hash": "b68271c3ab69f7601bdd90024d4f7de8"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/Camera2InstrumentedTest.kt": {
+    "mtime": 1788688953.307731,
+    "seen": 1789100586.2315679,
+    "ast_hash": "fb95460e85e8a541505757f04b3f0d7f",
+    "semantic_hash": "fb95460e85e8a541505757f04b3f0d7f"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/HdrAvgInstrumentedTest.kt": {
+    "mtime": 1787223166.8588607,
+    "seen": 1789100586.2315679,
+    "ast_hash": "7f1fc4fa9add513f1af7253a2b523b08",
+    "semantic_hash": "7f1fc4fa9add513f1af7253a2b523b08"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/MainInstrumentedTest.kt": {
+    "mtime": 1788157375.6310985,
+    "seen": 1789100586.2315688,
+    "ast_hash": "50bf1efbcbd4a24f67fdf7924977b12f",
+    "semantic_hash": "50bf1efbcbd4a24f67fdf7924977b12f"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/PanoramaInstrumentedTest.kt": {
+    "mtime": 1787223166.8597026,
+    "seen": 1789100586.2315688,
+    "ast_hash": "6136d3158d9a7ff701f2191f71d0ac8c",
+    "semantic_hash": "6136d3158d9a7ff701f2191f71d0ac8c"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/PhotoInstrumentedTest.kt": {
+    "mtime": 1788157375.6347609,
+    "seen": 1789100586.23157,
+    "ast_hash": "c17c14d7d7b84ead790719b792eea5fd",
+    "semantic_hash": "c17c14d7d7b84ead790719b792eea5fd"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/TestUtils.kt": {
+    "mtime": 1788157375.6397557,
+    "seen": 1789100586.23157,
+    "ast_hash": "30d897886bb93dbf8626a38538d659f8",
+    "semantic_hash": "30d897886bb93dbf8626a38538d659f8"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/test/VideoInstrumentedTest.kt": {
+    "mtime": 1787223166.860851,
+    "seen": 1789100586.231571,
+    "ast_hash": "3eaa7279729d257637ecee3404b93196",
+    "semantic_hash": "3eaa7279729d257637ecee3404b93196"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/ui/EspressoCameraUiInstrumentedTest.kt": {
+    "mtime": 1787223166.8612523,
+    "seen": 1789100586.231571,
+    "ast_hash": "f5d2cc2d9dd0b476d1cf2e5e9e5b2d47",
+    "semantic_hash": "f5d2cc2d9dd0b476d1cf2e5e9e5b2d47"
+  },
+  "app/src/androidTest/java/com/hightechif/openkamera/video/VideoRecordingStateMachineInstrumentedTest.kt": {
+    "mtime": 1787223166.861551,
+    "seen": 1789100586.231572,
+    "ast_hash": "fa2a7f4565344b1e71fd1c881e54c17c",
+    "semantic_hash": "fa2a7f4565344b1e71fd1c881e54c17c"
+  },
+  "app/src/main/cpp/hdr/histogram_adjust.cpp": {
+    "mtime": 1788236261.6447299,
+    "seen": 1789100586.231572,
+    "ast_hash": "5899f4f723c4f1af9cb3b5c7404baa6a",
+    "semantic_hash": "5899f4f723c4f1af9cb3b5c7404baa6a"
+  },
+  "app/src/main/cpp/hdr/histogram_adjust.h": {
+    "mtime": 1788246603.0769005,
+    "seen": 1789100586.231573,
+    "ast_hash": "311bfd5aa991b4c39ec83dbbe290af95",
+    "semantic_hash": "311bfd5aa991b4c39ec83dbbe290af95"
+  },
+  "app/src/main/cpp/hdr/process_hdr.cpp": {
+    "mtime": 1788236251.6500134,
+    "seen": 1789100586.231573,
+    "ast_hash": "9abc95339f1e75bf8ec1f3576660ba30",
+    "semantic_hash": "9abc95339f1e75bf8ec1f3576660ba30"
+  },
+  "app/src/main/cpp/hdr/process_hdr.h": {
+    "mtime": 1788236244.401023,
+    "seen": 1789100586.231574,
+    "ast_hash": "da2100e5d3731c99da6801db45c90a14",
+    "semantic_hash": "da2100e5d3731c99da6801db45c90a14"
+  },
+  "app/src/main/cpp/mtb/align_mtb.cpp": {
+    "mtime": 1788246575.6621144,
+    "seen": 1789100586.231574,
+    "ast_hash": "c151326f60d3a5cd3399debd018901f7",
+    "semantic_hash": "c151326f60d3a5cd3399debd018901f7"
+  },
+  "app/src/main/cpp/mtb/align_mtb.h": {
+    "mtime": 1788236072.6163146,
+    "seen": 1789100586.231575,
+    "ast_hash": "d4f934c804d09526d59960115344e204",
+    "semantic_hash": "d4f934c804d09526d59960115344e204"
+  },
+  "app/src/main/cpp/mtb/create_mtb.cpp": {
+    "mtime": 1788236066.487733,
+    "seen": 1789100586.231575,
+    "ast_hash": "3864fa22e4ac5fab0f56815d4fd011b3",
+    "semantic_hash": "3864fa22e4ac5fab0f56815d4fd011b3"
+  },
+  "app/src/main/cpp/mtb/create_mtb.h": {
+    "mtime": 1788236060.3823783,
+    "seen": 1789100586.231576,
+    "ast_hash": "f8d4e0a307b4594039dadff60344df48",
+    "semantic_hash": "f8d4e0a307b4594039dadff60344df48"
+  },
+  "app/src/main/cpp/mtb/process_avg.cpp": {
+    "mtime": 1788238080.1942894,
+    "seen": 1789100586.231576,
+    "ast_hash": "e5e4fcb23061fc432971e6f12acf88fa",
+    "semantic_hash": "e5e4fcb23061fc432971e6f12acf88fa"
+  },
+  "app/src/main/cpp/mtb/process_avg.h": {
+    "mtime": 1788236090.6640825,
+    "seen": 1789100586.231576,
+    "ast_hash": "6303721394f6fc1b3439ba6833af228f",
+    "semantic_hash": "6303721394f6fc1b3439ba6833af228f"
+  },
+  "app/src/main/cpp/native_bridge.cpp": {
+    "mtime": 1788236428.237637,
+    "seen": 1789100586.2315772,
+    "ast_hash": "4cd052dcc2ebf2a07191cb9b76df3b32",
+    "semantic_hash": "4cd052dcc2ebf2a07191cb9b76df3b32"
+  },
+  "app/src/main/cpp/panorama/feature_detector.cpp": {
+    "mtime": 1788236401.4665647,
+    "seen": 1789100586.2315772,
+    "ast_hash": "c1a4e7444c6ea399cf4e3a6722632ac7",
+    "semantic_hash": "c1a4e7444c6ea399cf4e3a6722632ac7"
+  },
+  "app/src/main/cpp/panorama/feature_detector.h": {
+    "mtime": 1788236395.3311877,
+    "seen": 1789100586.231578,
+    "ast_hash": "4e274386e29757c372750473a836a6e4",
+    "semantic_hash": "4e274386e29757c372750473a836a6e4"
+  },
+  "app/src/main/cpp/panorama/pyramid_blending.cpp": {
+    "mtime": 1788238075.7199216,
+    "seen": 1789100586.231578,
+    "ast_hash": "89858c335534d482b4c7668f047a651a",
+    "semantic_hash": "89858c335534d482b4c7668f047a651a"
+  },
+  "app/src/main/cpp/panorama/pyramid_blending.h": {
+    "mtime": 1788236407.1754177,
+    "seen": 1789100586.2315788,
+    "ast_hash": "d7694439f1668f1c90b3a00a2a960af9",
+    "semantic_hash": "d7694439f1668f1c90b3a00a2a960af9"
+  },
+  "app/src/main/cpp/preview/focus_peaking.cpp": {
+    "mtime": 1788235853.386073,
+    "seen": 1789100586.2315788,
+    "ast_hash": "1f5ccd9c010c02098ba6acdcde84b9ee",
+    "semantic_hash": "1f5ccd9c010c02098ba6acdcde84b9ee"
+  },
+  "app/src/main/cpp/preview/focus_peaking.h": {
+    "mtime": 1788235847.0878322,
+    "seen": 1789100586.23158,
+    "ast_hash": "9f94162d46c95522c5a8c3ed7c2541f3",
+    "semantic_hash": "9f94162d46c95522c5a8c3ed7c2541f3"
+  },
+  "app/src/main/cpp/preview/histogram_compute.cpp": {
+    "mtime": 1788235842.5501716,
+    "seen": 1789100586.23158,
+    "ast_hash": "6f7dddc52012ffd3acde6c6d66ab10c5",
+    "semantic_hash": "6f7dddc52012ffd3acde6c6d66ab10c5"
+  },
+  "app/src/main/cpp/preview/histogram_compute.h": {
+    "mtime": 1788235837.3954082,
+    "seen": 1789100586.231581,
+    "ast_hash": "52ee5b1972c66e3ef6a2596702af2577",
+    "semantic_hash": "52ee5b1972c66e3ef6a2596702af2577"
+  },
+  "app/src/main/cpp/preview/zebra_stripes.cpp": {
+    "mtime": 1788235864.0396793,
+    "seen": 1789100586.231581,
+    "ast_hash": "9af2e21ff4dd9b0987b06365e62e5792",
+    "semantic_hash": "9af2e21ff4dd9b0987b06365e62e5792"
+  },
+  "app/src/main/cpp/preview/zebra_stripes.h": {
+    "mtime": 1788235858.8511906,
+    "seen": 1789100586.231581,
+    "ast_hash": "ed18d0a7f0a0018e16a69086309f418a",
+    "semantic_hash": "ed18d0a7f0a0018e16a69086309f418a"
+  },
+  "app/src/main/cpp/utils/bitmap_utils.h": {
+    "mtime": 1788235738.1322727,
+    "seen": 1789100586.231582,
+    "ast_hash": "79f6c3a16449f5a404843792c0b94188",
+    "semantic_hash": "79f6c3a16449f5a404843792c0b94188"
+  },
+  "app/src/main/cpp/utils/neon_math.h": {
+    "mtime": 1788235731.1140378,
+    "seen": 1789100586.231582,
+    "ast_hash": "b468c2705ff838ddf0b85247c2f91c3b",
+    "semantic_hash": "b468c2705ff838ddf0b85247c2f91c3b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ActivityUtils.kt": {
+    "mtime": 1788772035.3428226,
+    "seen": 1789100586.2315829,
+    "ast_hash": "80b0948bae8acea77435938fd71199ff",
+    "semantic_hash": "80b0948bae8acea77435938fd71199ff"
+  },
+  "app/src/main/java/com/hightechif/openkamera/MainActivity.kt": {
+    "mtime": 1788776237.0316913,
+    "seen": 1789100586.2315829,
+    "ast_hash": "eb5d772ba5f2efc954294ed9242f6a98",
+    "semantic_hash": "eb5d772ba5f2efc954294ed9242f6a98"
+  },
+  "app/src/main/java/com/hightechif/openkamera/MainActivityLegacyGlue.kt": {
+    "mtime": 1788777894.9199579,
+    "seen": 1789100586.231584,
+    "ast_hash": "d219056ce412d7cd095269f4636d82be",
+    "semantic_hash": "d219056ce412d7cd095269f4636d82be"
+  },
+  "app/src/main/java/com/hightechif/openkamera/MyApplicationInterface.kt": {
+    "mtime": 1788776139.425016,
+    "seen": 1789100586.231584,
+    "ast_hash": "0618b7babdbd8de02d56940cd7e5867e",
+    "semantic_hash": "0618b7babdbd8de02d56940cd7e5867e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/OpenKameraApplication.kt": {
+    "mtime": 1788771810.091524,
+    "seen": 1789100586.231584,
+    "ast_hash": "87545b2c20b96abd62b002a2e7bd6fd5",
+    "semantic_hash": "87545b2c20b96abd62b002a2e7bd6fd5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/SystemOrientation.kt": {
+    "mtime": 1788771809.895367,
+    "seen": 1789100586.231585,
+    "ast_hash": "ae8e2bac88df3a820d095015fd320a9d",
+    "semantic_hash": "ae8e2bac88df3a820d095015fd320a9d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/TakePhoto.kt": {
+    "mtime": 1788771810.0975957,
+    "seen": 1789100586.231586,
+    "ast_hash": "a275f5bc62c359c0d9b663b6c9465667",
+    "semantic_hash": "a275f5bc62c359c0d9b663b6c9465667"
+  },
+  "app/src/main/java/com/hightechif/openkamera/audio/AudioControllerImpl.kt": {
+    "mtime": 1788771809.5547857,
+    "seen": 1789100586.231586,
+    "ast_hash": "341739b27c5e7ffae68a482bce0598e8",
+    "semantic_hash": "341739b27c5e7ffae68a482bce0598e8"
+  },
+  "app/src/main/java/com/hightechif/openkamera/audio/AudioListener.kt": {
+    "mtime": 1788771809.5726304,
+    "seen": 1789100586.231586,
+    "ast_hash": "3eb808c8dcd456e30e430980a48f87e7",
+    "semantic_hash": "3eb808c8dcd456e30e430980a48f87e7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/audio/MyAudioTriggerListenerCallback.kt": {
+    "mtime": 1788771809.5614526,
+    "seen": 1789100586.2315872,
+    "ast_hash": "46e03033dc2d7d162b764bdc0231c320",
+    "semantic_hash": "46e03033dc2d7d162b764bdc0231c320"
+  },
+  "app/src/main/java/com/hightechif/openkamera/audio/SoundPoolManager.kt": {
+    "mtime": 1788771809.5670314,
+    "seen": 1789100586.2315872,
+    "ast_hash": "0d74069ce66cdd4e707e1222b6c8e0b1",
+    "semantic_hash": "0d74069ce66cdd4e707e1222b6c8e0b1"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2EngineImpl.kt": {
+    "mtime": 1788771809.11344,
+    "seen": 1789100586.2315881,
+    "ast_hash": "16593442a857482440d20aa789a736f8",
+    "semantic_hash": "16593442a857482440d20aa789a736f8"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2Settings.kt": {
+    "mtime": 1788771809.1911101,
+    "seen": 1789100586.2315881,
+    "ast_hash": "f589675e5c6f240f1343f15bf4fdff95",
+    "semantic_hash": "f589675e5c6f240f1343f15bf4fdff95"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController.kt": {
+    "mtime": 1788771809.0125556,
+    "seen": 1789100586.231589,
+    "ast_hash": "e4e88726520cc42e923763d85cd218d8",
+    "semantic_hash": "e4e88726520cc42e923763d85cd218d8"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController1.kt": {
+    "mtime": 1788771808.950916,
+    "seen": 1789100586.231589,
+    "ast_hash": "cc553955168bcc1f5324d18221045526",
+    "semantic_hash": "cc553955168bcc1f5324d18221045526"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController2.kt": {
+    "mtime": 1788771809.1629255,
+    "seen": 1789100586.231589,
+    "ast_hash": "93c954774c83384b508f385e20e4b020",
+    "semantic_hash": "93c954774c83384b508f385e20e4b020"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraControllerException.kt": {
+    "mtime": 1788771808.9876719,
+    "seen": 1789100586.2315898,
+    "ast_hash": "7c7f5dd3bc0392d40f7a201206a790eb",
+    "semantic_hash": "7c7f5dd3bc0392d40f7a201206a790eb"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraControllerManager.kt": {
+    "mtime": 1788771809.097887,
+    "seen": 1789100586.2315898,
+    "ast_hash": "864eb8b890f1b6baedb76548f4c99dd5",
+    "semantic_hash": "864eb8b890f1b6baedb76548f4c99dd5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraControllerManager1.kt": {
+    "mtime": 1788771808.9822834,
+    "seen": 1789100586.231591,
+    "ast_hash": "e712eed28721f3d0ef2885b0573fd579",
+    "semantic_hash": "e712eed28721f3d0ef2885b0573fd579"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraControllerManager2.kt": {
+    "mtime": 1788771809.1727269,
+    "seen": 1789100586.231591,
+    "ast_hash": "e3314448e78e344232385a2de98f8398",
+    "semantic_hash": "e3314448e78e344232385a2de98f8398"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/PreviewSurfaceManager.kt": {
+    "mtime": 1788771808.926243,
+    "seen": 1789100586.231591,
+    "ast_hash": "30012cea129f96ebc4301203f79eb539",
+    "semantic_hash": "30012cea129f96ebc4301203f79eb539"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/RawImage.kt": {
+    "mtime": 1788771809.1044626,
+    "seen": 1789100586.231592,
+    "ast_hash": "4fff8cf947488e6f4123d42df181d7f2",
+    "semantic_hash": "4fff8cf947488e6f4123d42df181d7f2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/burst/Camera2CaptureCoordinator.kt": {
+    "mtime": 1788771809.0559866,
+    "seen": 1789100586.231592,
+    "ast_hash": "cadb95536ba77578377aae28efa10b7b",
+    "semantic_hash": "cadb95536ba77578377aae28efa10b7b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/burst/Camera2CaptureState.kt": {
+    "mtime": 1788771809.0452793,
+    "seen": 1789100586.231593,
+    "ast_hash": "db595b445ef8b64b15af596438843298",
+    "semantic_hash": "db595b445ef8b64b15af596438843298"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/burst/FocusBracketingCalculator.kt": {
+    "mtime": 1788771809.063852,
+    "seen": 1789100586.231593,
+    "ast_hash": "e4f553e803b8a821aac33ed52161fea6",
+    "semantic_hash": "e4f553e803b8a821aac33ed52161fea6"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/capabilities/Camera2CapabilitiesResolver.kt": {
+    "mtime": 1788771808.9767911,
+    "seen": 1789100586.231594,
+    "ast_hash": "1a3a0ef6c6158e5d7d3b2378607e9ac4",
+    "semantic_hash": "1a3a0ef6c6158e5d7d3b2378607e9ac4"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/capabilities/Camera2InfoCache.kt": {
+    "mtime": 1788771808.969268,
+    "seen": 1789100586.231594,
+    "ast_hash": "e7688193311bf8cbd03768deae9740d1",
+    "semantic_hash": "e7688193311bf8cbd03768deae9740d1"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/dispatcher/Camera2StateCallbackDispatcher.kt": {
+    "mtime": 1788771808.9951556,
+    "seen": 1789100586.231594,
+    "ast_hash": "b0f2061ea25bf76d3a97e5a40f9f3db7",
+    "semantic_hash": "b0f2061ea25bf76d3a97e5a40f9f3db7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/extension/Camera2DeviceQuirks.kt": {
+    "mtime": 1788771808.9623086,
+    "seen": 1789100586.231595,
+    "ast_hash": "7485bf6f403efaae4b04deca1f8885a3",
+    "semantic_hash": "7485bf6f403efaae4b04deca1f8885a3"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/extension/Camera2VendorTagsExtension.kt": {
+    "mtime": 1788771808.9568498,
+    "seen": 1789100586.231595,
+    "ast_hash": "a7b8db75ac851974f9d58f1794926201",
+    "semantic_hash": "a7b8db75ac851974f9d58f1794926201"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/focus/Camera23AController.kt": {
+    "mtime": 1788771809.0762005,
+    "seen": 1789100586.231596,
+    "ast_hash": "baa483aa95ba96af5b8a2871b716f283",
+    "semantic_hash": "baa483aa95ba96af5b8a2871b716f283"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/focus/Camera2FocusMeteringCoordinator.kt": {
+    "mtime": 1788771809.0834484,
+    "seen": 1789100586.231596,
+    "ast_hash": "758b2ff61c9069349a1d8c88bae62a32",
+    "semantic_hash": "758b2ff61c9069349a1d8c88bae62a32"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/focus/Camera2FocusMeteringState.kt": {
+    "mtime": 1788771809.0701985,
+    "seen": 1789100586.231597,
+    "ast_hash": "ef772fe2e3c9c54b58062ca18442b24d",
+    "semantic_hash": "ef772fe2e3c9c54b58062ca18442b24d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/focus/MeteringAreaConverter.kt": {
+    "mtime": 1788771809.0912936,
+    "seen": 1789100586.231597,
+    "ast_hash": "8ec15ecddbafa45c6b69f652beb4c862",
+    "semantic_hash": "8ec15ecddbafa45c6b69f652beb4c862"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/lifecycle/Camera2SessionManager.kt": {
+    "mtime": 1788771809.0345223,
+    "seen": 1789100586.231597,
+    "ast_hash": "cd37151359d9648a251f8d534b5a131b",
+    "semantic_hash": "cd37151359d9648a251f8d534b5a131b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/pipeline/Camera2ImageReaderPipeline.kt": {
+    "mtime": 1788771808.9426086,
+    "seen": 1789100586.2315981,
+    "ast_hash": "5017a3c16c4e6ea3610b7354c1663e58",
+    "semantic_hash": "5017a3c16c4e6ea3610b7354c1663e58"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/pipeline/Camera2PipelineManager.kt": {
+    "mtime": 1788771808.9322364,
+    "seen": 1789100586.2315981,
+    "ast_hash": "1e66ff814a8dc7617d3c9dd0cd824beb",
+    "semantic_hash": "1e66ff814a8dc7617d3c9dd0cd824beb"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/pipeline/ImageReaderConfig.kt": {
+    "mtime": 1788771808.9372518,
+    "seen": 1789100586.231599,
+    "ast_hash": "fbd0be86b7c7996bc0acca0ff5a56653",
+    "semantic_hash": "fbd0be86b7c7996bc0acca0ff5a56653"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/request/Camera2RequestBuilderHelper.kt": {
+    "mtime": 1788771809.1420724,
+    "seen": 1789100586.231599,
+    "ast_hash": "eeb3c04a23083f441771b7a3d18468f4",
+    "semantic_hash": "eeb3c04a23083f441771b7a3d18468f4"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/request/CaptureRequestConfiguration.kt": {
+    "mtime": 1788771809.1300182,
+    "seen": 1789100586.2316,
+    "ast_hash": "34679f87c242e87cba75bdb37c6ea4d0",
+    "semantic_hash": "34679f87c242e87cba75bdb37c6ea4d0"
+  },
+  "app/src/main/java/com/hightechif/openkamera/cameracontroller/threading/Camera2ThreadManager.kt": {
+    "mtime": 1788771809.1806319,
+    "seen": 1789100586.2316,
+    "ast_hash": "17fd0b7c9d8b4a394d0462bcbe680222",
+    "semantic_hash": "17fd0b7c9d8b4a394d0462bcbe680222"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/CameraModule.kt": {
+    "mtime": 1788771809.2476666,
+    "seen": 1789100586.2316,
+    "ast_hash": "4023298a3cb6572a7d0f1124e6cb57ce",
+    "semantic_hash": "4023298a3cb6572a7d0f1124e6cb57ce"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/CoroutinesQualifiers.kt": {
+    "mtime": 1788771809.2418416,
+    "seen": 1789100586.231601,
+    "ast_hash": "4aa1fda519063a1af15cfc00521c093e",
+    "semantic_hash": "4aa1fda519063a1af15cfc00521c093e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/DispatchersModule.kt": {
+    "mtime": 1788771809.2094662,
+    "seen": 1789100586.231601,
+    "ast_hash": "b8bc4596b1d482b82f830dd37d1dd529",
+    "semantic_hash": "b8bc4596b1d482b82f830dd37d1dd529"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/PreferencesModule.kt": {
+    "mtime": 1788771809.2534165,
+    "seen": 1789100586.231602,
+    "ast_hash": "43521e4825c3e6714aac76791fb65cd2",
+    "semantic_hash": "43521e4825c3e6714aac76791fb65cd2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/ProcessingModule.kt": {
+    "mtime": 1788771809.2358563,
+    "seen": 1789100586.231602,
+    "ast_hash": "1479c34117b93cb9e5c9078633f9e4fa",
+    "semantic_hash": "1479c34117b93cb9e5c9078633f9e4fa"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/RepositoryModule.kt": {
+    "mtime": 1788771809.230319,
+    "seen": 1789100586.231603,
+    "ast_hash": "e02dc5b0ea0a798b4505f63134f76fdf",
+    "semantic_hash": "e02dc5b0ea0a798b4505f63134f76fdf"
+  },
+  "app/src/main/java/com/hightechif/openkamera/di/ServiceModule.kt": {
+    "mtime": 1788771809.2214723,
+    "seen": 1789100586.231603,
+    "ast_hash": "d43d5d2860b368050ae78128250cd7d3",
+    "semantic_hash": "d43d5d2860b368050ae78128250cd7d3"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/engine/IAudioController.kt": {
+    "mtime": 1788771810.0716906,
+    "seen": 1789100586.2316039,
+    "ast_hash": "cd57656a44a68d52616229950286873a",
+    "semantic_hash": "cd57656a44a68d52616229950286873a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/engine/ICameraEngine.kt": {
+    "mtime": 1788771810.058799,
+    "seen": 1789100586.231605,
+    "ast_hash": "be8b5ca3ec4f120f6be7cfcfdf5165a7",
+    "semantic_hash": "be8b5ca3ec4f120f6be7cfcfdf5165a7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/engine/IImageProcessor.kt": {
+    "mtime": 1788771810.0523846,
+    "seen": 1789100586.231605,
+    "ast_hash": "9da467fdc373649d274b880b3c07e221",
+    "semantic_hash": "9da467fdc373649d274b880b3c07e221"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/engine/IRemoteInputManager.kt": {
+    "mtime": 1788771810.0652971,
+    "seen": 1789100586.231605,
+    "ast_hash": "f9097853f9e725bcbd247936c4fc410a",
+    "semantic_hash": "f9097853f9e725bcbd247936c4fc410a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/interactor/CameraSettingsInteractor.kt": {
+    "mtime": 1788771810.0783257,
+    "seen": 1789100586.231606,
+    "ast_hash": "b84dddc2b7f14d8a0aa599b9a9bb4aca",
+    "semantic_hash": "b84dddc2b7f14d8a0aa599b9a9bb4aca"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/model/CameraModels.kt": {
+    "mtime": 1788771809.9959698,
+    "seen": 1789100586.231606,
+    "ast_hash": "edd407e1f52d80d450cb5ae65b796327",
+    "semantic_hash": "edd407e1f52d80d450cb5ae65b796327"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/model/CaptureModels.kt": {
+    "mtime": 1788771810.001934,
+    "seen": 1789100586.231607,
+    "ast_hash": "31c29aaa8333271617ce649844569cb7",
+    "semantic_hash": "31c29aaa8333271617ce649844569cb7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/model/TelemetryModels.kt": {
+    "mtime": 1788771810.0080712,
+    "seen": 1789100586.231607,
+    "ast_hash": "9ce64286d9f3ee4cace9b244564b72c7",
+    "semantic_hash": "9ce64286d9f3ee4cace9b244564b72c7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/model/VideoModels.kt": {
+    "mtime": 1788771810.0138285,
+    "seen": 1789100586.2316082,
+    "ast_hash": "74e46c74ac9bd8fb2eb20a5ddfd5b522",
+    "semantic_hash": "74e46c74ac9bd8fb2eb20a5ddfd5b522"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/ILocationRepository.kt": {
+    "mtime": 1788771809.977593,
+    "seen": 1789100586.2316082,
+    "ast_hash": "b169a6d01e648da2b31d784c56f64d9b",
+    "semantic_hash": "b169a6d01e648da2b31d784c56f64d9b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/IMediaRepository.kt": {
+    "mtime": 1788771809.9828675,
+    "seen": 1789100586.231609,
+    "ast_hash": "5c3188f84162c57a101a0f3f4eee30ec",
+    "semantic_hash": "5c3188f84162c57a101a0f3f4eee30ec"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/ISensorRepository.kt": {
+    "mtime": 1788771809.9882588,
+    "seen": 1789100586.231609,
+    "ast_hash": "c0078339556118134bead6d6a0415fef",
+    "semantic_hash": "c0078339556118134bead6d6a0415fef"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/ISettingsRepository.kt": {
+    "mtime": 1788771809.9393167,
+    "seen": 1789100586.231609,
+    "ast_hash": "3a1b1992f462e70e625f929d1acdf57c",
+    "semantic_hash": "3a1b1992f462e70e625f929d1acdf57c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/CameraPreferencesRepository.kt": {
+    "mtime": 1788776102.0137484,
+    "seen": 1789100586.23161,
+    "ast_hash": "88707fa7f13c6b3763c0ce35c07d215f",
+    "semantic_hash": "88707fa7f13c6b3763c0ce35c07d215f"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/LocationPreferencesRepository.kt": {
+    "mtime": 1788771809.966277,
+    "seen": 1789100586.23161,
+    "ast_hash": "00df5c3074fd68d3019674e9aca76951",
+    "semantic_hash": "00df5c3074fd68d3019674e9aca76951"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/PhotoPreferencesRepository.kt": {
+    "mtime": 1788776110.7285554,
+    "seen": 1789100586.2316108,
+    "ast_hash": "b6ce09c1d3f37ed0a78b6b75aaa689e9",
+    "semantic_hash": "b6ce09c1d3f37ed0a78b6b75aaa689e9"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/UiHudPreferencesRepository.kt": {
+    "mtime": 1788771809.9454908,
+    "seen": 1789100586.2316108,
+    "ast_hash": "eb12c25a696de8ff3bdbe625410c9a6e",
+    "semantic_hash": "eb12c25a696de8ff3bdbe625410c9a6e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/VideoPreferencesRepository.kt": {
+    "mtime": 1788776092.427162,
+    "seen": 1789100586.231612,
+    "ast_hash": "ce6ec302c3418e74d9d0a23ca7a908b6",
+    "semantic_hash": "ce6ec302c3418e74d9d0a23ca7a908b6"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/usecase/CameraControlUseCases.kt": {
+    "mtime": 1788771810.0402136,
+    "seen": 1789100586.231612,
+    "ast_hash": "a41819ef626eb5e8ffe5f0d8ed215281",
+    "semantic_hash": "a41819ef626eb5e8ffe5f0d8ed215281"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/usecase/CapturePhotoUseCase.kt": {
+    "mtime": 1788771810.0341084,
+    "seen": 1789100586.231612,
+    "ast_hash": "c0cd15fcd0f4af77071c2a8356ea943e",
+    "semantic_hash": "c0cd15fcd0f4af77071c2a8356ea943e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/usecase/ProcessHdrUseCase.kt": {
+    "mtime": 1788771810.02873,
+    "seen": 1789100586.231613,
+    "ast_hash": "862cf959246b14afc100157aa5f9dcc2",
+    "semantic_hash": "862cf959246b14afc100157aa5f9dcc2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/usecase/ProcessPanoramaUseCase.kt": {
+    "mtime": 1788771810.0458515,
+    "seen": 1789100586.231613,
+    "ast_hash": "91207dedd590fdb6729d8f21ff9c4310",
+    "semantic_hash": "91207dedd590fdb6729d8f21ff9c4310"
+  },
+  "app/src/main/java/com/hightechif/openkamera/domain/usecase/RecordVideoUseCase.kt": {
+    "mtime": 1788771810.0198336,
+    "seen": 1789100586.2316139,
+    "ast_hash": "9fca5518ef4cd3c439c9b2dfe2dbf14e",
+    "semantic_hash": "9fca5518ef4cd3c439c9b2dfe2dbf14e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/lifecycle/CameraLifecycleCoordinator.kt": {
+    "mtime": 1788771809.3572052,
+    "seen": 1789100586.2316139,
+    "ast_hash": "c980a79487deea67a633f64a54ef814f",
+    "semantic_hash": "c980a79487deea67a633f64a54ef814f"
+  },
+  "app/src/main/java/com/hightechif/openkamera/lifecycle/OrientationLifecycleManager.kt": {
+    "mtime": 1788772090.4244187,
+    "seen": 1789100586.231615,
+    "ast_hash": "1952995596e5d1f8c72f042c6a27766c",
+    "semantic_hash": "1952995596e5d1f8c72f042c6a27766c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/MyPreferenceFragment.kt": {
+    "mtime": 1788771808.869687,
+    "seen": 1789100586.231615,
+    "ast_hash": "0da42c1c4201411422c7f1198ac5b7c2",
+    "semantic_hash": "0da42c1c4201411422c7f1198ac5b7c2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceKeys.kt": {
+    "mtime": 1788771808.89976,
+    "seen": 1789100586.231616,
+    "ast_hash": "ce8011a58e6cdb90f714a4ab006ba1d7",
+    "semantic_hash": "ce8011a58e6cdb90f714a4ab006ba1d7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubCameraControlsMore.kt": {
+    "mtime": 1788772090.4249675,
+    "seen": 1789100586.231616,
+    "ast_hash": "95f6f7efb8dcbf269bfb6ef600ccdab7",
+    "semantic_hash": "95f6f7efb8dcbf269bfb6ef600ccdab7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubGUI.kt": {
+    "mtime": 1788771808.889474,
+    "seen": 1789100586.231616,
+    "ast_hash": "e97449b6db2e148f332ee1a94079741a",
+    "semantic_hash": "e97449b6db2e148f332ee1a94079741a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubLicences.kt": {
+    "mtime": 1788771808.8339329,
+    "seen": 1789100586.231617,
+    "ast_hash": "8949998ad56aca88ae11cc6e89f20d02",
+    "semantic_hash": "8949998ad56aca88ae11cc6e89f20d02"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubLocation.kt": {
+    "mtime": 1788771808.9179454,
+    "seen": 1789100586.231617,
+    "ast_hash": "a70146517d72c7e55be0bc15d8be2660",
+    "semantic_hash": "a70146517d72c7e55be0bc15d8be2660"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubPhoto.kt": {
+    "mtime": 1788771808.855897,
+    "seen": 1789100586.2316182,
+    "ast_hash": "d39f6e4e5717b3f6337160fdac9abd5f",
+    "semantic_hash": "d39f6e4e5717b3f6337160fdac9abd5f"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubPreview.kt": {
+    "mtime": 1788771808.905718,
+    "seen": 1789100586.2316182,
+    "ast_hash": "d071ee8c9f4a2b4467697b14a6f975e5",
+    "semantic_hash": "d071ee8c9f4a2b4467697b14a6f975e5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubProcessing.kt": {
+    "mtime": 1788771808.8620994,
+    "seen": 1789100586.2316191,
+    "ast_hash": "372f23a915eb36fa90d12d61258f1621",
+    "semantic_hash": "372f23a915eb36fa90d12d61258f1621"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubRemoteCtrl.kt": {
+    "mtime": 1788771808.8761787,
+    "seen": 1789100586.2316191,
+    "ast_hash": "c686a92877aeb7cce8a82f883d606588",
+    "semantic_hash": "c686a92877aeb7cce8a82f883d606588"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubScreen.kt": {
+    "mtime": 1788771808.8821306,
+    "seen": 1789100586.2316191,
+    "ast_hash": "12e2ab98c53fd9be50eca65cd5331e6e",
+    "semantic_hash": "12e2ab98c53fd9be50eca65cd5331e6e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubSettingsManager.kt": {
+    "mtime": 1788772090.4255583,
+    "seen": 1789100586.23162,
+    "ast_hash": "5f64ffc73c5aa9ca56d0e3da445fed6c",
+    "semantic_hash": "5f64ffc73c5aa9ca56d0e3da445fed6c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/PreferenceSubVideo.kt": {
+    "mtime": 1788771808.8207653,
+    "seen": 1789100586.23162,
+    "ast_hash": "57da92280295929c946fb2be9a75ac73",
+    "semantic_hash": "57da92280295929c946fb2be9a75ac73"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/SettingsManager.kt": {
+    "mtime": 1788771808.8486311,
+    "seen": 1789100586.231621,
+    "ast_hash": "27dd85ada47bdb7387fbd230fd331513",
+    "semantic_hash": "27dd85ada47bdb7387fbd230fd331513"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preferences/SettingsRepositoryImpl.kt": {
+    "mtime": 1788771808.8270354,
+    "seen": 1789100586.231621,
+    "ast_hash": "91972ae10c313bf0cf834bb790fafddc",
+    "semantic_hash": "91972ae10c313bf0cf834bb790fafddc"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/ApplicationInterface.kt": {
+    "mtime": 1788771809.73964,
+    "seen": 1789100586.231622,
+    "ast_hash": "dbe0a77c004be9d4956971b7ffb088c6",
+    "semantic_hash": "dbe0a77c004be9d4956971b7ffb088c6"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/BasicApplicationInterface.kt": {
+    "mtime": 1788771809.733415,
+    "seen": 1789100586.231622,
+    "ast_hash": "a324b87b0d2e2090abcab41d03cea4a5",
+    "semantic_hash": "a324b87b0d2e2090abcab41d03cea4a5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/CameraCaptureStateMachine.kt": {
+    "mtime": 1788771809.7452078,
+    "seen": 1789100586.231623,
+    "ast_hash": "c781df7b937199ea56a880fd382e0c30",
+    "semantic_hash": "c781df7b937199ea56a880fd382e0c30"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/CameraSettingsInterface.kt": {
+    "mtime": 1788771809.590004,
+    "seen": 1789100586.231623,
+    "ast_hash": "8240705f9f6842ea56292503f32362b5",
+    "semantic_hash": "8240705f9f6842ea56292503f32362b5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/CanvasView.kt": {
+    "mtime": 1788771809.8565238,
+    "seen": 1789100586.231623,
+    "ast_hash": "f78983bb9547373334cd4740719fe4d1",
+    "semantic_hash": "f78983bb9547373334cd4740719fe4d1"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/Preview.kt": {
+    "mtime": 1788771809.7836487,
+    "seen": 1789100586.231624,
+    "ast_hash": "70ae12e9047facc31becf5b560710002",
+    "semantic_hash": "70ae12e9047facc31becf5b560710002"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/PreviewCaptureCoordinator.kt": {
+    "mtime": 1788771809.700518,
+    "seen": 1789100586.231624,
+    "ast_hash": "7fc70b03546393382ef0e35cc50bbf8a",
+    "semantic_hash": "7fc70b03546393382ef0e35cc50bbf8a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/VideoProfile.kt": {
+    "mtime": 1788771809.751161,
+    "seen": 1789100586.2316248,
+    "ast_hash": "3eb9f65c22961c780e65deff451daf62",
+    "semantic_hash": "3eb9f65c22961c780e65deff451daf62"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/VideoQualityHandler.kt": {
+    "mtime": 1788771809.8502536,
+    "seen": 1789100586.2316248,
+    "ast_hash": "7063f78d4abf7c205d989b0dbd95876e",
+    "semantic_hash": "7063f78d4abf7c205d989b0dbd95876e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/FocusPeakingProcessor.kt": {
+    "mtime": 1788771809.6945307,
+    "seen": 1789100586.231626,
+    "ast_hash": "6e1898aefa9d949a5a2935309cd5c3ad",
+    "semantic_hash": "6e1898aefa9d949a5a2935309cd5c3ad"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/FrameAnalysisConfig.kt": {
+    "mtime": 1788771809.6519704,
+    "seen": 1789100586.231626,
+    "ast_hash": "be3f533ab9d2d7f46b16467d1f176d3d",
+    "semantic_hash": "be3f533ab9d2d7f46b16467d1f176d3d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/FrameAnalysisResult.kt": {
+    "mtime": 1788771809.6744995,
+    "seen": 1789100586.231626,
+    "ast_hash": "84c73cf1b1b74550476aa1a3069aa3b6",
+    "semantic_hash": "84c73cf1b1b74550476aa1a3069aa3b6"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/HistogramProcessor.kt": {
+    "mtime": 1788771809.6883845,
+    "seen": 1789100586.231627,
+    "ast_hash": "c6bb8a354d59b493e2be23b6b78249fb",
+    "semantic_hash": "c6bb8a354d59b493e2be23b6b78249fb"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/HistogramType.kt": {
+    "mtime": 1788771809.663001,
+    "seen": 1789100586.231627,
+    "ast_hash": "4d778d1dc0af90f40f0cf245123e63f7",
+    "semantic_hash": "4d778d1dc0af90f40f0cf245123e63f7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/PreShotsRingBuffer.kt": {
+    "mtime": 1788771809.6809847,
+    "seen": 1789100586.231628,
+    "ast_hash": "eb798b48431e5322feb4f33d6e7abe41",
+    "semantic_hash": "eb798b48431e5322feb4f33d6e7abe41"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/PreviewFrameAnalyzer.kt": {
+    "mtime": 1788771809.6687748,
+    "seen": 1789100586.231628,
+    "ast_hash": "8bf544d963549d739450b150889b9e55",
+    "semantic_hash": "8bf544d963549d739450b150889b9e55"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/PreviewFrameEffectsProcessor.kt": {
+    "mtime": 1788771809.646258,
+    "seen": 1789100586.2316291,
+    "ast_hash": "253ef7fec98b4eb82a012f5d45878865",
+    "semantic_hash": "253ef7fec98b4eb82a012f5d45878865"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/analysis/ZebraStripesProcessor.kt": {
+    "mtime": 1788771809.6574512,
+    "seen": 1789100586.2316291,
+    "ast_hash": "7b716af75d0a4bb0b36c59f419f327fb",
+    "semantic_hash": "7b716af75d0a4bb0b36c59f419f327fb"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/camerasurface/CameraSurface.kt": {
+    "mtime": 1788771809.8824024,
+    "seen": 1789100586.23163,
+    "ast_hash": "4178073315c8ead15eeb74fb48f1b967",
+    "semantic_hash": "4178073315c8ead15eeb74fb48f1b967"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/camerasurface/MySurfaceView.kt": {
+    "mtime": 1788771809.8698614,
+    "seen": 1789100586.23163,
+    "ast_hash": "1868ab71da2e3768f6b589e1f8720407",
+    "semantic_hash": "1868ab71da2e3768f6b589e1f8720407"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/camerasurface/MyTextureView.kt": {
+    "mtime": 1788771809.8760452,
+    "seen": 1789100586.23163,
+    "ast_hash": "a94dd6dcefb7381a98b89da1e7dd654b",
+    "semantic_hash": "a94dd6dcefb7381a98b89da1e7dd654b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/camerasurface/PreviewSurfaceManager.kt": {
+    "mtime": 1788771809.8631797,
+    "seen": 1789100586.231631,
+    "ast_hash": "b877a2a64c628c5f2f3f5af21eca6aee",
+    "semantic_hash": "b877a2a64c628c5f2f3f5af21eca6aee"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/faces/PreviewFaceDetectionEngine.kt": {
+    "mtime": 1788771809.8889785,
+    "seen": 1789100586.231631,
+    "ast_hash": "3f6ed85cedd22108bdb2d71a315af3f7",
+    "semantic_hash": "3f6ed85cedd22108bdb2d71a315af3f7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/geometry/FocusMeteringArea.kt": {
+    "mtime": 1788771809.8153517,
+    "seen": 1789100586.2316318,
+    "ast_hash": "cb6f67ff2eef1d27008ddaa2d7744888",
+    "semantic_hash": "cb6f67ff2eef1d27008ddaa2d7744888"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/geometry/PreviewMatrixCalculator.kt": {
+    "mtime": 1788771809.841407,
+    "seen": 1789100586.2316318,
+    "ast_hash": "d59defc00f54f424102509ba579e03f4",
+    "semantic_hash": "d59defc00f54f424102509ba579e03f4"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/geometry/ViewportDimensions.kt": {
+    "mtime": 1788771809.8322883,
+    "seen": 1789100586.231633,
+    "ast_hash": "f92a9753ef2eb565557428a90d09e1fe",
+    "semantic_hash": "f92a9753ef2eb565557428a90d09e1fe"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/geometry/ViewportTransformHelper.kt": {
+    "mtime": 1788771809.8235447,
+    "seen": 1789100586.231633,
+    "ast_hash": "1dd50ebcb05336f01bc46c37c2709fd1",
+    "semantic_hash": "1dd50ebcb05336f01bc46c37c2709fd1"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/gesture/PreviewGestureHandler.kt": {
+    "mtime": 1788771809.7593591,
+    "seen": 1789100586.231633,
+    "ast_hash": "5370104fecf4a054e9fe19fec894be7e",
+    "semantic_hash": "5370104fecf4a054e9fe19fec894be7e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/gesture/PreviewTouchGestureCoordinator.kt": {
+    "mtime": 1788771809.7649622,
+    "seen": 1789100586.231634,
+    "ast_hash": "6ae49b81f8bda24b6341bf6eed5a0f3e",
+    "semantic_hash": "6ae49b81f8bda24b6341bf6eed5a0f3e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/sensor/PreviewSensorManager.kt": {
+    "mtime": 1788771809.7923474,
+    "seen": 1789100586.231634,
+    "ast_hash": "f4409e775d25bd95bbdb846012b2ebdb",
+    "semantic_hash": "f4409e775d25bd95bbdb846012b2ebdb"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/setup/PreviewCameraSetupHelper.kt": {
+    "mtime": 1788771809.7232187,
+    "seen": 1789100586.2316349,
+    "ast_hash": "657ebc6f85724a2db998c0decfe5f3db",
+    "semantic_hash": "657ebc6f85724a2db998c0decfe5f3db"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/timer/BurstScheduleConfig.kt": {
+    "mtime": 1788771809.7174187,
+    "seen": 1789100586.2316349,
+    "ast_hash": "72fe669b2f8874b575da39339fe4e4ad",
+    "semantic_hash": "72fe669b2f8874b575da39339fe4e4ad"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/timer/CaptureTimerCoordinator.kt": {
+    "mtime": 1788771809.7060246,
+    "seen": 1789100586.231636,
+    "ast_hash": "502e7e59e27400e3aa6fdf0d45ebdd67",
+    "semantic_hash": "502e7e59e27400e3aa6fdf0d45ebdd67"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/timer/CountdownState.kt": {
+    "mtime": 1788771809.7118955,
+    "seen": 1789100586.231636,
+    "ast_hash": "08abec92933228bdc31fe07ef0cd7f78",
+    "semantic_hash": "08abec92933228bdc31fe07ef0cd7f78"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/PreviewVideoManager.kt": {
+    "mtime": 1788771809.6048443,
+    "seen": 1789100586.231636,
+    "ast_hash": "47cf51f93f7aa10b6d3fecbb028a5a02",
+    "semantic_hash": "47cf51f93f7aa10b6d3fecbb028a5a02"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoProfileResolver.kt": {
+    "mtime": 1788771809.6339488,
+    "seen": 1789100586.231637,
+    "ast_hash": "7883cfecde9dd6ece1477ade6482cb2c",
+    "semantic_hash": "7883cfecde9dd6ece1477ade6482cb2c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoRecorderEngine.kt": {
+    "mtime": 1788771809.6283412,
+    "seen": 1789100586.231637,
+    "ast_hash": "fe906e1cf094158b077813c2b9c87851",
+    "semantic_hash": "fe906e1cf094158b077813c2b9c87851"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoRecordingConfig.kt": {
+    "mtime": 1788771809.6104383,
+    "seen": 1789100586.231638,
+    "ast_hash": "5501f4ff90777d0e3d4779fe630cc38c",
+    "semantic_hash": "5501f4ff90777d0e3d4779fe630cc38c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoRecordingCoordinator.kt": {
+    "mtime": 1788771809.6168284,
+    "seen": 1789100586.231638,
+    "ast_hash": "1e54a0c9044aa0aaea0cc0c20a14163f",
+    "semantic_hash": "1e54a0c9044aa0aaea0cc0c20a14163f"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoSessionManager.kt": {
+    "mtime": 1788771809.6399858,
+    "seen": 1789100586.2316391,
+    "ast_hash": "1da2804738addde5c5b5a0254922e4db",
+    "semantic_hash": "1da2804738addde5c5b5a0254922e4db"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoSessionOutput.kt": {
+    "mtime": 1788771809.5992112,
+    "seen": 1789100586.2316391,
+    "ast_hash": "b7bc5bd891fd3f6db6dc7c1a8f6d5380",
+    "semantic_hash": "b7bc5bd891fd3f6db6dc7c1a8f6d5380"
+  },
+  "app/src/main/java/com/hightechif/openkamera/preview/video/VideoSessionState.kt": {
+    "mtime": 1788771809.6225934,
+    "seen": 1789100586.23164,
+    "ast_hash": "e8a66181891a314cff109992694be536",
+    "semantic_hash": "e8a66181891a314cff109992694be536"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/HDRProcessor.kt": {
+    "mtime": 1788771809.3043253,
+    "seen": 1789100586.23164,
+    "ast_hash": "f6201765daea628ff32673e18f34d918",
+    "semantic_hash": "f6201765daea628ff32673e18f34d918"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/HDRProcessorException.kt": {
+    "mtime": 1788771809.3199244,
+    "seen": 1789100586.23164,
+    "ast_hash": "bef8b726e808b9c1b09642500763dcc9",
+    "semantic_hash": "bef8b726e808b9c1b09642500763dcc9"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/ImageProcessorImpl.kt": {
+    "mtime": 1788771809.288867,
+    "seen": 1789100586.231641,
+    "ast_hash": "7e5fc343d1d50ba1da4d952e84c9a16d",
+    "semantic_hash": "7e5fc343d1d50ba1da4d952e84c9a16d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/JavaImageFunctionsHDR.kt": {
+    "mtime": 1788771809.3292222,
+    "seen": 1789100586.231642,
+    "ast_hash": "5b8f3db97a7021fc7ba360f23bb7ffa4",
+    "semantic_hash": "5b8f3db97a7021fc7ba360f23bb7ffa4"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/JavaImageFunctionsPanorama.kt": {
+    "mtime": 1788771809.261542,
+    "seen": 1789100586.231642,
+    "ast_hash": "2ba83399fae20011aac7d5d292cefa7a",
+    "semantic_hash": "2ba83399fae20011aac7d5d292cefa7a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/JavaImageFunctionsPreview.kt": {
+    "mtime": 1788771809.2765164,
+    "seen": 1789100586.231643,
+    "ast_hash": "272c26ff8d51a40c322e49531c9bef43",
+    "semantic_hash": "272c26ff8d51a40c322e49531c9bef43"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/JavaImageProcessing.kt": {
+    "mtime": 1788771809.282876,
+    "seen": 1789100586.231643,
+    "ast_hash": "461c465e06924a478068483579c11509",
+    "semantic_hash": "461c465e06924a478068483579c11509"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/NativeImageProcessorBridge.kt": {
+    "mtime": 1788771809.2699046,
+    "seen": 1789100586.231644,
+    "ast_hash": "c72e90fdcc3c85162f6b8f0afc189fe2",
+    "semantic_hash": "c72e90fdcc3c85162f6b8f0afc189fe2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/PanoramaProcessor.kt": {
+    "mtime": 1788771809.3137405,
+    "seen": 1789100586.231644,
+    "ast_hash": "000f24474514d032c5f55049cc5a9ef8",
+    "semantic_hash": "000f24474514d032c5f55049cc5a9ef8"
+  },
+  "app/src/main/java/com/hightechif/openkamera/processing/PanoramaProcessorException.kt": {
+    "mtime": 1788771809.2950811,
+    "seen": 1789100586.2316449,
+    "ast_hash": "1b2eed85ec415431739881cb54f2bc0d",
+    "semantic_hash": "1b2eed85ec415431739881cb54f2bc0d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/remotecontrol/BluetoothLeService.kt": {
+    "mtime": 1788771809.925929,
+    "seen": 1789100586.2316449,
+    "ast_hash": "7aa9976f3f042d4e963b20182a228404",
+    "semantic_hash": "7aa9976f3f042d4e963b20182a228404"
+  },
+  "app/src/main/java/com/hightechif/openkamera/remotecontrol/BluetoothRemoteControl.kt": {
+    "mtime": 1788771809.9052508,
+    "seen": 1789100586.2316449,
+    "ast_hash": "91779196adea075b1d0bb6123b254eb4",
+    "semantic_hash": "91779196adea075b1d0bb6123b254eb4"
+  },
+  "app/src/main/java/com/hightechif/openkamera/remotecontrol/DeviceScanner.kt": {
+    "mtime": 1788771809.9126284,
+    "seen": 1789100586.231646,
+    "ast_hash": "e2bbc56abb1b9ab22e577b0349b385e0",
+    "semantic_hash": "e2bbc56abb1b9ab22e577b0349b385e0"
+  },
+  "app/src/main/java/com/hightechif/openkamera/remotecontrol/KrakenGattAttributes.kt": {
+    "mtime": 1788771809.9191031,
+    "seen": 1789100586.231646,
+    "ast_hash": "13b5f0cb69e7d263719bd24f534b3f70",
+    "semantic_hash": "13b5f0cb69e7d263719bd24f534b3f70"
+  },
+  "app/src/main/java/com/hightechif/openkamera/remotecontrol/RemoteInputManagerImpl.kt": {
+    "mtime": 1788771809.932523,
+    "seen": 1789100586.231647,
+    "ast_hash": "df487c74661eaf7c5cca10f10b5e340d",
+    "semantic_hash": "df487c74661eaf7c5cca10f10b5e340d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/sensors/GyroSensor.kt": {
+    "mtime": 1788771808.795472,
+    "seen": 1789100586.231647,
+    "ast_hash": "aecb0cc572d462ad32d1ed88a1b759af",
+    "semantic_hash": "aecb0cc572d462ad32d1ed88a1b759af"
+  },
+  "app/src/main/java/com/hightechif/openkamera/sensors/LocationRepositoryImpl.kt": {
+    "mtime": 1788771808.779424,
+    "seen": 1789100586.231648,
+    "ast_hash": "0918be52d6414785710579ca058994ce",
+    "semantic_hash": "0918be52d6414785710579ca058994ce"
+  },
+  "app/src/main/java/com/hightechif/openkamera/sensors/LocationSupplier.kt": {
+    "mtime": 1788771808.8015733,
+    "seen": 1789100586.231648,
+    "ast_hash": "1797810a9e777d72a12136cb0ff0e194",
+    "semantic_hash": "1797810a9e777d72a12136cb0ff0e194"
+  },
+  "app/src/main/java/com/hightechif/openkamera/sensors/MagneticSensor.kt": {
+    "mtime": 1788771808.8100753,
+    "seen": 1789100586.231648,
+    "ast_hash": "88f030c7ae74f7ca177fa61b70c1fa94",
+    "semantic_hash": "88f030c7ae74f7ca177fa61b70c1fa94"
+  },
+  "app/src/main/java/com/hightechif/openkamera/sensors/SensorRepositoryImpl.kt": {
+    "mtime": 1788771808.787426,
+    "seen": 1789100586.231649,
+    "ast_hash": "db05d3a0aa95ce816033d90703e2102b",
+    "semantic_hash": "db05d3a0aa95ce816033d90703e2102b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/BitmapPostProcessor.kt": {
+    "mtime": 1788771809.492054,
+    "seen": 1789100586.231649,
+    "ast_hash": "992d17a6527a535c6c2ae073994aea98",
+    "semantic_hash": "992d17a6527a535c6c2ae073994aea98"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/ExifUtils.kt": {
+    "mtime": 1788771809.449989,
+    "seen": 1789100586.23165,
+    "ast_hash": "bb2d832220a852d88673c2543fac275d",
+    "semantic_hash": "bb2d832220a852d88673c2543fac275d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/ImageSavePipeline.kt": {
+    "mtime": 1788771809.4728193,
+    "seen": 1789100586.23165,
+    "ast_hash": "6f323a95f442dd6e8a6b75dc049fca30",
+    "semantic_hash": "6f323a95f442dd6e8a6b75dc049fca30"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/ImageSaveQueueState.kt": {
+    "mtime": 1788771809.4420571,
+    "seen": 1789100586.231651,
+    "ast_hash": "072a299d9c9a76daebf1580ce9717ecf",
+    "semantic_hash": "072a299d9c9a76daebf1580ce9717ecf"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/ImageSaver.kt": {
+    "mtime": 1788772090.426705,
+    "seen": 1789100586.231651,
+    "ast_hash": "7b2c35727ebcd1b15b42875693b543a5",
+    "semantic_hash": "7b2c35727ebcd1b15b42875693b543a5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/MediaPersistenceManager.kt": {
+    "mtime": 1788771809.4979255,
+    "seen": 1789100586.231651,
+    "ast_hash": "ddcfe0074ea9f9b5af42d39728bc4275",
+    "semantic_hash": "ddcfe0074ea9f9b5af42d39728bc4275"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/MediaProcessingWorker.kt": {
+    "mtime": 1788771809.5095818,
+    "seen": 1789100586.231652,
+    "ast_hash": "452cb07ea17300fdaefb6b384b023a39",
+    "semantic_hash": "452cb07ea17300fdaefb6b384b023a39"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/MediaStorageRepositoryImpl.kt": {
+    "mtime": 1788771809.4810753,
+    "seen": 1789100586.231652,
+    "ast_hash": "4ec6db7098ae98eaa01ce24e6a5d33bf",
+    "semantic_hash": "4ec6db7098ae98eaa01ce24e6a5d33bf"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/SaveLocationHistory.kt": {
+    "mtime": 1788771809.4867291,
+    "seen": 1789100586.2316532,
+    "ast_hash": "f67e8d1121703a8f68a68bb36414fc6d",
+    "semantic_hash": "f67e8d1121703a8f68a68bb36414fc6d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/SaveTask.kt": {
+    "mtime": 1788771809.5035114,
+    "seen": 1789100586.2316532,
+    "ast_hash": "ded544673dc587a80a1b96a9c58f0072",
+    "semantic_hash": "ded544673dc587a80a1b96a9c58f0072"
+  },
+  "app/src/main/java/com/hightechif/openkamera/storage/StorageUtils.kt": {
+    "mtime": 1788772090.4278371,
+    "seen": 1789100586.231654,
+    "ast_hash": "90dd2ede31f77917a08ab8ae9896ca2a",
+    "semantic_hash": "90dd2ede31f77917a08ab8ae9896ca2a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/KeyguardUtils.kt": {
+    "mtime": 1788771809.5343726,
+    "seen": 1789100586.231654,
+    "ast_hash": "a2fbffbe5972b0b6b5fbd5765c8d99a7",
+    "semantic_hash": "a2fbffbe5972b0b6b5fbd5765c8d99a7"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/MyTileService.kt": {
+    "mtime": 1788771809.5486107,
+    "seen": 1789100586.231654,
+    "ast_hash": "5a39479452a2d6716cf6530c5e828e28",
+    "semantic_hash": "5a39479452a2d6716cf6530c5e828e28"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/MyTileServiceFrontCamera.kt": {
+    "mtime": 1788771809.527497,
+    "seen": 1789100586.231655,
+    "ast_hash": "4d8111c28a47b7ba03c8da80690c1150",
+    "semantic_hash": "4d8111c28a47b7ba03c8da80690c1150"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/MyTileServiceVideo.kt": {
+    "mtime": 1788771809.5216753,
+    "seen": 1789100586.231655,
+    "ast_hash": "d3248b218ca9d605402dc48812c84e04",
+    "semantic_hash": "d3248b218ca9d605402dc48812c84e04"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/MyWidgetProviderTakePhoto.kt": {
+    "mtime": 1788771809.540002,
+    "seen": 1789100586.2316558,
+    "ast_hash": "6fe1b4e64a6033e90ccf6bff9246dba9",
+    "semantic_hash": "6fe1b4e64a6033e90ccf6bff9246dba9"
+  },
+  "app/src/main/java/com/hightechif/openkamera/system/PermissionHandler.kt": {
+    "mtime": 1788772090.4283998,
+    "seen": 1789100586.2316558,
+    "ast_hash": "4518a02239c339a598f4df0f0f6cbae2",
+    "semantic_hash": "4518a02239c339a598f4df0f0f6cbae2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/ArraySeekBarPreference.kt": {
+    "mtime": 1788772090.4292045,
+    "seen": 1789100586.231657,
+    "ast_hash": "2f8514eb996426f2fa133e0fee244b31",
+    "semantic_hash": "2f8514eb996426f2fa133e0fee244b31"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/CameraUiState.kt": {
+    "mtime": 1788771808.7313735,
+    "seen": 1789100586.231657,
+    "ast_hash": "c0f36265641f2d9031f274ee005fa10b",
+    "semantic_hash": "c0f36265641f2d9031f274ee005fa10b"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt": {
+    "mtime": 1788771808.7613664,
+    "seen": 1789100586.231658,
+    "ast_hash": "4454bc8298d5f5fe113c536cfe2af69a",
+    "semantic_hash": "4454bc8298d5f5fe113c536cfe2af69a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/DrawPreview.kt": {
+    "mtime": 1788772197.2914343,
+    "seen": 1789100586.231658,
+    "ast_hash": "387d78400e341a5bdd20929a60aee093",
+    "semantic_hash": "387d78400e341a5bdd20929a60aee093"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/FolderChooserDialog.kt": {
+    "mtime": 1788771808.6866956,
+    "seen": 1789100586.231659,
+    "ast_hash": "4408c09ed1f31625c9cabc3f290a1f56",
+    "semantic_hash": "4408c09ed1f31625c9cabc3f290a1f56"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/HudOverlayState.kt": {
+    "mtime": 1788771808.7232482,
+    "seen": 1789100586.231659,
+    "ast_hash": "508063f7cfea5c5570f643015618b95c",
+    "semantic_hash": "508063f7cfea5c5570f643015618b95c"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/MainUI.kt": {
+    "mtime": 1788778208.1839159,
+    "seen": 1789100586.2316601,
+    "ast_hash": "3ac62e687bcb68d433250c1d2a987c08",
+    "semantic_hash": "3ac62e687bcb68d433250c1d2a987c08"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/ManualSeekbars.kt": {
+    "mtime": 1788771808.7688892,
+    "seen": 1789100586.2316601,
+    "ast_hash": "b95301daa26adc73540c169e67d3a027",
+    "semantic_hash": "b95301daa26adc73540c169e67d3a027"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/MyEditTextPreference.kt": {
+    "mtime": 1788771808.7167451,
+    "seen": 1789100586.2316601,
+    "ast_hash": "3919a81350f39e31ae92d65fd9042d6f",
+    "semantic_hash": "3919a81350f39e31ae92d65fd9042d6f"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/PopupView.kt": {
+    "mtime": 1788771808.755197,
+    "seen": 1789100586.231661,
+    "ast_hash": "fcf8c9f76a295c874b310e4da3cd8afa",
+    "semantic_hash": "fcf8c9f76a295c874b310e4da3cd8afa"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/SettingsViewModel.kt": {
+    "mtime": 1788771808.7381544,
+    "seen": 1789100586.231661,
+    "ast_hash": "4d2aca130bd3c687e24bb751cd7cd753",
+    "semantic_hash": "4d2aca130bd3c687e24bb751cd7cd753"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/activity/DialogCoordinator.kt": {
+    "mtime": 1788771808.652169,
+    "seen": 1789100586.231662,
+    "ast_hash": "59bdf0ee4892d38c8074683420024e80",
+    "semantic_hash": "59bdf0ee4892d38c8074683420024e80"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/activity/KeyEventHandler.kt": {
+    "mtime": 1788777894.87939,
+    "seen": 1789100586.231662,
+    "ast_hash": "5253176046f959f694e6c710733a2766",
+    "semantic_hash": "5253176046f959f694e6c710733a2766"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/activity/PermissionManager.kt": {
+    "mtime": 1788772090.428941,
+    "seen": 1789100586.231663,
+    "ast_hash": "cf4f5a69184797b018f5b7f9ceeaed12",
+    "semantic_hash": "cf4f5a69184797b018f5b7f9ceeaed12"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/CropGuideOverlayRenderer.kt": {
+    "mtime": 1788771808.5987823,
+    "seen": 1789100586.231663,
+    "ast_hash": "4a9470df41245c0b8f60445e84ca0301",
+    "semantic_hash": "4a9470df41245c0b8f60445e84ca0301"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/DrawPreviewContext.kt": {
+    "mtime": 1788771808.618709,
+    "seen": 1789100586.2316642,
+    "ast_hash": "813d615acecbd2ebbb3487e6f41e9d61",
+    "semantic_hash": "813d615acecbd2ebbb3487e6f41e9d61"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/EffectOverlayRenderer.kt": {
+    "mtime": 1788771808.5897543,
+    "seen": 1789100586.2316642,
+    "ast_hash": "357107603aab3f7ea3f62998200ced34",
+    "semantic_hash": "357107603aab3f7ea3f62998200ced34"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/FocusFaceOverlayRenderer.kt": {
+    "mtime": 1788771808.6273556,
+    "seen": 1789100586.2316642,
+    "ast_hash": "7b420a19b09be3a257f9259b3856b75a",
+    "semantic_hash": "7b420a19b09be3a257f9259b3856b75a"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/GridOverlayRenderer.kt": {
+    "mtime": 1788771808.633917,
+    "seen": 1789100586.231665,
+    "ast_hash": "42f19e834164ad2cd5e15e3aeff538a0",
+    "semantic_hash": "42f19e834164ad2cd5e15e3aeff538a0"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/GyroTargetOverlayRenderer.kt": {
+    "mtime": 1788771808.6064377,
+    "seen": 1789100586.231665,
+    "ast_hash": "13b5f70410100b16ec43db6c27b68606",
+    "semantic_hash": "13b5f70410100b16ec43db6c27b68606"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/HorizonAngleOverlayRenderer.kt": {
+    "mtime": 1788771808.6407855,
+    "seen": 1789100586.2316658,
+    "ast_hash": "aa4e621336e9788109f22ed6165db0cd",
+    "semantic_hash": "aa4e621336e9788109f22ed6165db0cd"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/OverlayRenderer.kt": {
+    "mtime": 1788771808.5832207,
+    "seen": 1789100586.2316658,
+    "ast_hash": "b2cef3fa0d4f88e67bd657caed1de9ab",
+    "semantic_hash": "b2cef3fa0d4f88e67bd657caed1de9ab"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/RendererUtils.kt": {
+    "mtime": 1788771808.6464276,
+    "seen": 1789100586.231667,
+    "ast_hash": "d945794171b366a23df14227e0645dc5",
+    "semantic_hash": "d945794171b366a23df14227e0645dc5"
+  },
+  "app/src/main/java/com/hightechif/openkamera/ui/renderers/TelemetryHudOverlayRenderer.kt": {
+    "mtime": 1788771808.6130166,
+    "seen": 1789100586.231667,
+    "ast_hash": "e9c9abe2a22c2b6aafbea3234f564a8e",
+    "semantic_hash": "e9c9abe2a22c2b6aafbea3234f564a8e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/ExifHandler.kt": {
+    "mtime": 1788771809.3837435,
+    "seen": 1789100586.231668,
+    "ast_hash": "4df8eb0e4b332001f0778a0573275628",
+    "semantic_hash": "4df8eb0e4b332001f0778a0573275628"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/ImageUtils.kt": {
+    "mtime": 1788771809.3698094,
+    "seen": 1789100586.231668,
+    "ast_hash": "866d6de59c45a88c5b365ecd74d5068d",
+    "semantic_hash": "866d6de59c45a88c5b365ecd74d5068d"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/MultiCamHandler.kt": {
+    "mtime": 1788771809.425834,
+    "seen": 1789100586.231669,
+    "ast_hash": "9311250a15e6012c111864960ad6b218",
+    "semantic_hash": "9311250a15e6012c111864960ad6b218"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/MyDebug.kt": {
+    "mtime": 1788771809.4184828,
+    "seen": 1789100586.231669,
+    "ast_hash": "2afd802752075f8c69d297abe0a0d236",
+    "semantic_hash": "2afd802752075f8c69d297abe0a0d236"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/OnScreenIcons.kt": {
+    "mtime": 1788771809.376925,
+    "seen": 1789100586.231669,
+    "ast_hash": "52e7f9987fd1a3844205db3c07f1ba27",
+    "semantic_hash": "52e7f9987fd1a3844205db3c07f1ba27"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/PostProcessing.kt": {
+    "mtime": 1788771809.3918948,
+    "seen": 1789100586.23167,
+    "ast_hash": "4663422e39027c6797e278582f42b5ec",
+    "semantic_hash": "4663422e39027c6797e278582f42b5ec"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/Preshots.kt": {
+    "mtime": 1788771809.3636062,
+    "seen": 1789100586.23167,
+    "ast_hash": "d538b1c0dcb6bbaaecdbe6fb06e790dc",
+    "semantic_hash": "d538b1c0dcb6bbaaecdbe6fb06e790dc"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/SaveLocationHandler.kt": {
+    "mtime": 1788772167.3345287,
+    "seen": 1789100586.231671,
+    "ast_hash": "14bff93f891a53985dc5a120231c345e",
+    "semantic_hash": "14bff93f891a53985dc5a120231c345e"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/TextFormatter.kt": {
+    "mtime": 1788771809.397834,
+    "seen": 1789100586.231671,
+    "ast_hash": "73adfaf1b7942808cfb29e26b5c461b2",
+    "semantic_hash": "73adfaf1b7942808cfb29e26b5c461b2"
+  },
+  "app/src/main/java/com/hightechif/openkamera/utils/ToastBoxer.kt": {
+    "mtime": 1788771809.4039705,
+    "seen": 1789100586.231672,
+    "ast_hash": "1f445ac71eca83e74bd0748d695529dc",
+    "semantic_hash": "1f445ac71eca83e74bd0748d695529dc"
+  },
+  "app/src/test/java/com/hightechif/openkamera/MyApplicationInterfaceUnitTest.kt": {
+    "mtime": 1788066698.0103667,
+    "seen": 1789100586.231672,
+    "ast_hash": "c62cb5451c9692a4a01dfab1277ac419",
+    "semantic_hash": "c62cb5451c9692a4a01dfab1277ac419"
+  },
+  "app/src/test/java/com/hightechif/openkamera/audio/AudioControllerUnitTest.kt": {
+    "mtime": 1788766063.6980991,
+    "seen": 1789100586.231673,
+    "ast_hash": "fcc1d08e2311324393d3cf37f48b37f2",
+    "semantic_hash": "fcc1d08e2311324393d3cf37f48b37f2"
+  },
+  "app/src/test/java/com/hightechif/openkamera/audio/AudioListenerUnitTest.kt": {
+    "mtime": 1788766040.950063,
+    "seen": 1789100586.231673,
+    "ast_hash": "afd2bf5d8f4073164de15bc48f1c590a",
+    "semantic_hash": "afd2bf5d8f4073164de15bc48f1c590a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/Camera2EngineUnitTest.kt": {
+    "mtime": 1788066705.1184287,
+    "seen": 1789100586.2316742,
+    "ast_hash": "f5226918d49d78da667ee714cedf9632",
+    "semantic_hash": "f5226918d49d78da667ee714cedf9632"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/Camera2FacadeArchitectureUnitTest.kt": {
+    "mtime": 1788173472.6372705,
+    "seen": 1789100586.2316742,
+    "ast_hash": "31787ea396270c64503b21746e7129c9",
+    "semantic_hash": "31787ea396270c64503b21746e7129c9"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/CameraResolutionUnitTest.kt": {
+    "mtime": 1788025385.0738118,
+    "seen": 1789100586.231675,
+    "ast_hash": "05baa2b18d93a980ea9d0c342100aa0a",
+    "semantic_hash": "05baa2b18d93a980ea9d0c342100aa0a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/burst/Camera2CaptureCoordinatorTest.kt": {
+    "mtime": 1788727458.2855952,
+    "seen": 1789100586.231675,
+    "ast_hash": "d64a6f6db9605d2d52e27cbb2820823b",
+    "semantic_hash": "d64a6f6db9605d2d52e27cbb2820823b"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/burst/Camera2CaptureCoordinatorUnitTest.kt": {
+    "mtime": 1788165588.6950903,
+    "seen": 1789100586.231675,
+    "ast_hash": "ca827bac17438d64e4a67503473c73fd",
+    "semantic_hash": "ca827bac17438d64e4a67503473c73fd"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/capabilities/Camera2CapabilitiesResolverUnitTest.kt": {
+    "mtime": 1788729544.6888402,
+    "seen": 1789100586.2316759,
+    "ast_hash": "d4171d0e18dd372f848f8717d78e9ce0",
+    "semantic_hash": "d4171d0e18dd372f848f8717d78e9ce0"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/capabilities/Camera2InfoCacheTest.kt": {
+    "mtime": 1788694964.1519494,
+    "seen": 1789100586.2316759,
+    "ast_hash": "b72d3877d35fe6dea4866717dd2b36b7",
+    "semantic_hash": "b72d3877d35fe6dea4866717dd2b36b7"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/dispatcher/Camera2StateCallbackDispatcherUnitTest.kt": {
+    "mtime": 1788172892.914047,
+    "seen": 1789100586.2316768,
+    "ast_hash": "3ad234817ef8731b22a62ebc97f61650",
+    "semantic_hash": "3ad234817ef8731b22a62ebc97f61650"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/extension/Camera2ExtensionArchitectureUnitTest.kt": {
+    "mtime": 1788173197.5614583,
+    "seen": 1789100586.2316768,
+    "ast_hash": "0d1fe2d9fba6a9bd7a580e48647cbb13",
+    "semantic_hash": "0d1fe2d9fba6a9bd7a580e48647cbb13"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/focus/Camera23AControllerTest.kt": {
+    "mtime": 1788694998.3461096,
+    "seen": 1789100586.231678,
+    "ast_hash": "94a445a3982e28fc47ba28faeb9f222b",
+    "semantic_hash": "94a445a3982e28fc47ba28faeb9f222b"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/focus/Camera2FocusMeteringCoordinatorTest.kt": {
+    "mtime": 1788727458.2749279,
+    "seen": 1789100586.231678,
+    "ast_hash": "2a69fbde8190ae8f36463ca7a067842a",
+    "semantic_hash": "2a69fbde8190ae8f36463ca7a067842a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/focus/Camera2FocusMeteringCoordinatorUnitTest.kt": {
+    "mtime": 1788162928.3198164,
+    "seen": 1789100586.231678,
+    "ast_hash": "4596f527d26a94174a0808ee5a0478fd",
+    "semantic_hash": "4596f527d26a94174a0808ee5a0478fd"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/lifecycle/Camera2SessionManagerTest.kt": {
+    "mtime": 1788727253.7401192,
+    "seen": 1789100586.231679,
+    "ast_hash": "97f63d6a747c11e0424427e3a9f1542a",
+    "semantic_hash": "97f63d6a747c11e0424427e3a9f1542a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/lifecycle/Camera2SessionManagerUnitTest.kt": {
+    "mtime": 1788172551.5882673,
+    "seen": 1789100586.231679,
+    "ast_hash": "4a1f391b3f1c21a78ff251ba697a0403",
+    "semantic_hash": "4a1f391b3f1c21a78ff251ba697a0403"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/pipeline/Camera2ImageReaderPipelineUnitTest.kt": {
+    "mtime": 1788171191.5731719,
+    "seen": 1789100586.23168,
+    "ast_hash": "8daffc576e8245e00489c5de1d7f37d1",
+    "semantic_hash": "8daffc576e8245e00489c5de1d7f37d1"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/pipeline/Camera2PipelineManagerTest.kt": {
+    "mtime": 1788694977.8058627,
+    "seen": 1789100586.23168,
+    "ast_hash": "a9ff4180b9990fd8394091d936b5025a",
+    "semantic_hash": "a9ff4180b9990fd8394091d936b5025a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/request/Camera2RequestBuilderHelperUnitTest.kt": {
+    "mtime": 1788171612.3506095,
+    "seen": 1789100586.231681,
+    "ast_hash": "09c15eb43e3356e3f562d95db52350d1",
+    "semantic_hash": "09c15eb43e3356e3f562d95db52350d1"
+  },
+  "app/src/test/java/com/hightechif/openkamera/cameracontroller/threading/Camera2ThreadManagerUnitTest.kt": {
+    "mtime": 1788173007.9910247,
+    "seen": 1789100586.231681,
+    "ast_hash": "c898a5b3e35b87b3482d0190f77ddc71",
+    "semantic_hash": "c898a5b3e35b87b3482d0190f77ddc71"
+  },
+  "app/src/test/java/com/hightechif/openkamera/di/DispatchersModuleTest.kt": {
+    "mtime": 1787547328.5022707,
+    "seen": 1789100586.231682,
+    "ast_hash": "70320fa0ad55dcd903ae0fb821a92a55",
+    "semantic_hash": "70320fa0ad55dcd903ae0fb821a92a55"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/interactor/CameraSettingsInteractorTest.kt": {
+    "mtime": 1788686275.5949914,
+    "seen": 1789100586.231682,
+    "ast_hash": "f7bb5a81401cbd173c4aed7d81a1c7cc",
+    "semantic_hash": "f7bb5a81401cbd173c4aed7d81a1c7cc"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/model/CameraModelsTest.kt": {
+    "mtime": 1787547697.830069,
+    "seen": 1789100586.231682,
+    "ast_hash": "d05fb3aca09aa01a9a248de52e19f7a6",
+    "semantic_hash": "d05fb3aca09aa01a9a248de52e19f7a6"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/model/CaptureModelsTest.kt": {
+    "mtime": 1787547692.2729487,
+    "seen": 1789100586.231683,
+    "ast_hash": "b91c97a0aa93c3af5f1bba149ca09733",
+    "semantic_hash": "b91c97a0aa93c3af5f1bba149ca09733"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/model/TelemetryModelsTest.kt": {
+    "mtime": 1787547667.7151203,
+    "seen": 1789100586.231683,
+    "ast_hash": "f933a4ed7f5d6b683536c512cc6dbc78",
+    "semantic_hash": "f933a4ed7f5d6b683536c512cc6dbc78"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/repository/preferences/CameraPreferencesRepositoryTest.kt": {
+    "mtime": 1788685836.1068285,
+    "seen": 1789100586.2316842,
+    "ast_hash": "498b59f5543ea166a255781c95e78d04",
+    "semantic_hash": "498b59f5543ea166a255781c95e78d04"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/repository/preferences/LocationPreferencesRepositoryTest.kt": {
+    "mtime": 1788685816.008451,
+    "seen": 1789100586.2316842,
+    "ast_hash": "63ac10e1a9e4b70ec245643a406e888f",
+    "semantic_hash": "63ac10e1a9e4b70ec245643a406e888f"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/repository/preferences/PhotoPreferencesRepositoryTest.kt": {
+    "mtime": 1788685811.5210023,
+    "seen": 1789100586.2316852,
+    "ast_hash": "08cebc0fd792c94b1e47872129a3e14f",
+    "semantic_hash": "08cebc0fd792c94b1e47872129a3e14f"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/repository/preferences/UiHudPreferencesRepositoryTest.kt": {
+    "mtime": 1788688346.5190663,
+    "seen": 1789100586.2316852,
+    "ast_hash": "19ce1fb905f8a47f4446c79061498eb8",
+    "semantic_hash": "19ce1fb905f8a47f4446c79061498eb8"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/repository/preferences/VideoPreferencesRepositoryTest.kt": {
+    "mtime": 1788685807.2028482,
+    "seen": 1789100586.2316859,
+    "ast_hash": "f924ed08b0e93c513867dea20d0b251b",
+    "semantic_hash": "f924ed08b0e93c513867dea20d0b251b"
+  },
+  "app/src/test/java/com/hightechif/openkamera/domain/usecase/DomainUseCasesUnitTest.kt": {
+    "mtime": 1788764948.0926456,
+    "seen": 1789100586.2316859,
+    "ast_hash": "ef37fd734fc38979a4ef32bbce4f33f2",
+    "semantic_hash": "ef37fd734fc38979a4ef32bbce4f33f2"
+  },
+  "app/src/test/java/com/hightechif/openkamera/integration/CameraUdfIntegrationTest.kt": {
+    "mtime": 1787725393.0280688,
+    "seen": 1789100586.2316868,
+    "ast_hash": "c88f431dc8db765772505cd88c57d2de",
+    "semantic_hash": "c88f431dc8db765772505cd88c57d2de"
+  },
+  "app/src/test/java/com/hightechif/openkamera/lifecycle/CameraLifecycleCoordinatorTest.kt": {
+    "mtime": 1788719518.3377995,
+    "seen": 1789100586.2316868,
+    "ast_hash": "f7599748998091961ee7d13c2c62fcc7",
+    "semantic_hash": "f7599748998091961ee7d13c2c62fcc7"
+  },
+  "app/src/test/java/com/hightechif/openkamera/lifecycle/OrientationLifecycleManagerTest.kt": {
+    "mtime": 1788719509.516921,
+    "seen": 1789100586.2316868,
+    "ast_hash": "2f743fef293d51f2125fe60630fd10ae",
+    "semantic_hash": "2f743fef293d51f2125fe60630fd10ae"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preferences/PreferencesRepositoriesUnitTest.kt": {
+    "mtime": 1788763555.8546765,
+    "seen": 1789100586.231688,
+    "ast_hash": "4d13c88e3d84daee74830da6dff67017",
+    "semantic_hash": "4d13c88e3d84daee74830da6dff67017"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preferences/SettingsManagerUnitTest.kt": {
+    "mtime": 1788066709.7194974,
+    "seen": 1789100586.231688,
+    "ast_hash": "78a59fa754b3d40b646a5970224f2a2e",
+    "semantic_hash": "78a59fa754b3d40b646a5970224f2a2e"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preferences/SettingsPreferenceUnitTest.kt": {
+    "mtime": 1787735034.3443382,
+    "seen": 1789100586.231689,
+    "ast_hash": "136ba50d6fd127cedb2dd9e14a0d61f5",
+    "semantic_hash": "136ba50d6fd127cedb2dd9e14a0d61f5"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preferences/SettingsRepositoryUnitTest.kt": {
+    "mtime": 1787554097.3882768,
+    "seen": 1789100586.231689,
+    "ast_hash": "af4d1a252baee51c794ec77412dd0633",
+    "semantic_hash": "af4d1a252baee51c794ec77412dd0633"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/CameraCaptureStateMachineTest.kt": {
+    "mtime": 1788727772.3462088,
+    "seen": 1789100586.23169,
+    "ast_hash": "af80f2ade75ade6325037ef2abcfc7fb",
+    "semantic_hash": "af80f2ade75ade6325037ef2abcfc7fb"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/PreviewCaptureCoordinatorTest.kt": {
+    "mtime": 1788693180.1295843,
+    "seen": 1789100586.23169,
+    "ast_hash": "adee00974acbc877f49ef3d56c6286c9",
+    "semantic_hash": "adee00974acbc877f49ef3d56c6286c9"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/PreviewFpsUnitTest.kt": {
+    "mtime": 1787223166.906325,
+    "seen": 1789100586.2316911,
+    "ast_hash": "39649a6fa9a2c021a5641dfda124c069",
+    "semantic_hash": "39649a6fa9a2c021a5641dfda124c069"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/PreviewGestureHandlerTest.kt": {
+    "mtime": 1788764263.8130274,
+    "seen": 1789100586.2316911,
+    "ast_hash": "862de7b78b1db98f2b23eaa81354734f",
+    "semantic_hash": "862de7b78b1db98f2b23eaa81354734f"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/PreviewSensorManagerTest.kt": {
+    "mtime": 1788694598.2366056,
+    "seen": 1789100586.231692,
+    "ast_hash": "0f06845de89098fae6571af9ec872203",
+    "semantic_hash": "0f06845de89098fae6571af9ec872203"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/PreviewSurfaceManagerTest.kt": {
+    "mtime": 1788727766.5326197,
+    "seen": 1789100586.231692,
+    "ast_hash": "ae4fe6f05a42d705a368fe6203a2aa80",
+    "semantic_hash": "ae4fe6f05a42d705a368fe6203a2aa80"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/VideoProfileUnitTest.kt": {
+    "mtime": 1787999378.7269418,
+    "seen": 1789100586.231692,
+    "ast_hash": "9bfa294a664d098322b68a87c20afe4b",
+    "semantic_hash": "9bfa294a664d098322b68a87c20afe4b"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/VideoQualityUnitTest.kt": {
+    "mtime": 1787223166.9067268,
+    "seen": 1789100586.231693,
+    "ast_hash": "8db16ce3bf16149419c80521f91bb525",
+    "semantic_hash": "8db16ce3bf16149419c80521f91bb525"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/analysis/FocusPeakingProcessorUnitTest.kt": {
+    "mtime": 1788235934.4309192,
+    "seen": 1789100586.231693,
+    "ast_hash": "cd7db33505a2497380d41b68db369826",
+    "semantic_hash": "cd7db33505a2497380d41b68db369826"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/analysis/HistogramProcessorUnitTest.kt": {
+    "mtime": 1788235928.3612442,
+    "seen": 1789100586.231694,
+    "ast_hash": "123b160cd94ad65fba0395c0ff25151f",
+    "semantic_hash": "123b160cd94ad65fba0395c0ff25151f"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/analysis/PreviewFrameAnalyzerUnitTest.kt": {
+    "mtime": 1788159684.4637148,
+    "seen": 1789100586.231694,
+    "ast_hash": "c643229bdcefe004481ff2cab8b70265",
+    "semantic_hash": "c643229bdcefe004481ff2cab8b70265"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/analysis/PreviewFrameEffectsProcessorTest.kt": {
+    "mtime": 1788693148.1475053,
+    "seen": 1789100586.2316952,
+    "ast_hash": "b1a6c3556e35d62741ddbe0dc6794b30",
+    "semantic_hash": "b1a6c3556e35d62741ddbe0dc6794b30"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/faces/PreviewFaceDetectionEngineUnitTest.kt": {
+    "mtime": 1788729614.8227453,
+    "seen": 1789100586.2316952,
+    "ast_hash": "f5eed0af1d3500175db8b43b351157bd",
+    "semantic_hash": "f5eed0af1d3500175db8b43b351157bd"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/geometry/PreviewMatrixCalculatorUnitTest.kt": {
+    "mtime": 1788764228.073847,
+    "seen": 1789100586.231696,
+    "ast_hash": "ce2c5ca79e4106fd40372d84db7f27e6",
+    "semantic_hash": "ce2c5ca79e4106fd40372d84db7f27e6"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/gesture/PreviewTouchGestureUnitTest.kt": {
+    "mtime": 1788149962.8296914,
+    "seen": 1789100586.231696,
+    "ast_hash": "b06a7818bb605da85e46a3656c65f8fa",
+    "semantic_hash": "b06a7818bb605da85e46a3656c65f8fa"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/setup/PreviewCameraSetupHelperUnitTest.kt": {
+    "mtime": 1788729726.8257735,
+    "seen": 1789100586.2316968,
+    "ast_hash": "3b901a8b81816842454aabf5cc32a695",
+    "semantic_hash": "3b901a8b81816842454aabf5cc32a695"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/timer/CaptureTimerCoordinatorUnitTest.kt": {
+    "mtime": 1788160654.7234037,
+    "seen": 1789100586.2316968,
+    "ast_hash": "c83c410f59e5d9a712eff8be84b6f4ff",
+    "semantic_hash": "c83c410f59e5d9a712eff8be84b6f4ff"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/video/VideoProfileResolverTest.kt": {
+    "mtime": 1788510339.9740484,
+    "seen": 1789100586.231698,
+    "ast_hash": "1997d1992e78fa7862ef2545e6beeaf7",
+    "semantic_hash": "1997d1992e78fa7862ef2545e6beeaf7"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/video/VideoRecorderEngineTest.kt": {
+    "mtime": 1788510117.6838086,
+    "seen": 1789100586.231698,
+    "ast_hash": "3f9d5b0e6d72d3d5a678e17f34e9e7ce",
+    "semantic_hash": "3f9d5b0e6d72d3d5a678e17f34e9e7ce"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/video/VideoRecordingCoordinatorTest.kt": {
+    "mtime": 1788764894.768725,
+    "seen": 1789100586.231699,
+    "ast_hash": "5f18a01f88d488fd063235cf31aa7136",
+    "semantic_hash": "5f18a01f88d488fd063235cf31aa7136"
+  },
+  "app/src/test/java/com/hightechif/openkamera/preview/video/VideoSessionManagerUnitTest.kt": {
+    "mtime": 1788161464.8078084,
+    "seen": 1789100586.231699,
+    "ast_hash": "c65004dcfb6a1c3b539481b8e6ec0f5b",
+    "semantic_hash": "c65004dcfb6a1c3b539481b8e6ec0f5b"
+  },
+  "app/src/test/java/com/hightechif/openkamera/processing/HDRProcessorUnitTest.kt": {
+    "mtime": 1788236354.9363434,
+    "seen": 1789100586.231699,
+    "ast_hash": "515c7fa4a899cf12d9b03bc882620a7c",
+    "semantic_hash": "515c7fa4a899cf12d9b03bc882620a7c"
+  },
+  "app/src/test/java/com/hightechif/openkamera/processing/HdrMathUnitTest.kt": {
+    "mtime": 1787223166.9071178,
+    "seen": 1789100586.2317,
+    "ast_hash": "f97bf19ecf1cf9880a0922dbbca39619",
+    "semantic_hash": "f97bf19ecf1cf9880a0922dbbca39619"
+  },
+  "app/src/test/java/com/hightechif/openkamera/processing/ImageProcessorUnitTest.kt": {
+    "mtime": 1787552792.9952495,
+    "seen": 1789100586.2317,
+    "ast_hash": "171dde159f85ec0ac6abb89d772af7c3",
+    "semantic_hash": "171dde159f85ec0ac6abb89d772af7c3"
+  },
+  "app/src/test/java/com/hightechif/openkamera/processing/MtbAlignmentUnitTest.kt": {
+    "mtime": 1788236150.4474907,
+    "seen": 1789100586.231701,
+    "ast_hash": "1953c9cace2a70d0a6e44d4e36ba90c7",
+    "semantic_hash": "1953c9cace2a70d0a6e44d4e36ba90c7"
+  },
+  "app/src/test/java/com/hightechif/openkamera/processing/PanoramaProcessorUnitTest.kt": {
+    "mtime": 1788236448.9671938,
+    "seen": 1789100586.231701,
+    "ast_hash": "4969248dc19545888b2e3925f2f41958",
+    "semantic_hash": "4969248dc19545888b2e3925f2f41958"
+  },
+  "app/src/test/java/com/hightechif/openkamera/remotecontrol/BluetoothRemoteControlUnitTest.kt": {
+    "mtime": 1787223166.907482,
+    "seen": 1789100586.231701,
+    "ast_hash": "aca6d2d8f97df0466410456d385dd00e",
+    "semantic_hash": "aca6d2d8f97df0466410456d385dd00e"
+  },
+  "app/src/test/java/com/hightechif/openkamera/remotecontrol/RemoteInputManagerTest.kt": {
+    "mtime": 1788766053.0830638,
+    "seen": 1789100586.231702,
+    "ast_hash": "d97634807d077d2a99b6205d76138faf",
+    "semantic_hash": "d97634807d077d2a99b6205d76138faf"
+  },
+  "app/src/test/java/com/hightechif/openkamera/sensors/LocationDmsUnitTest.kt": {
+    "mtime": 1787223166.9114118,
+    "seen": 1789100586.231702,
+    "ast_hash": "4c4bbb7ea8bad2853bef2914653ecee3",
+    "semantic_hash": "4c4bbb7ea8bad2853bef2914653ecee3"
+  },
+  "app/src/test/java/com/hightechif/openkamera/sensors/LocationRepositoryUnitTest.kt": {
+    "mtime": 1788762088.1418338,
+    "seen": 1789100586.231703,
+    "ast_hash": "f7e851b1582294eac727d42d43f9d00a",
+    "semantic_hash": "f7e851b1582294eac727d42d43f9d00a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/sensors/SensorCalculationTest.kt": {
+    "mtime": 1788763936.0126817,
+    "seen": 1789100586.231703,
+    "ast_hash": "6f42302ca162cfbdd24c0fe099cadf5d",
+    "semantic_hash": "6f42302ca162cfbdd24c0fe099cadf5d"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/BitmapPostProcessorTest.kt": {
+    "mtime": 1788507255.326949,
+    "seen": 1789100586.231704,
+    "ast_hash": "ba1555f05584eb55c5c3623bc299fa01",
+    "semantic_hash": "ba1555f05584eb55c5c3623bc299fa01"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/ImageSavePipelineTest.kt": {
+    "mtime": 1788767514.3605335,
+    "seen": 1789100586.231704,
+    "ast_hash": "38a3b8791269d4a76fd4fbeb21e2987c",
+    "semantic_hash": "38a3b8791269d4a76fd4fbeb21e2987c"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/ImageSaverCostUnitTest.kt": {
+    "mtime": 1787223166.9119124,
+    "seen": 1789100586.2317052,
+    "ast_hash": "560b6cf685381d81596d57b0be0e7294",
+    "semantic_hash": "560b6cf685381d81596d57b0be0e7294"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/ImageSaverQueueUnitTest.kt": {
+    "mtime": 1787223166.912365,
+    "seen": 1789100586.2317052,
+    "ast_hash": "d1155eab40199d0bbbca36581c320bc4",
+    "semantic_hash": "d1155eab40199d0bbbca36581c320bc4"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/MediaPersistenceManagerTest.kt": {
+    "mtime": 1788507289.4544196,
+    "seen": 1789100586.2317052,
+    "ast_hash": "81d4c7c71172c24543e5ab5eab89131a",
+    "semantic_hash": "81d4c7c71172c24543e5ab5eab89131a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/MediaStorageRepositoryUnitTest.kt": {
+    "mtime": 1788768047.8220475,
+    "seen": 1789100586.2317061,
+    "ast_hash": "b1e74b4c1d3eaf9858ba5d6792878a78",
+    "semantic_hash": "b1e74b4c1d3eaf9858ba5d6792878a78"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/SaveTaskTest.kt": {
+    "mtime": 1788507211.2596552,
+    "seen": 1789100586.2317061,
+    "ast_hash": "e8da89b000d643e25aac54d2f2672ec0",
+    "semantic_hash": "e8da89b000d643e25aac54d2f2672ec0"
+  },
+  "app/src/test/java/com/hightechif/openkamera/storage/StorageLocationUnitTest.kt": {
+    "mtime": 1787223166.9127703,
+    "seen": 1789100586.2317069,
+    "ast_hash": "fec5b8da165f7fada91668bc4f49a2aa",
+    "semantic_hash": "fec5b8da165f7fada91668bc4f49a2aa"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/CameraColorTempUnitTest.kt": {
+    "mtime": 1787223166.913247,
+    "seen": 1789100586.2317069,
+    "ast_hash": "bedd60eb3f48a719fa0f3ffd6057f37f",
+    "semantic_hash": "bedd60eb3f48a719fa0f3ffd6057f37f"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/CameraViewModelUnitTest.kt": {
+    "mtime": 1788766084.4299977,
+    "seen": 1789100586.2317078,
+    "ast_hash": "e561acfe395257993a50af6548ee76da",
+    "semantic_hash": "e561acfe395257993a50af6548ee76da"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/DrawPreviewCalculationUnitTest.kt": {
+    "mtime": 1787555594.4476976,
+    "seen": 1789100586.2317078,
+    "ast_hash": "d7762c512a7a01d7f06beb35c2ccd6f2",
+    "semantic_hash": "d7762c512a7a01d7f06beb35c2ccd6f2"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/DrawPreviewUnitTest.kt": {
+    "mtime": 1788769694.032859,
+    "seen": 1789100586.2317078,
+    "ast_hash": "8099229cdf0d8a5e6145386199cf0974",
+    "semantic_hash": "8099229cdf0d8a5e6145386199cf0974"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/MainActivityInteractionUnitTest.kt": {
+    "mtime": 1787728066.221634,
+    "seen": 1789100586.231709,
+    "ast_hash": "488164a19e60575c4473f5bc3ff78bcb",
+    "semantic_hash": "488164a19e60575c4473f5bc3ff78bcb"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/MainUiFormattingUnitTest.kt": {
+    "mtime": 1788085483.187922,
+    "seen": 1789100586.231709,
+    "ast_hash": "03f6e93ee12dc4c79f35a42cc3b85172",
+    "semantic_hash": "03f6e93ee12dc4c79f35a42cc3b85172"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/SettingsViewModelUnitTest.kt": {
+    "mtime": 1787718988.0356503,
+    "seen": 1789100586.23171,
+    "ast_hash": "97a42f2496cdc333107108de34115915",
+    "semantic_hash": "97a42f2496cdc333107108de34115915"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/activity/DialogCoordinatorTest.kt": {
+    "mtime": 1788762763.8622758,
+    "seen": 1789100586.23171,
+    "ast_hash": "b55591117ac65642269cc3765e3376b4",
+    "semantic_hash": "b55591117ac65642269cc3765e3376b4"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/activity/KeyEventHandlerTest.kt": {
+    "mtime": 1788762628.894039,
+    "seen": 1789100586.23171,
+    "ast_hash": "4a3151cfce09a674afd384ca8cca4799",
+    "semantic_hash": "4a3151cfce09a674afd384ca8cca4799"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/activity/KeyEventHandlerUnitTest.kt": {
+    "mtime": 1788755331.7579134,
+    "seen": 1789100586.231711,
+    "ast_hash": "ead4b7afb08d657ac9559dc54994b362",
+    "semantic_hash": "ead4b7afb08d657ac9559dc54994b362"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/activity/PermissionManagerTest.kt": {
+    "mtime": 1788762543.9868555,
+    "seen": 1789100586.231711,
+    "ast_hash": "5868b15a62b07b88bfaed0bfc557942a",
+    "semantic_hash": "5868b15a62b07b88bfaed0bfc557942a"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/CropGuideOverlayRendererTest.kt": {
+    "mtime": 1788691322.2249963,
+    "seen": 1789100586.231712,
+    "ast_hash": "3793a861417f9b80043aad088e588256",
+    "semantic_hash": "3793a861417f9b80043aad088e588256"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/EffectOverlayRendererTest.kt": {
+    "mtime": 1788696423.0263186,
+    "seen": 1789100586.231712,
+    "ast_hash": "da57b64065964ac5bf24195b33312b86",
+    "semantic_hash": "da57b64065964ac5bf24195b33312b86"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/FocusFaceOverlayRendererTest.kt": {
+    "mtime": 1788728214.7995524,
+    "seen": 1789100586.231713,
+    "ast_hash": "7509d413a64dd8c6024f494a34a74e2c",
+    "semantic_hash": "7509d413a64dd8c6024f494a34a74e2c"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/GridOverlayRendererTest.kt": {
+    "mtime": 1788689696.8674097,
+    "seen": 1789100586.231713,
+    "ast_hash": "53f3265d154b8490babfc270ab098ae5",
+    "semantic_hash": "53f3265d154b8490babfc270ab098ae5"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/HorizonAngleOverlayRendererTest.kt": {
+    "mtime": 1788689706.117737,
+    "seen": 1789100586.231714,
+    "ast_hash": "812269d98a841264081045a6b192dfe7",
+    "semantic_hash": "812269d98a841264081045a6b192dfe7"
+  },
+  "app/src/test/java/com/hightechif/openkamera/ui/renderers/RendererUtilsTest.kt": {
+    "mtime": 1788689691.3062534,
+    "seen": 1789100586.231714,
+    "ast_hash": "fa7d73f13abdcdaa50d31ba7fdfa89da",
+    "semantic_hash": "fa7d73f13abdcdaa50d31ba7fdfa89da"
+  },
+  "app/src/test/java/com/hightechif/openkamera/utils/TextFormatterUnitTest.kt": {
+    "mtime": 1787223166.9139533,
+    "seen": 1789100586.231714,
+    "ast_hash": "c3ee0dba82c377e394c14596c27c5610",
+    "semantic_hash": "c3ee0dba82c377e394c14596c27c5610"
+  },
+  "build.gradle": {
+    "mtime": 1787547357.487072,
+    "seen": 1789100586.231715,
+    "ast_hash": "260d33b91b2a75c29e84bd87c64c18e7",
+    "semantic_hash": "260d33b91b2a75c29e84bd87c64c18e7"
+  },
+  "gradlew": {
+    "mtime": 1749312116.250522,
+    "seen": 1789100586.231715,
+    "ast_hash": "02c16663c6f0aa37f98d94d698c22b8c",
+    "semantic_hash": "02c16663c6f0aa37f98d94d698c22b8c"
+  },
+  "settings.gradle": {
+    "mtime": 1787214364.215325,
+    "seen": 1789100586.2317162,
+    "ast_hash": "d0836e66fd7b905d446b0062fdbdf5c4",
+    "semantic_hash": "d0836e66fd7b905d446b0062fdbdf5c4"
+  },
+  "README.md": {
+    "mtime": 1787223702.3396552,
+    "seen": 1789100586.2317162,
+    "ast_hash": "09ae3d06041195832fc4f8412f83cbc4",
+    "semantic_hash": "09ae3d06041195832fc4f8412f83cbc4"
+  },
+  "app/src/main/res/raw/mybeep.ogg": {
+    "mtime": 1786520090.2225742,
+    "seen": 1789100586.231717,
+    "ast_hash": "11a86e3d2a3c66d8822e61718a77b1fa",
+    "semantic_hash": "11a86e3d2a3c66d8822e61718a77b1fa"
+  },
+  "app/src/main/res/raw/mybeep_hi.ogg": {
+    "mtime": 1786520090.2226996,
+    "seen": 1789100586.231717,
+    "ast_hash": "8c61a395ce03e2bd1c42d0c375dbd1a3",
+    "semantic_hash": "8c61a395ce03e2bd1c42d0c375dbd1a3"
+  }
+}
