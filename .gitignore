@@ -186,3 +186,9 @@ gfx/
 testdata/
 
 uninstall.bat
+
+# Graphify local state and token tracking
+graphify-out/cache/
+graphify-out/cost.json
+graphify-out/manifest.json
+.graphify_*
