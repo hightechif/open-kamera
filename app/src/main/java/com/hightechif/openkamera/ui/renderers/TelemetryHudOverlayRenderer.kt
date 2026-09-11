@@ -8,6 +8,8 @@
 package com.hightechif.openkamera.ui.renderers
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -16,6 +18,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.location.Location
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
 import com.hightechif.openkamera.MyApplicationInterface.Alignment
@@ -132,7 +135,12 @@ class TelemetryHudOverlayRenderer(
         BitmapFactory.decodeResource(context.resources, R.drawable.ic_timelapse_white_48dp)
 
     private val locationInfo = LocationSupplier.LocationInfo()
-    private val tempHistogramChannel = IntArray(256)
+
+    // Battery
+    private val batteryIfilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+    private var hasBatteryFrac = false
+    private var batteryFrac = 0.0f
+    private var lastBatteryTime: Long = 0
 
     private val freeMemoryRunnable = Runnable {
         val freeMb: Long =
@@ -171,6 +179,8 @@ class TelemetryHudOverlayRenderer(
         val uiRotation: Int = preview.uIRotation
         val sharedPreferences = context.sharedPreferences
 
+        val showBatteryPref =
+            context.hudOverlayState.showBattery || sharedPreferences.getBoolean(PreferenceKeys.SHOW_BATTERY_PREFERENCE_KEY, true)
         val showTimePref =
             context.hudOverlayState.showTime || sharedPreferences.getBoolean(PreferenceKeys.SHOW_TIME_PREFERENCE_KEY, false)
         val showCameraIdPref =
@@ -186,9 +196,75 @@ class TelemetryHudOverlayRenderer(
         p.textSize = 16 * context.scaleFont + 0.5f
         p.textAlign = Paint.Align.LEFT
 
-        val topX = (context.dpToPx(16f)).toInt()
+        var topX = (context.dpToPx(16f)).toInt()
         val topY = (context.dpToPx(16f)).toInt()
         val bottomY = canvas.height - (context.dpToPx(16f)).toInt()
+
+        var batteryX = topX
+        var batteryY = topY + (5 * context.scaleDp + 0.5f).toInt()
+        val batteryWidth = (5 * context.scaleDp + 0.5f).toInt()
+        val batteryHeight = 4 * batteryWidth
+        if (uiRotation == 90 || uiRotation == 270) {
+            val diff = canvas.width - canvas.height
+            batteryX += diff / 2
+            batteryY -= diff / 2
+        }
+        if (context.deviceUiRotation == 90) {
+            batteryY = canvas.height - batteryY - batteryHeight
+        }
+        if (context.deviceUiRotation == 180) {
+            batteryX = canvas.width - batteryX - batteryWidth
+        }
+        if (showBatteryPref) {
+            if (!this.hasBatteryFrac || timeMs > this.lastBatteryTime + 60000) {
+                try {
+                    val batteryStatus: Intent? =
+                        context.mainActivity.registerReceiver(null, batteryIfilter)
+                    if (batteryStatus != null) {
+                        val batteryLevel = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                        val batteryScale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                        if (batteryLevel != -1 && batteryScale > 0) {
+                            hasBatteryFrac = true
+                            batteryFrac = batteryLevel / batteryScale.toFloat()
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+                lastBatteryTime = timeMs
+            }
+            var drawBattery = true
+            if (batteryFrac <= 0.05f) {
+                drawBattery = (((timeMs / 1000)) % 2) == 0L
+            }
+            if (drawBattery) {
+                p.color = if (batteryFrac > 0.15f) Color.rgb(37, 155, 36) else Color.rgb(
+                    244,
+                    67,
+                    54
+                )
+                p.style = Paint.Style.FILL
+                canvas.drawRect(
+                    batteryX.toFloat(),
+                    batteryY + (1.0f - batteryFrac) * (batteryHeight - 2),
+                    (batteryX + batteryWidth).toFloat(),
+                    (batteryY + batteryHeight).toFloat(),
+                    p
+                )
+                if (batteryFrac < 1.0f) {
+                    p.color = Color.BLACK
+                    p.alpha = 64
+                    canvas.drawRect(
+                        batteryX.toFloat(),
+                        batteryY.toFloat(),
+                        (batteryX + batteryWidth).toFloat(),
+                        batteryY + (1.0f - batteryFrac) * (batteryHeight - 2),
+                        p
+                    )
+                    p.alpha = 255
+                }
+            }
+            topX += (10 * context.scaleDp + 0.5f).toInt()
+        }
 
         var locationX = topX
         var locationY = topY
@@ -465,74 +541,29 @@ class TelemetryHudOverlayRenderer(
                 }
             }
 
-            // Draw histogram
-            if (preview.isPreviewBitmapEnabled) {
-                val histogram: IntArray? = preview.histogram
-                if (histogram != null) {
-                    val histogramWidth =
-                        (RendererUtils.HISTOGRAM_WIDTH_DP * context.scaleDp + 0.5f).toInt()
-                    val histogramHeight =
-                        (RendererUtils.HISTOGRAM_HEIGHT_DP * context.scaleDp + 0.5f).toInt()
 
-                    var hLocX = locationX - flashPadding
-                    if (context.deviceUiRotation == 180) {
-                        hLocX = locationX - histogramWidth + flashPadding
-                    }
-                    iconDest[hLocX - flashPadding, locationY, hLocX - flashPadding + histogramWidth] =
-                        locationY + histogramHeight
-                    if (context.deviceUiRotation == 90) {
-                        iconDest.top -= histogramHeight
-                        iconDest.bottom -= histogramHeight
-                    }
 
-                    p.style = Paint.Style.FILL
-                    p.color = Color.argb(64, 0, 0, 0)
-                    canvas.drawRect(iconDest, p)
-
-                    var max = 0
-                    for (value in histogram) {
-                        max = max(max.toDouble(), value.toDouble()).toInt()
-                    }
-
-                    if (histogram.size == 256 * 3) {
-                        var c = 0
-                        val a0 = 151
-                        val a1 = 110
-                        val a2 = 94
-
-                        for (i in 0..255) tempHistogramChannel[i] = histogram[c++]
-                        p.color = Color.argb(a0, 255, 0, 0)
-                        drawHistogramChannel(canvas, tempHistogramChannel, max)
-
-                        for (i in 0..255) tempHistogramChannel[i] = histogram[c++]
-                        p.color = Color.argb(a1, 0, 255, 0)
-                        drawHistogramChannel(canvas, tempHistogramChannel, max)
-
-                        for (i in 0..255) tempHistogramChannel[i] = histogram[c++]
-                        p.color = Color.argb(a2, 0, 0, 255)
-                        drawHistogramChannel(canvas, tempHistogramChannel, max)
-                    } else {
-                        p.color = Color.argb(192, 255, 255, 255)
-                        drawHistogramChannel(canvas, histogram, max)
-                    }
-                }
+            // Audio VU Meter during video recording
+            val showVideoMaxAmp = sharedPreferences.getBoolean(PreferenceKeys.SHOW_VIDEO_MAX_AMP_PREFERENCE_KEY, false)
+            if (showVideoMaxAmp && preview.isVideoRecording && !preview.isVideoRecordingPaused) {
+                val maxAmp = preview.maxAmplitude
+                val ampFrac = (maxAmp / 32767.0f).coerceIn(0.0f, 1.0f)
+                val ampWidth = (160 * context.scaleDp + 0.5f).toInt()
+                val ampHeight = (10 * context.scaleDp + 0.5f).toInt()
+                val ampX = (canvas.width - ampWidth) / 2
+                val ampY = canvas.height - (context.dpToPx(60f)).toInt()
+                p.color = Color.WHITE
+                p.style = Paint.Style.STROKE
+                p.strokeWidth = context.strokeWidth
+                canvas.drawRect(ampX.toFloat(), ampY.toFloat(), (ampX + ampWidth).toFloat(), (ampY + ampHeight).toFloat(), p)
+                p.style = Paint.Style.FILL
+                p.color = Color.GREEN
+                canvas.drawRect(ampX.toFloat(), ampY.toFloat(), ampX + ampFrac * ampWidth, (ampY + ampHeight).toFloat(), p)
             }
         }
     }
 
-    private fun drawHistogramChannel(canvas: Canvas, histogramChannel: IntArray, max: Int) {
-        path.reset()
-        path.moveTo(iconDest.left.toFloat(), iconDest.bottom.toFloat())
-        for (c in histogramChannel.indices) {
-            val cAlpha = c / histogramChannel.size.toDouble()
-            val x = (cAlpha * iconDest.width()).toInt()
-            val h = if (max > 0) (histogramChannel[c] * iconDest.height()) / max else 0
-            path.lineTo((iconDest.left + x).toFloat(), (iconDest.bottom - h).toFloat())
-        }
-        path.lineTo(iconDest.right.toFloat(), iconDest.bottom.toFloat())
-        path.close()
-        canvas.drawPath(path, p)
-    }
+
 
     override fun onDestroy() {
         freeMemoryExecutor.shutdown()

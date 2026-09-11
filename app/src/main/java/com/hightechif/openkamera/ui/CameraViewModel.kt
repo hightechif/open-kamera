@@ -245,8 +245,20 @@ class CameraViewModel @Inject constructor(
         handleShutterClicked(customConfig)
     }
 
+    fun takePicture(customConfig: CaptureConfig? = null) {
+        capturePhoto(customConfig)
+    }
+
     fun toggleVideoRecording() {
         handleRecordVideoClicked()
+    }
+
+    fun toggleRecording() {
+        toggleVideoRecording()
+    }
+
+    fun switchCameraFacing() {
+        handleSwitchCameraClicked()
     }
 
     fun pauseVideoRecording() {

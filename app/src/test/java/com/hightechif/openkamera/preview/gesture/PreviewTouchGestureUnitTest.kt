@@ -93,4 +93,47 @@ class PreviewTouchGestureUnitTest {
         // Should not trigger single touch tap because it's a swipe
         assertEquals(false, singleTouchHandled)
     }
+
+    @Test
+    fun computeFocusArea_transformsAndClampsToSensorRange() {
+        val matrix = android.graphics.Matrix()
+        // Identity matrix maps (0, 0) directly
+        val areaCenter = coordinator.computeFocusArea(0f, 0f, matrix, areaSize = 100)
+        assertEquals(-100, areaCenter.bounds.left)
+        assertEquals(-100, areaCenter.bounds.top)
+        assertEquals(100, areaCenter.bounds.right)
+        assertEquals(100, areaCenter.bounds.bottom)
+
+        // Point near edge clamped to [-1000, 1000]
+        val areaEdge = coordinator.computeFocusArea(1200f, 1200f, matrix, areaSize = 100)
+        assertEquals(1000, areaEdge.bounds.right)
+        assertEquals(1000, areaEdge.bounds.bottom)
+    }
+
+    @Test
+    fun calculatePinchZoom_scalesAndClampsRatio() {
+        val zoom = PreviewGestureHandler.calculatePinchZoom(
+            currentZoom = 2.0f,
+            scaleFactor = 1.5f,
+            minZoom = 1.0f,
+            maxZoom = 10.0f
+        )
+        assertEquals(3.0f, zoom, 0.001f)
+
+        val clampedMax = PreviewGestureHandler.calculatePinchZoom(
+            currentZoom = 8.0f,
+            scaleFactor = 2.0f,
+            minZoom = 1.0f,
+            maxZoom = 10.0f
+        )
+        assertEquals(10.0f, clampedMax, 0.001f)
+
+        val clampedMin = PreviewGestureHandler.calculatePinchZoom(
+            currentZoom = 1.5f,
+            scaleFactor = 0.5f,
+            minZoom = 1.0f,
+            maxZoom = 10.0f
+        )
+        assertEquals(1.0f, clampedMin, 0.001f)
+    }
 }

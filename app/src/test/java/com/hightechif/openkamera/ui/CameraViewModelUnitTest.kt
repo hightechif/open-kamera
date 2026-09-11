@@ -66,7 +66,7 @@ class CameraViewModelUnitTest {
     private val mockToggleFlashUseCase = mockk<ToggleFlashUseCase>(relaxed = true)
     private val mockSetZoomUseCase = mockk<SetZoomUseCase>(relaxed = true)
     private val mockTapToFocusUseCase = mockk<TapToFocusUseCase>(relaxed = true)
-    private val mockSwitchCameraFacingUseCase = mockk<SwitchCameraFacingUseCase>(relaxed = true)
+    private lateinit var mockSwitchCameraFacingUseCase: SwitchCameraFacingUseCase
     private val mockGetCameraCapabilitiesUseCase = mockk<GetCameraCapabilitiesUseCase>(relaxed = true)
     private val mockSettingsRepository = mockk<ISettingsRepository>(relaxed = true)
     private val mockMediaRepository = mockk<IMediaRepository>(relaxed = true)
@@ -90,15 +90,19 @@ class CameraViewModelUnitTest {
         Dispatchers.setMain(testDispatcher)
 
         every { mockCameraEngine.engineStateFlow } returns engineStateFlow
+        coEvery { mockCameraEngine.openCamera(any()) } returns Result.success(Unit)
         every { mockSettingsRepository.flashModeFlow } returns flashModeFlow
         every { mockSettingsRepository.gridTypeFlow } returns gridTypeFlow
         every { mockSettingsRepository.captureModeFlow } returns captureModeFlow
         every { mockSettingsRepository.isRawEnabledFlow } returns isRawEnabledFlow
+        every { mockSettingsRepository.getStringPreference("preference_camera_facing", any()) } returns com.hightechif.openkamera.domain.model.CameraFacing.BACK.name
         every { mockMediaRepository.latestMediaThumbnailFlow } returns latestThumbnailFlow
         every { mockSensorRepository.sensorOrientationFlow } returns sensorOrientationFlow
         every { mockAdjustExposureUseCase.exposureCompensationFlow } returns exposureCompensationFlow
         every { mockSetZoomUseCase.currentZoomRatio } returns currentZoomRatioFlow
         every { mockSetZoomUseCase.maxZoomRatio } returns maxZoomRatioFlow
+
+        mockSwitchCameraFacingUseCase = SwitchCameraFacingUseCase(mockCameraEngine, mockSettingsRepository)
 
         viewModel = CameraViewModel(
             cameraEngine = mockCameraEngine,
@@ -338,5 +342,34 @@ class CameraViewModelUnitTest {
         testScheduler.runCurrent()
 
         coVerify(atLeast = 1) { mockCapturePhotoUseCase(any()) }
+    }
+
+    @Test
+    fun takePicture_invokesCapturePhotoUseCase() = runTest(testDispatcher) {
+        coEvery { mockCapturePhotoUseCase(any()) } returns flowOf(CaptureProgress.Completed(byteArrayOf(1, 2)))
+
+        viewModel.takePicture()
+        testScheduler.runCurrent()
+
+        coVerify(atLeast = 1) { mockCapturePhotoUseCase(any()) }
+    }
+
+    @Test
+    fun toggleRecording_invokesRecordVideoUseCase() = runTest(testDispatcher) {
+        val mockFile = mockk<File>(relaxed = true)
+        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockFile)
+
+        viewModel.toggleRecording()
+        testScheduler.runCurrent()
+
+        coVerify(atLeast = 1) { mockRecordVideoUseCase.startRecording() }
+    }
+
+    @Test
+    fun switchCameraFacing_invokesSwitchCameraFacingUseCase() = runTest(testDispatcher) {
+        viewModel.switchCameraFacing()
+        testScheduler.runCurrent()
+
+        coVerify(atLeast = 1) { mockCameraEngine.openCamera(com.hightechif.openkamera.domain.model.CameraFacing.FRONT) }
     }
 }

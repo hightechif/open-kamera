@@ -1333,6 +1333,9 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     }
 
     private fun zoomByStep(change: Int) {
+        if (preview.supportsZoom()) {
+            cameraViewModel.onEvent(CameraUiEvent.OnZoomChanged(preview.zoomRatio))
+        }
         var newChange = change
         if (MyDebug.LOG) Log.d(TAG, "zoomByStep: $newChange")
         if (preview.supportsZoom() && newChange != 0) {
@@ -1376,6 +1379,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     }
 
     fun changeExposure(change: Int) {
+        cameraViewModel.adjustExposure(change)
         var newChange = change
         if (preview.supportsExposures()) {
             if (exposureSeekbarValues != null) {
@@ -1914,6 +1918,11 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
     fun clickedTakePhoto(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhoto")
+        if (preview.isVideo) {
+            cameraViewModel.toggleRecording()
+        } else {
+            cameraViewModel.takePicture()
+        }
         this.takePicture(false)
     }
 
