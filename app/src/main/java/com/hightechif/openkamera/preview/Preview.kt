@@ -30,7 +30,6 @@ import android.location.Location
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
 import android.net.Uri
-import android.os.AsyncTask
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -60,19 +59,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.TakePhoto
-import com.hightechif.openkamera.preview.faces.PreviewFaceDetectionEngine
-import com.hightechif.openkamera.preview.setup.PreviewCameraSetupHelper
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
 import com.hightechif.openkamera.cameracontroller.CameraController.Facing
 import com.hightechif.openkamera.cameracontroller.CameraController.SupportedValues
 import com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile
-import com.hightechif.openkamera.cameracontroller.CameraController1
 import com.hightechif.openkamera.cameracontroller.CameraController2
 import com.hightechif.openkamera.cameracontroller.CameraControllerException
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager
-import com.hightechif.openkamera.cameracontroller.CameraControllerManager1
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager2
 import com.hightechif.openkamera.cameracontroller.RawImage
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
@@ -82,13 +77,14 @@ import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
-import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
 import com.hightechif.openkamera.preview.camerasurface.PreviewSurfaceManager
+import com.hightechif.openkamera.preview.faces.PreviewFaceDetectionEngine
 import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
 import com.hightechif.openkamera.preview.gesture.PreviewGestureHandler
 import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
+import com.hightechif.openkamera.preview.setup.PreviewCameraSetupHelper
 import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
 import com.hightechif.openkamera.preview.timer.CaptureTimerCoordinator
 import com.hightechif.openkamera.preview.video.VideoProfileResolver
@@ -97,11 +93,17 @@ import com.hightechif.openkamera.preview.video.VideoSessionManager
 import com.hightechif.openkamera.preview.video.VideoSessionOutput
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.ToastBoxer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
 import java.text.DecimalFormat
@@ -110,15 +112,13 @@ import java.util.Hashtable
 import java.util.Locale
 import java.util.Timer
 import java.util.TimerTask
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.tan
+import kotlin.time.Duration.Companion.milliseconds
 
 private typealias VideoFileInfo = VideoSessionOutput
 internal typealias CameraOpenState = CameraCaptureStateMachine.CameraOpenState
@@ -239,11 +239,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             cameraCaptureStateMachine.setOpenState(value)
         }
 
-    // background task used for opening camera
-    private var openCameraTask: AsyncTask<Void?, Void?, CameraController?>? = null
-
-    // background task used for closing camera
-    private var closeCameraTask: CloseCameraTask? = null
+    // Coroutine scope and jobs for asynchronous camera open/close lifecycle operations
+    internal val previewLifecycleScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    internal var openCameraJob: Job? = null
+    internal var closeCameraJob: Job? = null
+    private var reopenAfterClose: Boolean = false
 
     // whether we have permissions necessary to operate the camera (camera, storage); assume true until we've been denied one of them
     private var hasPermissions = true
@@ -540,7 +541,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     var settingTargetFocusDistanceTime: Long =
         0 // time when focusSetForTargetDistance last changed
         private set
-
 
 
     // for testing; must be volatile for test project reading the state
@@ -1268,68 +1268,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         fun onClosed()
     }
 
-    private inner class CloseCameraTask(
-        val cameraControllerLocal: CameraController,
-        val closeCameraCallback: CloseCameraCallback?
-    ) : AsyncTask<Void?, Void?, Void?>() {
-        var reopen: Boolean = false // if set to true, reopen the camera once closed
-
-        private val tag = "CloseCameraTask"
-
-        override fun doInBackground(vararg voids: Void?): Void? {
-            var debugTime: Long = 0
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "doInBackground, async task: $this"
-                )
-                debugTime = System.currentTimeMillis()
-            }
-            cameraControllerLocal.stopPreview()
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "time to stop preview: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-            cameraControllerLocal.release()
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "time to release camera controller: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-            return null
-        }
-
-        /** The system calls this to perform work in the UI thread and delivers
-         * the result from doInBackground()  */
-        override fun onPostExecute(result: Void?) {
-            if (MyDebug.LOG) Log.d(
-                tag,
-                "onPostExecute, async task: $this"
-            )
-            cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
-            closeCameraTask = null // just to be safe
-            if (closeCameraCallback != null) {
-                if (MyDebug.LOG) Log.d(
-                    tag,
-                    "onPostExecute, calling closeCameraCallback.onClosed"
-                )
-                closeCameraCallback.onClosed()
-            }
-            if (reopen) {
-                if (MyDebug.LOG) Log.d(tag, "onPostExecute, reOpen Kamera")
-                openCamera()
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "onPostExecute done, async task: $this"
-            )
-        }
-
-    }
-
     /** Closes the camera.
      * @param async Whether to close the camera on a background thread.
      * @param closeCameraCallback If async is true, closeCameraCallback.onClosed() will be called,
@@ -1390,11 +1328,43 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 val cameraControllerLocal: CameraController = cameraController!!
                 cameraController = null
                 if (async) {
-                    if (MyDebug.LOG) Log.d(TAG, "close camera on background async")
+                    if (MyDebug.LOG) Log.d(TAG, "close camera on background async coroutine")
                     cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSING
-                    closeCameraTask =
-                        CloseCameraTask(cameraControllerLocal, closeCameraCallback)
-                    closeCameraTask!!.execute()
+                    closeCameraJob?.cancel()
+                    closeCameraJob = previewLifecycleScope.launch {
+                        var asyncDebugTime: Long = 0
+                        if (MyDebug.LOG) {
+                            Log.d(TAG, "closing camera on background coroutine")
+                            asyncDebugTime = System.currentTimeMillis()
+                        }
+                        withContext(Dispatchers.IO) {
+                            cameraControllerLocal.stopPreview()
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "time to stop preview: " + (System.currentTimeMillis() - asyncDebugTime)
+                                )
+                            }
+                            cameraControllerLocal.release()
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "time to release camera controller: " + (System.currentTimeMillis() - asyncDebugTime)
+                                )
+                            }
+                        }
+                        cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+                        closeCameraJob = null
+                        if (closeCameraCallback != null) {
+                            if (MyDebug.LOG) Log.d(TAG, "calling closeCameraCallback.onClosed")
+                            closeCameraCallback.onClosed()
+                        }
+                        if (reopenAfterClose) {
+                            reopenAfterClose = false
+                            if (MyDebug.LOG) Log.d(TAG, "reopening camera after close")
+                            openCamera()
+                        }
+                    }
                 } else {
                     if (MyDebug.LOG) {
                         Log.d(
@@ -1682,46 +1652,38 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             val cameraIdF = cameraId
             val cameraIdSPhysicalF = cameraIdSPhysical
 
-            openCameraTask = object : AsyncTask<Void?, Void?, CameraController?>() {
-                private val TAG = "Preview/OpenKamera"
-
-                override fun doInBackground(vararg voids: Void?): CameraController? {
-                    if (MyDebug.LOG) Log.d(TAG, "doInBackground, async task: $this")
-                    return openCameraCore(cameraIdF, cameraIdSPhysicalF)
-                }
-
-                /** The system calls this to perform work in the UI thread and delivers
-                 * the result from doInBackground()  */
-                override fun onPostExecute(cameraController: CameraController?) {
-                    if (MyDebug.LOG) Log.d(TAG, "onPostExecute, async task: $this")
-                    // see note in OpenKameraCore() for why we set cameraController here
-                    this@Preview.cameraController = cameraController
-                    cameraOpened()
-                    // set cameraOpenState after cameraOpened, just in case a non-UI thread is listening for this - also
-                    // important for test code waitUntilCameraOpened(), as test code runs on a different thread
-                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
-                    openCameraTask = null // just to be safe
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "onPostExecute done, async task: $this"
-                    )
-                }
-
-                override fun onCancelled(cameraController: CameraController?) {
-                    if (MyDebug.LOG) {
-                        Log.d(TAG, "onCancelled, async task: $this")
-                        Log.d(TAG, "camera_controller: $cameraController")
+            openCameraJob?.cancel()
+            openCameraJob = previewLifecycleScope.launch {
+                if (MyDebug.LOG) Log.d(TAG, "openCamera coroutine started: $this")
+                var cameraControllerResult: CameraController? = null
+                try {
+                    cameraControllerResult = withContext(Dispatchers.IO) {
+                        openCameraCore(cameraIdF, cameraIdSPhysicalF)
                     }
-                    // this typically means the application has paused whilst we were opening camera in background - so should just
-                    // dispose of the camera controller
-                    // this is the local cameraController, not Preview.this.cameraController!
-                    cameraController?.release()
-                    cameraOpenState =
-                        CameraOpenState.CAMERAOPENSTATE_OPENED // n.b., still set OPENED state - important for test thread to know that this callback is complete
-                    openCameraTask = null // just to be safe
-                    if (MyDebug.LOG) Log.d(TAG, "onCancelled done, async task: $this")
+                    if (!isActive) {
+                        if (MyDebug.LOG) {
+                            Log.d(TAG, "openCamera coroutine cancelled while opening")
+                            Log.d(TAG, "camera_controller: $cameraControllerResult")
+                        }
+                        cameraControllerResult?.release()
+                        cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                        return@launch
+                    }
+                    this@Preview.cameraController = cameraControllerResult
+                    cameraOpened()
+                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                    if (MyDebug.LOG) Log.d(TAG, "openCamera coroutine done")
+                } catch (e: CancellationException) {
+                    if (MyDebug.LOG) {
+                        Log.d(TAG, "openCamera coroutine cancelled")
+                        Log.d(TAG, "camera_controller: $cameraControllerResult")
+                    }
+                    cameraControllerResult?.release()
+                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                } finally {
+                    openCameraJob = null
                 }
-            }.execute()
+            }
         } else {
             this.cameraController = openCameraCore(cameraId, cameraIdSPhysical)
             if (MyDebug.LOG) {
@@ -1783,32 +1745,26 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         }
                     }
                 }
-            if (usingAndroidL) {
-                val previewErrorCallback: CameraController.ErrorCallback =
-                    object : CameraController.ErrorCallback {
-                        override fun onError() {
-                            if (MyDebug.LOG) Log.e(
-                                TAG,
-                                "error from CameraController: preview failed to start"
-                            )
-                            applicationInterface.onFailedStartPreview()
-                        }
+            val previewErrorCallback: CameraController.ErrorCallback =
+                object : CameraController.ErrorCallback {
+                    override fun onError() {
+                        if (MyDebug.LOG) Log.e(
+                            TAG,
+                            "error from CameraController: preview failed to start"
+                        )
+                        applicationInterface.onFailedStartPreview()
                     }
-                cameraControllerLocal = CameraController2(
-                    this@Preview.context,
-                    cameraId,
-                    cameraIdSPhysical,
-                    cameraFeaturesCaches,
-                    previewErrorCallback,
-                    cameraErrorCallback
-                )
-                if (applicationInterface.useCamera2FakeFlash()) {
-                    cameraControllerLocal.useCamera2FakeFlash = true
                 }
-            } else {
-                // Isolated legacy Camera1 fallback for legacy hardware/devices
-                cameraControllerLocal =
-                    CameraController1.createInstance(cameraId, cameraErrorCallback)
+            cameraControllerLocal = CameraController2(
+                this@Preview.context,
+                cameraId,
+                cameraIdSPhysical,
+                cameraFeaturesCaches,
+                previewErrorCallback,
+                cameraErrorCallback
+            )
+            if (applicationInterface.useCamera2FakeFlash()) {
+                cameraControllerLocal.useCamera2FakeFlash = true
             }
             //throw new CameraControllerException; // uncomment to test camera not opening
         } catch (e: CameraControllerException) {
@@ -2012,7 +1968,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 // also filter unsupported flash modes
                 if (supportedFlashValues != null) {
                     if (MyDebug.LOG) Log.d(TAG, "restrict flash modes for extension session")
-                    supportedFlashValues = PreviewCameraSetupHelper.filterExtensionFlashModes(supportedFlashValues)
+                    supportedFlashValues =
+                        PreviewCameraSetupHelper.filterExtensionFlashModes(supportedFlashValues)
                 }
 
                 // also disallow focus modes
@@ -2122,13 +2079,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                             "current_size: " + currentSize.width + " x " + currentSize.height + " supports_burst? " + currentSize.supportsBurst
                         )
                     }
-                    val bestSupportingIndex = PreviewCameraSetupHelper.findBestSupportingPictureSizeIndex(
-                        photoSizes,
-                        currentSize,
-                        isBurst,
-                        isExtension,
-                        extension
-                    )
+                    val bestSupportingIndex =
+                        PreviewCameraSetupHelper.findBestSupportingPictureSizeIndex(
+                            photoSizes,
+                            currentSize,
+                            isBurst,
+                            isExtension,
+                            extension
+                        )
                     if (bestSupportingIndex != null) {
                         currentSizeIndex = bestSupportingIndex
                         // if we set a new size, we don't save this to applicationinterface (so that if user switches to a burst mode or extension mode and back
@@ -2407,7 +2365,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 )
             }
             if (this.usingFaceDetection) {
-                cameraController!!.setFaceDetectionListener(object : CameraController.FaceDetectionListener {
+                cameraController!!.setFaceDetectionListener(object :
+                    CameraController.FaceDetectionListener {
                     override fun onFaceDetection(faces: Array<CameraController.Face?>) {
                         if (MyDebug.LOG) Log.d(
                             TAG,
@@ -7334,12 +7293,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             // when pausing, we close the camera on a background thread - so if this is still happening when we resume,
             // we won't be able to open the camera, so need to Open Kamera when it's closed
             if (MyDebug.LOG) Log.d(TAG, "camera still closing")
-            if (closeCameraTask != null) { // just to be safe
-                closeCameraTask!!.reopen = true
+            if (closeCameraJob != null) { // just to be safe
+                reopenAfterClose = true
             } else {
                 Log.e(
                     TAG,
-                    "onResume: state is CAMERAOPENSTATE_CLOSING, but close_camera_task is null"
+                    "onResume: state is CAMERAOPENSTATE_CLOSING, but closeCameraJob is null"
                 )
             }
         } else {
@@ -7362,13 +7321,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             true // note, if activityIsPaused==false, we don't change appIsPaused, in case app was paused indicated via a separate call to onPause
 
         if (cameraOpenState == CameraOpenState.CAMERAOPENSTATE_OPENING) {
-            if (MyDebug.LOG) Log.d(TAG, "cancel open_camera_task")
-            if (openCameraTask != null) { // just to be safe
-                openCameraTask!!.cancel(true)
+            if (MyDebug.LOG) Log.d(TAG, "cancel openCameraJob")
+            if (openCameraJob != null) { // just to be safe
+                openCameraJob!!.cancel()
             } else {
                 Log.e(
                     TAG,
-                    "onPause: state is CAMERAOPENSTATE_OPENING, but open_camera_task is null"
+                    "onPause: state is CAMERAOPENSTATE_OPENING, but openCameraJob is null"
                 )
             }
         }
@@ -7401,36 +7360,29 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (cameraOpenState == CameraOpenState.CAMERAOPENSTATE_CLOSING) {
             // If the camera is currently closing on a background thread, then wait until the camera has closed to be safe
             if (MyDebug.LOG) {
-                Log.d(TAG, "wait for close_camera_task")
+                Log.d(TAG, "wait for closeCameraJob")
             }
-            if (closeCameraTask != null) { // just to be safe
+            if (closeCameraJob != null && closeCameraJob!!.isActive) {
                 val timeS = System.currentTimeMillis()
                 try {
-                    closeCameraTask!![3000, TimeUnit.MILLISECONDS] // set timeout to avoid ANR (camera resource should be freed by the OS when destroyed anyway)
-                } catch (e: ExecutionException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
-                } catch (e: InterruptedException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
-                } catch (e: TimeoutException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
+                    runBlocking {
+                        withTimeoutOrNull(3000.milliseconds) {
+                            closeCameraJob!!.join()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "exception while waiting for closeCameraJob to finish", e)
                 }
                 if (MyDebug.LOG) {
-                    Log.d(TAG, "done waiting for close_camera_task")
+                    Log.d(TAG, "done waiting for closeCameraJob")
                     Log.d(
                         TAG,
-                        "### time after waiting for close_camera_task: " + (System.currentTimeMillis() - timeS)
+                        "### time after waiting for closeCameraJob: " + (System.currentTimeMillis() - timeS)
                     )
                 }
-            } else {
-                Log.e(
-                    TAG,
-                    "onResume: state is CAMERAOPENSTATE_CLOSING, but close_camera_task is null"
-                )
             }
         }
+        previewLifecycleScope.cancel()
     }
 
     /*void updateUIPlacement() {
@@ -8028,27 +7980,15 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             Log.d(TAG, "is_test_junit4: $isTestJunit4")
         }
 
-        this.usingAndroidL = applicationInterface.useCamera2()
+        this.usingAndroidL = true
         if (MyDebug.LOG) {
             Log.d(TAG, "using_android_l?: $usingAndroidL")
         }
 
-        var usingTextureView = false
-        if (usingAndroidL) {
-            // use a TextureView for Android L - had bugs with SurfaceView not resizing properly on Nexus 7; and good to use a TextureView anyway
-            // ideally we'd use a TextureView for older camera API too, but sticking with SurfaceView to avoid risk of breaking behavior
-            usingTextureView = true
-        }
-
-        if (usingTextureView) {
-            this.cameraSurface = MyTextureView.createInstance(context, this)
-            // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
-            this.canvasView = CanvasView(context, this)
-            cameraControllerManager = CameraControllerManager2(context)
-        } else {
-            this.cameraSurface = MySurfaceView(context, this)
-            cameraControllerManager = CameraControllerManager1()
-        }
+        this.cameraSurface = MyTextureView.createInstance(context, this)
+        // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
+        this.canvasView = CanvasView(context, this)
+        cameraControllerManager = CameraControllerManager2(context)
 
         /*{
 			FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);

@@ -62,12 +62,32 @@ class MainActivity : MainActivityLegacyGlue() {
     @Inject
     lateinit var injectedAudioController: com.hightechif.openkamera.domain.engine.IAudioController
 
+    @Inject
+    lateinit var injectedCameraPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.CameraPreferencesRepository
+
+    @Inject
+    lateinit var injectedPhotoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.PhotoPreferencesRepository
+
+    @Inject
+    lateinit var injectedVideoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.VideoPreferencesRepository
+
+    @Inject
+    lateinit var injectedUiHudPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.UiHudPreferencesRepository
+
+    @Inject
+    lateinit var injectedLocationPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.LocationPreferencesRepository
+
     override val settingsRepository: ISettingsRepository get() = injectedSettingsRepository
     override val mediaRepository: IMediaRepository get() = injectedMediaRepository
     override val locationRepository: ILocationRepository get() = injectedLocationRepository
     override val sensorRepository: ISensorRepository get() = injectedSensorRepository
     override val remoteInputManager: com.hightechif.openkamera.domain.engine.IRemoteInputManager get() = injectedRemoteInputManager
     override val audioController: com.hightechif.openkamera.domain.engine.IAudioController get() = injectedAudioController
+    override val cameraPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.CameraPreferencesRepository get() = injectedCameraPreferencesRepository
+    override val photoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.PhotoPreferencesRepository get() = injectedPhotoPreferencesRepository
+    override val videoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.VideoPreferencesRepository get() = injectedVideoPreferencesRepository
+    override val uiHudPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.UiHudPreferencesRepository get() = injectedUiHudPreferencesRepository
+    override val locationPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.LocationPreferencesRepository get() = injectedLocationPreferencesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         var debugTime: Long = 0
@@ -197,9 +217,9 @@ class MainActivity : MainActivityLegacyGlue() {
         performLegacyConfigurationChanged(newConfig)
     }
 
-    override fun onSaveInstanceState(state: Bundle) {
-        super.onSaveInstanceState(state)
-        performLegacySaveInstanceState(state)
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        performLegacySaveInstanceState(outState)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

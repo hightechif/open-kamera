@@ -117,6 +117,7 @@ class PreferencesRepositoriesUnitTest {
     @Test
     fun cameraPreferences_hardwareAndExposureAndFocus() {
         assertFalse(cameraRepo.useCamera2(supportsCamera2 = false))
+        assertTrue(cameraRepo.useCamera2(supportsCamera2 = true))
         
         assertEquals(CameraPreferencesRepository.DEFAULT_FLASH_VALUE, cameraRepo.getFlashPref(0))
         cameraRepo.setFlashPref(0, "flash_torch")

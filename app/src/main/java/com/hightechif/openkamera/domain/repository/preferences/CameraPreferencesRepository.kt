@@ -35,12 +35,7 @@ class CameraPreferencesRepository(
     }
 
     fun useCamera2(supportsCamera2: Boolean): Boolean {
-        if (!supportsCamera2) return false
-        val cameraApi = sharedPreferences.getString(
-            PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-            PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
-        )
-        return "preference_camera_api_camera2" == cameraApi
+        return supportsCamera2
     }
 
     fun getFlashPref(cameraId: Int): String {

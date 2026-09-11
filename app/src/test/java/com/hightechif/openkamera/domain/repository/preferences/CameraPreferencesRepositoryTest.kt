@@ -66,9 +66,6 @@ class CameraPreferencesRepositoryTest {
     @Test
     fun `test useCamera2 resolution`() {
         assertFalse(repository.useCamera2(supportsCamera2 = false))
-        assertFalse(repository.useCamera2(supportsCamera2 = true))
-
-        sharedPreferences.edit().putString("preference_camera_api", "preference_camera_api_camera2").commit()
         assertTrue(repository.useCamera2(supportsCamera2 = true))
     }
 }

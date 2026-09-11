@@ -69,9 +69,6 @@ class CameraSettingsInteractorTest {
     @Test
     fun `test camera2 coordination`() {
         assertFalse(interactor.shouldUseCamera2(supportsCamera2 = false))
-        assertFalse(interactor.shouldUseCamera2(supportsCamera2 = true))
-
-        fakePrefs.edit().putString("preference_camera_api", "preference_camera_api_camera2").apply()
         assertTrue(interactor.shouldUseCamera2(supportsCamera2 = true))
     }
 }

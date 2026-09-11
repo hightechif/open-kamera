@@ -106,7 +106,12 @@ class MyApplicationInterface internal constructor(
     val mediaRepository: IMediaRepository? = null,
     val locationRepository: ILocationRepository? = null,
     val sensorRepository: ISensorRepository? = null,
-    settingsInteractor: CameraSettingsInteractor? = null
+    settingsInteractor: CameraSettingsInteractor? = null,
+    cameraPreferencesRepo: CameraPreferencesRepository? = null,
+    photoPreferencesRepo: PhotoPreferencesRepository? = null,
+    videoPreferencesRepo: VideoPreferencesRepository? = null,
+    uiHudPreferencesRepo: UiHudPreferencesRepository? = null,
+    locationPreferencesRepo: LocationPreferencesRepository? = null
 ) : BasicApplicationInterface() {
     // note, okay to change the order of enums in future versions, as getPhotoMode() does not rely on the order for the saved photo mode
     enum class PhotoMode {
@@ -255,19 +260,7 @@ class MyApplicationInterface internal constructor(
         get() = mainActivity
 
     override fun useCamera2(): Boolean {
-        if (mainActivity.supportsCamera2()) {
-            val cameraApi = settingsRepository?.getStringPreference(
-                PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-                PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
-            ) ?: sharedPreferences.getString(
-                PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-                PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
-            )
-            if ("preference_camera_api_camera2" == cameraApi) {
-                return true
-            }
-        }
-        return false
+        return mainActivity.supportsCamera2()
     }
 
     override fun getLocation(): Location? {
@@ -557,7 +550,7 @@ class MyApplicationInterface internal constructor(
             return Pair(bestSize.width, bestSize.height)
         }
 
-        var result: Pair<Int, Int>? = cameraSettingsInteractor.cameraPrefs.getCameraResolutionPref(
+        val result: Pair<Int, Int>? = cameraSettingsInteractor.cameraPrefs.getCameraResolutionPref(
             getCameraIdPref(),
             getCameraIdSPhysicalPref()
         )
@@ -3887,11 +3880,11 @@ class MyApplicationInterface internal constructor(
         this.mainActivity = mainActivity
         this.sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         this.cameraSettingsInteractor = settingsInteractor ?: CameraSettingsInteractor(
-            CameraPreferencesRepository(sharedPreferences),
-            VideoPreferencesRepository(sharedPreferences),
-            PhotoPreferencesRepository(sharedPreferences),
-            LocationPreferencesRepository(sharedPreferences),
-            UiHudPreferencesRepository(sharedPreferences)
+            cameraPreferencesRepo ?: CameraPreferencesRepository(sharedPreferences),
+            videoPreferencesRepo ?: VideoPreferencesRepository(sharedPreferences),
+            photoPreferencesRepo ?: PhotoPreferencesRepository(sharedPreferences),
+            locationPreferencesRepo ?: LocationPreferencesRepository(sharedPreferences),
+            uiHudPreferencesRepo ?: UiHudPreferencesRepository(sharedPreferences)
         )
         this.locationSupplier = LocationSupplier(mainActivity)
         if (MyDebug.LOG) Log.d(

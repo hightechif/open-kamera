@@ -155,6 +155,15 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     abstract val sensorRepository: ISensorRepository
     abstract val remoteInputManager: com.hightechif.openkamera.domain.engine.IRemoteInputManager
     abstract val audioController: com.hightechif.openkamera.domain.engine.IAudioController
+    abstract val cameraPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.CameraPreferencesRepository
+    abstract val photoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.PhotoPreferencesRepository
+    abstract val videoPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.VideoPreferencesRepository
+    abstract val uiHudPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.UiHudPreferencesRepository
+    abstract val locationPreferencesRepository: com.hightechif.openkamera.domain.repository.preferences.LocationPreferencesRepository
+
+    val sharedPreferences: SharedPreferences by lazy {
+        PreferenceManager.getDefaultSharedPreferences(this)
+    }
 
     var isAppPaused: Boolean = true
         internal set
@@ -402,7 +411,12 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
             settingsRepository,
             mediaRepository,
             locationRepository,
-            sensorRepository
+            sensorRepository,
+            cameraPreferencesRepo = cameraPreferencesRepository,
+            photoPreferencesRepo = photoPreferencesRepository,
+            videoPreferencesRepo = videoPreferencesRepository,
+            uiHudPreferencesRepo = uiHudPreferencesRepository,
+            locationPreferencesRepo = locationPreferencesRepository
         )
         if (MyDebug.LOG) Log.d(
             TAG,
@@ -720,7 +734,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         /** Whether this is a multi camera device, and the user preference is set to enable the multi-camera button.
          */
         get() {
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
             return isMultiCam && sharedPreferences.getBoolean(
                 PreferenceKeys.MULTI_CAM_BUTTON_PREFERENCE_KEY,
                 true
@@ -751,7 +764,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
      */
     fun showSwitchMultiCamIcon(): Boolean {
         if (preview.hasPhysicalCameras()) {
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
             if (sharedPreferences.getBoolean(
                     PreferenceKeys.MULTI_CAM_BUTTON_PREFERENCE_KEY,
                     true
@@ -761,9 +773,9 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         if (isMultiCamEnabled) {
             val cameraId = actualCameraId
             when (preview.cameraControllerManager.getFacing(cameraId)) {
-                Facing.FACING_BACK -> if (backCameraIds.size > 1) return true
-                Facing.FACING_FRONT -> if (frontCameraIds.size > 1) return true
-                else -> if (otherCameraIds.size > 1) return true
+                CameraController.Facing.FACING_BACK -> if (backCameraIds.size > 1) return true
+                CameraController.Facing.FACING_FRONT -> if (frontCameraIds.size > 1) return true
+                else -> {}
             }
         }
         return false
@@ -772,7 +784,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     /** Whether user preference is set to allow long press actions.
      */
     private fun allowLongPress(): Boolean {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
         return sharedPreferences.getBoolean(PreferenceKeys.ALLOW_LONG_PRESS_PREFERENCE_KEY, true)
     }
 
@@ -1235,7 +1246,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
     private fun setFirstTimeFlag() {
         if (MyDebug.LOG) Log.d(TAG, "setFirstTimeFlag")
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
         sharedPreferences.edit {
             putBoolean(PreferenceKeys.FIRST_TIME_PREFERENCE_KEY, true)
         }
