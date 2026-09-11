@@ -9,8 +9,6 @@ package com.hightechif.openkamera.cameracontroller
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.ImageFormat
-import android.graphics.Point
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraAccessException
@@ -29,13 +27,11 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.DngCreator
 import android.hardware.camera2.TotalCaptureResult
-import android.hardware.camera2.params.DynamicRangeProfiles
 import android.hardware.camera2.params.ExtensionSessionConfiguration
 import android.hardware.camera2.params.MeteringRectangle
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.RggbChannelVector
 import android.hardware.camera2.params.SessionConfiguration
-import android.hardware.camera2.params.StreamConfigurationMap
 import android.hardware.camera2.params.TonemapCurve
 import android.location.Location
 import android.media.AudioManager
@@ -46,9 +42,7 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
 import android.util.Log
-import android.util.Pair
 import android.util.Range
-import android.util.SizeF
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.TextureView
@@ -60,7 +54,6 @@ import com.hightechif.openkamera.cameracontroller.capabilities.Camera2Capabiliti
 import com.hightechif.openkamera.cameracontroller.capabilities.Camera2InfoCache
 import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
 import com.hightechif.openkamera.cameracontroller.extension.Camera2DeviceQuirks
-import com.hightechif.openkamera.cameracontroller.extension.Camera2VendorTagsExtension
 import com.hightechif.openkamera.cameracontroller.focus.Camera23AController
 import com.hightechif.openkamera.cameracontroller.focus.Camera2FocusMeteringCoordinator
 import com.hightechif.openkamera.cameracontroller.focus.MeteringAreaConverter
@@ -72,8 +65,6 @@ import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderH
 import com.hightechif.openkamera.cameracontroller.threading.Camera2ThreadManager
 import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.utils.MyDebug
-import java.util.Collections
-import java.util.Hashtable
 import java.util.LinkedList
 import java.util.Queue
 import java.util.concurrent.Executor
@@ -224,6 +215,90 @@ class CameraController2(
     val sessionManager = Camera2SessionManager()
     val imageReaderPipeline = Camera2ImageReaderPipeline()
     val pipelineManager = Camera2PipelineManager(imageReaderPipeline)
+
+    // Photo-capture state machine; takes full ownership of the takePicture() decision tree.
+    // The pipeline.initiate() wiring into takePicture() is completed in task 3.4.
+    val photoPipeline = Camera2PhotoPipeline(
+        context = object : Camera2PhotoPipeline.PipelineContext {
+            override val backgroundCameraLock: Any get() = this@CameraController2.backgroundCameraLock
+            override val sessionType
+                get() = if (this@CameraController2.sessionType == SessionType.SESSIONTYPE_EXTENSION)
+                    Camera2PhotoPipeline.PipelineContext.SessionTypeCompat.EXTENSION
+                else Camera2PhotoPipeline.PipelineContext.SessionTypeCompat.NORMAL
+            override val flashValue: String get() = this@CameraController2.cameraSettings.flashValue
+            override val hasIso: Boolean get() = this@CameraController2.cameraSettings.hasIso
+            override val previewBuilder get() = this@CameraController2.previewBuilder
+            override val imageReaderRaw get() = this@CameraController2.imageReaderRaw
+            override val useFakePrecaptureMode get() = this@CameraController2.useFakePrecaptureMode
+            override val captureResultAe get() = this@CameraController2.captureResultAe
+            override val isFlashRequired get() = this@CameraController2.isFlashRequired
+            override val fakePrecaptureUseFlash get() = this@CameraController2.fakePrecaptureUseFlash
+            override val fakePrecaptureUseFlashTimeMs get() = this@CameraController2.fakePrecaptureUseFlashTimeMs
+            override val captureResultHasIso get() = this@CameraController2.captureResultHasIso
+            override val captureResultIso get() = this@CameraController2.captureResultIso
+            override val handler get() = this@CameraController2.handler
+            override var pictureCb
+                get() = this@CameraController2.pictureCb
+                set(v) {
+                    this@CameraController2.pictureCb = v
+                }
+            override var jpegTodo
+                get() = this@CameraController2.jpegTodo
+                set(v) {
+                    this@CameraController2.jpegTodo = v
+                }
+            override var rawTodo
+                get() = this@CameraController2.rawTodo
+                set(v) {
+                    this@CameraController2.rawTodo = v
+                }
+            override var doneAllCaptures
+                get() = this@CameraController2.doneAllCaptures
+                set(v) {
+                    this@CameraController2.doneAllCaptures = v
+                }
+            override var takePictureErrorCb
+                get() = this@CameraController2.takePictureErrorCb
+                set(v) {
+                    this@CameraController2.takePictureErrorCb = v
+                }
+            override var fakePrecaptureTorchPerformed
+                get() = this@CameraController2.fakePrecaptureTorchPerformed
+                set(v) {
+                    this@CameraController2.fakePrecaptureTorchPerformed = v
+                }
+            override var state
+                get() = this@CameraController2.state
+                set(v) {
+                    this@CameraController2.state = v
+                }
+            override var precaptureStateChangeTimeMs
+                get() = this@CameraController2.precaptureStateChangeTimeMs
+                set(v) {
+                    this@CameraController2.precaptureStateChangeTimeMs = v
+                }
+            override var testFakeFlashPrecapture
+                get() = this@CameraController2.testFakeFlashPrecapture
+                set(v) {
+                    this@CameraController2.testFakeFlashPrecapture = v
+                }
+
+            override fun hasCaptureSession() =
+                this@CameraController2.camera != null && this@CameraController2.hasCaptureSession()
+
+            override fun fireAutoFlash() = this@CameraController2.fireAutoFlash()
+            override fun blockForExtensions() = this@CameraController2.blockForExtensions()
+            override fun setRepeatingRequest(request: android.hardware.camera2.CaptureRequest) =
+                this@CameraController2.setRepeatingRequest(request)
+
+            override fun runPrecaptureImpl() = this@CameraController2.runPrecapture()
+            override fun runFakePrecaptureImpl() = this@CameraController2.runFakePrecapture()
+            override fun takePictureAfterPrecaptureImpl() =
+                this@CameraController2.takePictureAfterPrecapture()
+        },
+        deviceQuirks = deviceQuirks
+    )
+    var captureStateListener: CaptureStateListener? = photoPipeline
     private val imageReader: ImageReader?
         get() = imageReaderPipeline.imageReaderJpeg
     private val imageReaderRaw: ImageReader?
@@ -232,6 +307,7 @@ class CameraController2(
 
     val threeAController = Camera23AController(focusCoordinator)
     val captureCoordinator = Camera2CaptureCoordinator(MAX_EXPO_BRACKETING_N_IMAGES)
+    val burstCoordinator = Camera2BurstCoordinator()
 
     private val expoBracketingNImages: Int
         get() = captureCoordinator.expoBracketingNImages
@@ -311,16 +387,37 @@ class CameraController2(
     private var doneAllCaptures = false
 
     //private CaptureRequest pendingRequestWhenReady;
-    private var nBurst = 0 // number of expected (remaining) burst JPEG images in this capture
-    override var nBurstTaken: Int = 0 // number of burst JPEG images taken so far in this capture
-        private set
+    // Burst-sequence state is owned by burstCoordinator; these delegated properties provide
+    // backwards-compatible access throughout the existing call sites.
+    private var nBurst: Int
+        get() = burstCoordinator.nBurst
+        set(value) {
+            burstCoordinator.setNBurst(value)
+        }
+    override var nBurstTaken: Int // number of burst JPEG images taken so far in this capture
+        get() = burstCoordinator.nBurstTaken
+        private set(value) {
+            burstCoordinator.setNBurstTaken(value)
+        }
 
     // total number of expected burst images in this capture (if known) (same for JPEG and RAW)
-    private var nBurstTotal = 0
-    private var nBurstRaw = 0 // number of expected (remaining) burst RAW images in this capture
+    private var nBurstTotal: Int
+        get() = burstCoordinator.nBurstTotal
+        set(value) {
+            burstCoordinator.setNBurstTotal(value)
+        }
+    private var nBurstRaw: Int // number of expected (remaining) burst RAW images in this capture
+        get() = burstCoordinator.nBurstRaw
+        set(value) {
+            burstCoordinator.setNBurstRaw(value)
+        }
 
     // if true then the burst images are returned in a single call to onBurstPictureTaken(), if false, then multiple calls to onPictureTaken() are made as soon as the image is available
-    private var burstSingleRequest = false
+    private var burstSingleRequest: Boolean
+        get() = burstCoordinator.burstSingleRequest
+        set(value) {
+            burstCoordinator.setBurstSingleRequest(value)
+        }
 
     // burst images that have been captured so far, but not yet sent to the application
     private val pendingBurstImages: MutableList<ByteArray?> = ArrayList()
@@ -1150,7 +1247,8 @@ class CameraController2(
         this.hasReceivedFrame = false
     }
 
-    private fun convertSceneMode(value2: Int): String? = Camera2RequestBuilderHelper.convertSceneModeToString(value2)
+    private fun convertSceneMode(value2: Int): String? =
+        Camera2RequestBuilderHelper.convertSceneModeToString(value2)
 
     override fun setSceneMode(value: String): SupportedValues? {
         if (MyDebug.LOG) Log.d(TAG, "setSceneMode: $value")
@@ -1171,7 +1269,8 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, SCENE_MODE_DEFAULT)
         if (supportedValues != null) {
-            val selectedValue2 = Camera2RequestBuilderHelper.convertSceneModeToInt(supportedValues.selectedValue)
+            val selectedValue2 =
+                Camera2RequestBuilderHelper.convertSceneModeToInt(supportedValues.selectedValue)
             cameraSettings.sceneMode = selectedValue2
             if (cameraSettings.setSceneMode(previewBuilder)) {
                 try {
@@ -1200,7 +1299,8 @@ class CameraController2(
         return false
     }
 
-    private fun convertColorEffect(value2: Int): String? = Camera2RequestBuilderHelper.convertColorEffectToString(value2)
+    private fun convertColorEffect(value2: Int): String? =
+        Camera2RequestBuilderHelper.convertColorEffectToString(value2)
 
     override fun setColorEffect(value: String): SupportedValues? {
         if (MyDebug.LOG) Log.d(TAG, "setColorEffect: $value")
@@ -1215,7 +1315,8 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, COLOR_EFFECT_DEFAULT)
         if (supportedValues != null) {
-            val selectedValue2 = Camera2RequestBuilderHelper.convertColorEffectToInt(supportedValues.selectedValue)
+            val selectedValue2 =
+                Camera2RequestBuilderHelper.convertColorEffectToInt(supportedValues.selectedValue)
             cameraSettings.colorEffect = selectedValue2
             if (cameraSettings.setColorEffect(previewBuilder)) {
                 try {
@@ -1240,7 +1341,8 @@ class CameraController2(
             return convertColorEffect(value2)
         }
 
-    private fun convertWhiteBalance(value2: Int): String? = Camera2RequestBuilderHelper.convertWhiteBalanceToString(value2)
+    private fun convertWhiteBalance(value2: Int): String? =
+        Camera2RequestBuilderHelper.convertWhiteBalanceToString(value2)
 
     /** Whether we should allow manual white balance, even if the device supports CONTROL_AWB_MODE_OFF.
      */
@@ -1272,7 +1374,8 @@ class CameraController2(
         }
         val supportedValues = checkModeIsSupported(values, value, WHITE_BALANCE_DEFAULT)
         if (supportedValues != null) {
-            val selectedValue2 = Camera2RequestBuilderHelper.convertWhiteBalanceToInt(supportedValues.selectedValue)
+            val selectedValue2 =
+                Camera2RequestBuilderHelper.convertWhiteBalanceToInt(supportedValues.selectedValue)
             cameraSettings.whiteBalance = selectedValue2
             if (cameraSettings.setWhiteBalance(previewBuilder)) {
                 try {
@@ -1306,8 +1409,10 @@ class CameraController2(
             return false
         }
         try {
-            newTemperature = max(newTemperature.toDouble(), MIN_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
-            newTemperature = min(newTemperature.toDouble(), MAX_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
+            newTemperature =
+                max(newTemperature.toDouble(), MIN_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
+            newTemperature =
+                min(newTemperature.toDouble(), MAX_WHITE_BALANCE_TEMPERATURE_C.toDouble()).toInt()
             cameraSettings.whiteBalanceTemperature = newTemperature
             if (cameraSettings.setWhiteBalance(previewBuilder)) {
                 setRepeatingRequest()
@@ -1326,12 +1431,14 @@ class CameraController2(
     override val whiteBalanceTemperature: Int
         get() = cameraSettings.whiteBalanceTemperature
 
-    private fun convertAntiBanding(value2: Int): String? = Camera2RequestBuilderHelper.convertAntiBandingToString(value2)
+    private fun convertAntiBanding(value2: Int): String? =
+        Camera2RequestBuilderHelper.convertAntiBandingToString(value2)
 
     override fun setAntiBanding(value: String): SupportedValues? {
         if (MyDebug.LOG) Log.d(TAG, "setAntiBanding: $value")
-        val values2 = characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES)
-            ?: return null
+        val values2 =
+            characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES)
+                ?: return null
         val values: MutableList<String> = ArrayList()
         for (value2 in values2) {
             val thisValue = convertAntiBanding(value2)
@@ -1342,7 +1449,8 @@ class CameraController2(
         val supportedValues = checkModeIsSupported(values, value, ANTIBANDING_DEFAULT)
         if (supportedValues != null) {
             if (supportedValues.selectedValue == value) {
-                val selectedValue2 = Camera2RequestBuilderHelper.convertAntiBandingToInt(supportedValues.selectedValue)
+                val selectedValue2 =
+                    Camera2RequestBuilderHelper.convertAntiBandingToInt(supportedValues.selectedValue)
                 cameraSettings.hasAntibanding = true
                 cameraSettings.antibanding = selectedValue2
                 if (cameraSettings.setAntiBanding(previewBuilder)) {
@@ -1370,7 +1478,9 @@ class CameraController2(
         }
 
     private fun convertEdgeMode(value2: Int): String? {
-        return if (value2 == CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertEdgeModeToString(value2)
+        return if (value2 == CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertEdgeModeToString(
+            value2
+        )
     }
 
     override fun setEdgeMode(value: String): SupportedValues? {
@@ -1392,7 +1502,8 @@ class CameraController2(
                 var selectedValue2 = CameraMetadata.EDGE_MODE_FAST
                 if (value != EDGE_MODE_DEFAULT) {
                     hasEdgeMode = true
-                    selectedValue2 = Camera2RequestBuilderHelper.convertEdgeModeToInt(supportedValues.selectedValue)
+                    selectedValue2 =
+                        Camera2RequestBuilderHelper.convertEdgeModeToInt(supportedValues.selectedValue)
                 }
 
                 if (cameraSettings.hasEdgeMode != hasEdgeMode || cameraSettings.edgeMode != selectedValue2) {
@@ -1424,13 +1535,16 @@ class CameraController2(
         }
 
     private fun convertNoiseReductionMode(value2: Int): String? {
-        return if (value2 == CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertNoiseReductionModeToString(value2)
+        return if (value2 == CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG) null else Camera2RequestBuilderHelper.convertNoiseReductionModeToString(
+            value2
+        )
     }
 
     override fun setNoiseReductionMode(value: String): SupportedValues? {
         if (MyDebug.LOG) Log.d(TAG, "setNoiseReductionMode: $value")
-        val values2 = characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
-            ?: return null
+        val values2 =
+            characteristics?.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)
+                ?: return null
         val values: MutableList<String> = ArrayList()
         values.add(NOISE_REDUCTION_MODE_DEFAULT)
         for (value2 in values2) {
@@ -1446,7 +1560,8 @@ class CameraController2(
                 var selectedValue2 = CameraMetadata.NOISE_REDUCTION_MODE_FAST
                 if (value != NOISE_REDUCTION_MODE_DEFAULT) {
                     hasNoiseReductionMode = true
-                    selectedValue2 = Camera2RequestBuilderHelper.convertNoiseReductionModeToInt(supportedValues.selectedValue)
+                    selectedValue2 =
+                        Camera2RequestBuilderHelper.convertNoiseReductionModeToInt(supportedValues.selectedValue)
                 }
 
                 if (cameraSettings.hasNoiseReductionMode != hasNoiseReductionMode || cameraSettings.noiseReductionMode != selectedValue2) {
@@ -2530,7 +2645,7 @@ class CameraController2(
             flashValue == "flash_frontscreen_auto" || flashValue == "flash_frontscreen_on"
         useFakePrecaptureMode = if (frontscreenFlash) {
             true
-        } else if (burstType !== BurstType.BURSTTYPE_NONE) true
+        } else if (deviceQuirks.requiresFakePrecapture(burstType !== BurstType.BURSTTYPE_NONE)) true
         else if (cameraSettings.hasIso) true
         else {
             useFakePrecapture
@@ -3807,7 +3922,7 @@ class CameraController2(
      */
     private fun adjustPreview(stillRequest: CaptureRequest): Boolean {
         var adjustPreview = false
-        if ((isSamsung || testForceRunPostCapture) && !previewIsVideoMode) {
+        if (deviceQuirks.requiresPostCaptureTrigger(previewIsVideoMode, testForceRunPostCapture)) {
             // don't do this if in video snapshot mode
             val aeMode = stillRequest.get(CaptureRequest.CONTROL_AE_MODE)
             val exposureTime = stillRequest.get(CaptureRequest.SENSOR_EXPOSURE_TIME)
@@ -3938,7 +4053,7 @@ class CameraController2(
                 // using manual shutter speeds.)
                 //stillBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                 //stillBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && sessionType != SessionType.SESSIONTYPE_EXTENSION) {
+                if (deviceQuirks.supportsZslHint() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && sessionType != SessionType.SESSIONTYPE_EXTENSION) {
                     // unclear why we wouldn't want to request ZSL
                     // this is also required to enable HDR+ on Google Pixel devices when using Camera2: https://opensource.google.com/projects/pixelvisualcorecamera
                     // but don't set for extension sessions (in theory it should be ignored, but just in case)
@@ -4127,7 +4242,7 @@ class CameraController2(
                 // n.b., don't set RequestTagType.CAPTURE here - we only do it for the last of the burst captures (see below)
                 cameraSettings.setupBuilder(stillBuilder, true)
 
-                if (MyDebug.LOG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (MyDebug.LOG && deviceQuirks.supportsZslHint() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val zsl = stillBuilder.get(CaptureRequest.CONTROL_ENABLE_ZSL)
                     Log.d(
                         TAG, "CONTROL_ENABLE_ZSL: " + (zsl
@@ -4670,7 +4785,7 @@ class CameraController2(
                     testFakeFlashPhoto++
                 }
 
-                if (!isSamsung && burstType === BurstType.BURSTTYPE_NORMAL && burstForNoiseReduction) {
+                if (deviceQuirks.allowsBurstNoiseReduction() && burstType === BurstType.BURSTTYPE_NORMAL && burstForNoiseReduction) {
                     // Must be done after calling setupBuilder(), so we override the default EDGE_MODE and NOISE_REDUCTION_MODE.
                     // We disable noise-reduction etc. for photo mode NR because on many devices this smears out detail that we actually
                     // aim to recover by averaging a stack of multiple images.
@@ -5094,116 +5209,7 @@ class CameraController2(
     }
 
     override fun takePicture(picture: PictureCallback, error: ErrorCallback) {
-        if (MyDebug.LOG) Log.d(TAG, "takePicture")
-        var debugTime: Long = 0
-        if (MyDebug.LOG) {
-            debugTime = System.currentTimeMillis()
-        }
-
-        var callTakePictureAfterPrecapture = false
-        var callRunFakePrecapture = false
-        var callRunPrecapture = false
-
-        synchronized(backgroundCameraLock) {
-            if (camera == null || !hasCaptureSession()) {
-                if (MyDebug.LOG) Log.d(TAG, "no camera or capture session")
-                error.onError()
-                return
-            }
-            this.pictureCb = picture
-            this.jpegTodo = true
-            this.rawTodo = imageReaderRaw != null
-            this.doneAllCaptures = false
-            this.takePictureErrorCb = error
-            this.fakePrecaptureTorchPerformed = false // just in case still on?
-            if (sessionType == SessionType.SESSIONTYPE_NORMAL && !readyForCapture) {
-                if (MyDebug.LOG) Log.e(TAG, "takePicture: not ready for capture!")
-                //throw new RuntimeException(); // debugging
-            }
-            run {
-                if (MyDebug.LOG) {
-                    Log.d(TAG, "current flash value: " + cameraSettings.flashValue)
-                    Log.d(
-                        TAG,
-                        "use_fake_precapture_mode: $useFakePrecaptureMode"
-                    )
-                }
-                if (sessionType == SessionType.SESSIONTYPE_EXTENSION) {
-                    // precapture not supported for extensions
-                    callTakePictureAfterPrecapture = true
-                } else if (cameraSettings.flashValue == "flash_off" || cameraSettings.flashValue == "flash_torch" || cameraSettings.flashValue == "flash_frontscreen_torch") {
-                    // Don't need precapture if flash off or torch
-                    callTakePictureAfterPrecapture = true
-                } else if (useFakePrecaptureMode) {
-                    // fake flash auto/on mode
-                    // fake precapture works by turning on torch (or using a "front screen flash"), so we can't use the camera's own decision for flash auto
-                    // instead we check the current ISO value
-                    val autoFlash =
-                        cameraSettings.flashValue == "flash_auto" || cameraSettings.flashValue == "flash_frontscreen_auto"
-                    val flashMode = previewBuilder?.get(CaptureRequest.FLASH_MODE)
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "flash_mode: $flashMode"
-                    )
-                    if (autoFlash && !fireAutoFlash()) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "fake precapture flash auto: seems bright enough to not need flash"
-                        )
-                        callTakePictureAfterPrecapture = true
-                    } else if (flashMode != null && flashMode == CameraMetadata.FLASH_MODE_TORCH) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "fake precapture flash: torch already on (presumably from autofocus)"
-                        )
-                        // On some devices (e.g., OnePlus 3T), if we've already turned on torch for an autofocus immediately before
-                        // taking the photo, ae convergence may have already occurred - so if we called runFakePrecapture(), we'd just get
-                        // stuck waiting for CONTROL_AE_STATE_SEARCHING which will never happen, until we hit the timeout - it works,
-                        // but it means taking photos is slower as we have to wait until the timeout
-                        // Instead we assume that ae scanning has already started, so go straight to STATE_WAITING_FAKE_PRECAPTURE_DONE,
-                        // which means wait until we're no longer CONTROL_AE_STATE_SEARCHING.
-                        // (Note, we don't want to go straight to takePictureAfterPrecapture(), as it might be that ae scanning is still
-                        // taking place.)
-                        // An alternative solution would be to switch torch off and back on again to cause ae scanning to start - but
-                        // at worst this is tricky to get working, and at best, taking photos would be slower.
-                        fakePrecaptureTorchPerformed =
-                            true // so we know to fire the torch when capturing
-                        testFakeFlashPrecapture++ // for testing, should treat this same as if we did do the precapture
-                        state = STATE_WAITING_FAKE_PRECAPTURE_DONE
-                        precaptureStateChangeTimeMs = System.currentTimeMillis()
-                    } else {
-                        callRunFakePrecapture = true
-                    }
-                } else {
-                    // standard flash, flash auto or on
-                    // note that we don't call needsFlash() (or use isFlashRequired) - as if ae state is neither CONVERGED nor FLASH_REQUIRED, we err on the side
-                    // of caution and don't skip the precapture
-                    //boolean needsFlash = captureResultAe != null && captureResultAe == CaptureResult.CONTROL_AE_STATE_FLASH_REQUIRED;
-                    val needsFlash =
-                        captureResultAe != null && captureResultAe != CaptureResult.CONTROL_AE_STATE_CONVERGED
-                    if (cameraSettings.flashValue == "flash_auto" && !needsFlash) {
-                        // if we call precapture anyway, flash wouldn't fire - but we tend to have a pause
-                        // so skipping the precapture if flash isn't going to fire makes this faster
-                        if (MyDebug.LOG) Log.d(TAG, "flash auto, but we don't need flash")
-                        callTakePictureAfterPrecapture = true
-                    } else {
-                        callRunPrecapture = true
-                    }
-                }
-            }
-        }
-
-        // important to call functions outside of locks, so that they can in turn call callbacks without a lock
-        if (callTakePictureAfterPrecapture) {
-            takePictureAfterPrecapture()
-        } else if (callRunFakePrecapture) {
-            runFakePrecapture()
-        } else if (callRunPrecapture) {
-            runPrecapture()
-        }
-        if (MyDebug.LOG) {
-            Log.d(TAG, "takePicture() took: " + (System.currentTimeMillis() - debugTime))
-        }
+        photoPipeline.initiate(picture, error)
     }
 
     override var displayOrientation: Int
@@ -5801,7 +5807,7 @@ class CameraController2(
         // Samsung Galaxy devices have bug where MediaActionSound always plays at 100% volume - the SHUTTER_CLICK sounds
         // really harsh/loud, so the video recording beep reduces this problem
         shutterClickSound =
-            if (isSamsung) MediaActionSound.START_VIDEO_RECORDING else MediaActionSound.SHUTTER_CLICK
+            if (deviceQuirks.usesAlternativeShutterSound()) MediaActionSound.START_VIDEO_RECORDING else MediaActionSound.SHUTTER_CLICK
 
         // expand tonemap curves
         jtvideoValues = enforceMinTonemapCurvePoints(jtvideoValuesBase)
@@ -5845,6 +5851,7 @@ class CameraController2(
                 Log.d(TAG, "was image captured?: " + failure.wasImageCaptured())
                 Log.d(TAG, "sequenceId: " + failure.sequenceId)
             }
+            captureStateListener?.onCaptureFailed()
             super.onCaptureFailed(
                 session,
                 request,
@@ -5934,6 +5941,7 @@ class CameraController2(
                     )
                 }
             }
+            captureStateListener?.onCaptureResultReceived(result)
             process(request, result)
             processCompleted(request, result)
             super.onCaptureCompleted(
@@ -6907,12 +6915,12 @@ class CameraController2(
         // for BURSTTYPE_EXPO:
         // could be more, but limit to 5 for now
         private const val MAX_EXPO_BRACKETING_N_IMAGES = 5
-        private const val STATE_NORMAL = 0
-        private const val STATE_WAITING_AUTOFOCUS = 1
-        private const val STATE_WAITING_PRECAPTURE_START = 2
-        private const val STATE_WAITING_PRECAPTURE_DONE = 3
-        private const val STATE_WAITING_FAKE_PRECAPTURE_START = 4
-        private const val STATE_WAITING_FAKE_PRECAPTURE_DONE = 5
+        internal const val STATE_NORMAL = 0
+        internal const val STATE_WAITING_AUTOFOCUS = 1
+        internal const val STATE_WAITING_PRECAPTURE_START = 2
+        internal const val STATE_WAITING_PRECAPTURE_DONE = 3
+        internal const val STATE_WAITING_FAKE_PRECAPTURE_START = 4
+        internal const val STATE_WAITING_FAKE_PRECAPTURE_DONE = 5
         private const val PRECAPTURE_START_TIMEOUT_C: Long = 2000
         private const val PRECAPTURE_DONE_TIMEOUT_C: Long = 3000
 
