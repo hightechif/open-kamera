@@ -1381,6 +1381,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     }
                     cameraControllerLocal.release()
                     cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+                    (context as? com.hightechif.openkamera.MainActivity)?.cameraEngineBridge?.detachController()
                 }
             }
         } else {
@@ -1673,7 +1674,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     cameraOpened()
                     cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
                     if (MyDebug.LOG) Log.d(TAG, "openCamera coroutine done")
-                } catch (e: CancellationException) {
+                } catch (_: CancellationException) {
                     if (MyDebug.LOG) {
                         Log.d(TAG, "openCamera coroutine cancelled")
                         Log.d(TAG, "camera_controller: $cameraControllerResult")
@@ -1826,6 +1827,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
             if (MyDebug.LOG) Log.d(TAG, "call setPreviewDisplay")
             cameraSurface.setPreviewDisplay(cameraController)
+            (context as? com.hightechif.openkamera.MainActivity)?.let { mainActivity ->
+                (cameraController as? CameraController2)?.let { cc2 ->
+                    mainActivity.cameraEngineBridge.attachController(cc2)
+                }
+            }
             if (MyDebug.LOG) {
                 Log.d(
                     TAG,

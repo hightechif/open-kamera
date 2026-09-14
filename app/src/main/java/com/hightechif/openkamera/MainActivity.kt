@@ -45,6 +45,9 @@ class MainActivity : MainActivityLegacyGlue() {
     override val settingsViewModel: SettingsViewModel by viewModels()
 
     @Inject
+    lateinit var cameraEngineBridge: com.hightechif.openkamera.cameracontroller.Camera2EngineBridge
+
+    @Inject
     lateinit var injectedSettingsRepository: ISettingsRepository
 
     @Inject

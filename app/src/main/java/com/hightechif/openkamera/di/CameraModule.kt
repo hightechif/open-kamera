@@ -6,7 +6,7 @@
  */
 package com.hightechif.openkamera.di
 
-import com.hightechif.openkamera.cameracontroller.Camera2EngineImpl
+import com.hightechif.openkamera.cameracontroller.Camera2EngineBridge
 import com.hightechif.openkamera.domain.engine.ICameraEngine
 import dagger.Binds
 import dagger.Module
@@ -21,6 +21,6 @@ abstract class CameraModule {
     @Binds
     @Singleton
     abstract fun bindCameraEngine(
-        impl: Camera2EngineImpl
+        bridge: Camera2EngineBridge
     ): ICameraEngine
 }

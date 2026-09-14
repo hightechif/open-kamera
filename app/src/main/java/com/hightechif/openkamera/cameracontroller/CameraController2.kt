@@ -178,8 +178,12 @@ class CameraController2(
         }
     private var cameraExtension = 0 // used if sessionType == SESSIONTYPE_EXTENSION
 
-    private var previewBuilder: CaptureRequest.Builder? = null
-    var previewIsVideoMode = false
+    internal var previewBuilder: CaptureRequest.Builder? = null
+    var previewIsVideoMode: Boolean
+        get() = videoPipeline.previewIsVideoMode
+        set(value) {
+            videoPipeline.previewIsVideoMode = value
+        }
     val focusCoordinator = Camera2FocusMeteringCoordinator()
     val focusMeteringCoordinator: Camera2FocusMeteringCoordinator get() = focusCoordinator
     private var autofocusCb: AutoFocusCallback?
@@ -209,10 +213,11 @@ class CameraController2(
     private val openCameraLock = Any()
 
     // lock to synchronize between UI thread and the background "CameraBackground" thread/handler
-    private val backgroundCameraLock = Any()
+    internal val backgroundCameraLock = Any()
 
     val callbackDispatcher = Camera2StateCallbackDispatcher()
     val sessionManager = Camera2SessionManager()
+    val cameraSettings = Camera2Settings(this)
     val imageReaderPipeline = Camera2ImageReaderPipeline()
     val pipelineManager = Camera2PipelineManager(imageReaderPipeline)
 
@@ -288,7 +293,7 @@ class CameraController2(
 
             override fun fireAutoFlash() = this@CameraController2.fireAutoFlash()
             override fun blockForExtensions() = this@CameraController2.blockForExtensions()
-            override fun setRepeatingRequest(request: android.hardware.camera2.CaptureRequest) =
+            override fun setRepeatingRequest(request: CaptureRequest) =
                 this@CameraController2.setRepeatingRequest(request)
 
             override fun runPrecaptureImpl() = this@CameraController2.runPrecapture()
@@ -299,6 +304,12 @@ class CameraController2(
         deviceQuirks = deviceQuirks
     )
     var captureStateListener: CaptureStateListener? = photoPipeline
+    val videoPipeline = Camera2VideoPipeline(
+        controller = this,
+        sessionManager = sessionManager,
+        cameraSettings = cameraSettings,
+        callbackDispatcher = callbackDispatcher
+    )
     private val imageReader: ImageReader?
         get() = imageReaderPipeline.imageReaderJpeg
     private val imageReaderRaw: ImageReader?
@@ -432,8 +443,18 @@ class CameraController2(
     // used to ensure that when taking JPEG+RAW, the JPEG picture callback is called first (only used for non-burst cases)
     private var pendingRawImage: RawImage? = null
     private var takePictureErrorCb: ErrorCallback? = null
-    private var wantVideoHighSpeed = false
-    private var isVideoHighSpeed = false // whether we're actually recording in high speed
+    private var wantVideoHighSpeed: Boolean
+        get() = videoPipeline.wantVideoHighSpeed
+        set(value) {
+            videoPipeline.wantVideoHighSpeed = value
+        }
+    private var isVideoHighSpeed: Boolean
+        @JvmName("getIsVideoHighSpeedState")
+        get() = videoPipeline.isVideoHighSpeed
+        @JvmName("setIsVideoHighSpeedState")
+        set(value) {
+            videoPipeline.isVideoHighSpeed = value
+        }
     private var aeFpsRanges = mutableListOf<IntArray>()
     private var hsFpsRanges = mutableListOf<IntArray>()
 
@@ -447,7 +468,11 @@ class CameraController2(
     var threadManager: Camera2ThreadManager? = null
     var handler: Handler? = null
     var executor: Executor? = null
-    private var videoRecorderSurface: Surface? = null
+    private var videoRecorderSurface: Surface?
+        get() = videoPipeline.videoRecorderSurface
+        set(value) {
+            videoPipeline.videoRecorderSurface = value
+        }
 
     private var previewWidth = 0
     private var previewHeight = 0
@@ -537,7 +562,7 @@ class CameraController2(
        We use this class instead of assigning the RequestTagType directly, so we can modify it
        (even though CaptureRequest only has a getTag() method).
      */
-    private class RequestTagObject(type: RequestTagType) {
+    class RequestTagObject(type: RequestTagType) {
         private var type: RequestTagType
 
         init {
@@ -559,7 +584,7 @@ class CameraController2(
         return captureSession != null
     }
 
-    private fun blockForExtensions() {
+    internal fun blockForExtensions() {
         if (sessionType == SessionType.SESSIONTYPE_EXTENSION) {
             throw RuntimeException("not supported for extension session")
         }
@@ -1103,7 +1128,7 @@ class CameraController2(
         }
     }
 
-    private val cameraSettings: Camera2Settings = Camera2Settings(this)
+
     private var pushRepeatingRequestWhenTorchOff = false
     private var pushRepeatingRequestWhenTorchOffId: CaptureRequest? = null
 
@@ -2769,7 +2794,7 @@ class CameraController2(
         this.soundsEnabled = enabled
     }
 
-    private fun playSound(soundName: Int) {
+    internal fun playSound(soundName: Int) {
         if (soundsEnabled) {
             // on some devices (e.g., Samsung Galaxy S10e), need to check whether phone on silent!
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -3113,7 +3138,7 @@ class CameraController2(
     }
 
     @Throws(CameraControllerException::class)
-    private fun createCaptureSession(
+    internal fun createCaptureSession(
         videoRecorder: MediaRecorder?,
         wantPhotoVideoRecording: Boolean
     ) {
@@ -4030,14 +4055,18 @@ class CameraController2(
                 }
                 // important to use TEMPLATE_MANUAL for manual exposure: this fixes bug on Pixel 6 Pro where manual exposure is ignored when longer than the
                 // preview exposure time (oddly Galaxy S10e has the same bug since Android 11, but that isn't fixed with using TEMPLATE_MANUAL)
-                stillBuilder =
-                    camera?.createCaptureRequest(if (previewIsVideoMode) CameraDevice.TEMPLATE_VIDEO_SNAPSHOT else if (cameraSettings.hasIso) CameraDevice.TEMPLATE_MANUAL else CameraDevice.TEMPLATE_STILL_CAPTURE)
-                stillBuilder!!.setTag(
-                    RequestTagObject(
-                        RequestTagType.CAPTURE
+                stillBuilder = (if (previewIsVideoMode) {
+                    videoPipeline.createVideoSnapshotRequest(camera!!, imageReader!!.surface, cameraSettings.hasIso)
+                } else {
+                    val builder = camera?.createCaptureRequest(if (cameraSettings.hasIso) CameraDevice.TEMPLATE_MANUAL else CameraDevice.TEMPLATE_STILL_CAPTURE)
+                    builder?.setTag(
+                        RequestTagObject(
+                            RequestTagType.CAPTURE
+                        )
                     )
-                )
-                cameraSettings.setupBuilder(stillBuilder, true)
+                    cameraSettings.setupBuilder(builder, true)
+                    builder
+                })!!
                 if (useFakePrecaptureMode && fakePrecaptureTorchPerformed) {
                     if (MyDebug.LOG) Log.d(TAG, "setting torch for capture")
                     if (!cameraSettings.hasIso) stillBuilder.set(
@@ -5228,9 +5257,7 @@ class CameraController2(
     }
 
     override fun initVideoRecorderPrePrepare(videoRecorder: MediaRecorder?) {
-        // if we change where we play the START_VIDEO_RECORDING sound, make sure it can't be heard in resultant video
-        blockForExtensions() // not supported for extension sessions
-        playSound(MediaActionSound.START_VIDEO_RECORDING)
+        videoPipeline.initVideoRecorderPrePrepare(videoRecorder)
     }
 
     @Throws(CameraControllerException::class)
@@ -5238,32 +5265,7 @@ class CameraController2(
         videoRecorder: MediaRecorder?,
         wantPhotoVideoRecording: Boolean
     ) {
-        if (MyDebug.LOG) Log.d(TAG, "initVideoRecorderPostPrepare")
-        if (camera == null) {
-            Log.e(TAG, "no camera")
-            throw CameraControllerException()
-        }
-        blockForExtensions() // not supported for extension sessions
-        try {
-            if (MyDebug.LOG) Log.d(TAG, "obtain video_recorder surface")
-            previewBuilder = camera?.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
-            if (MyDebug.LOG) Log.d(TAG, "done")
-            previewIsVideoMode = true
-            previewBuilder?.set(
-                CaptureRequest.CONTROL_CAPTURE_INTENT,
-                CaptureRequest.CONTROL_CAPTURE_INTENT_VIDEO_RECORD
-            )
-            previewBuilder?.let { cameraSettings.setupBuilder(it, false) }
-            createCaptureSession(videoRecorder, wantPhotoVideoRecording)
-        } catch (e: CameraAccessException) {
-            if (MyDebug.LOG) {
-                Log.e(TAG, "failed to create capture request for video")
-                Log.e(TAG, "reason: " + e.reason)
-                Log.e(TAG, "message: " + e.message)
-            }
-            e.printStackTrace()
-            throw CameraControllerException()
-        }
+        videoPipeline.initVideoRecorderPostPrepare(videoRecorder, wantPhotoVideoRecording)
     }
 
     @Throws(CameraControllerException::class)
