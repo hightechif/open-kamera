@@ -61,3 +61,12 @@ target_link_libraries(
     ${log-lib}
     ${jnigraphics-lib}
 )
+
+# Enforce 16 KB ELF segment alignment on 64-bit architectures for Android 15+ compatibility
+if(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a" OR CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64" OR ANDROID_ABI STREQUAL "arm64-v8a" OR ANDROID_ABI STREQUAL "x86_64")
+    target_link_options(
+        openkamera_native
+        PRIVATE
+        "-Wl,-z,max-page-size=16384"
+    )
+endif()
