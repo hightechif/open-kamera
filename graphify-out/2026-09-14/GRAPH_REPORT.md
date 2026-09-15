@@ -1,7 +1,8 @@
 # Graph Report - OpenKamera  (2026-09-14)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- 350 files · ~412,175 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
 - 5359 nodes · 10641 edges · 311 communities (183 shown, 84 thin omitted)
@@ -297,14 +298,14 @@
 ## Surprising Connections (you probably didn't know these)
 - `MainActivity` --coordinates--> `OpenKamera Architecture`  [EXTRACTED]
   app/src/main/java/com/hightechif/openkamera/MainActivity.kt → README.md
-- `Java_com_hightechif_openkamera_processing_NativeImageProcessorBridge_nativeProcessHdrFusion()` --references--> `LockedBitmap`  [INFERRED]
-  app/src/main/cpp/native_bridge.cpp → app/src/main/cpp/utils/bitmap_utils.h
 - `Java_com_hightechif_openkamera_processing_NativeImageProcessorBridge_nativeProcessHdrFusion()` --references--> `FrameInfo`  [INFERRED]
   app/src/main/cpp/native_bridge.cpp → app/src/main/cpp/hdr/process_hdr.h
-- `OnScreenIcons` --calls--> `ToastBoxer`  [INFERRED]
-  app/src/main/java/com/hightechif/openkamera/utils/OnScreenIcons.kt → app/src/main/java/com/hightechif/openkamera/utils/ToastBoxer.kt
+- `Java_com_hightechif_openkamera_processing_NativeImageProcessorBridge_nativeProcessHdrFusion()` --references--> `LockedBitmap`  [INFERRED]
+  app/src/main/cpp/native_bridge.cpp → app/src/main/cpp/utils/bitmap_utils.h
 - `Preview` --calls--> `CameraCaptureStateMachine`  [INFERRED]
   app/src/main/java/com/hightechif/openkamera/preview/Preview.kt → app/src/main/java/com/hightechif/openkamera/preview/CameraCaptureStateMachine.kt
+- `OnScreenIcons` --calls--> `ToastBoxer`  [INFERRED]
+  app/src/main/java/com/hightechif/openkamera/utils/OnScreenIcons.kt → app/src/main/java/com/hightechif/openkamera/utils/ToastBoxer.kt
 
 ## Import Cycles
 - None detected.
@@ -1047,20 +1048,20 @@ Cohesion: 0.67
 Nodes (3): SessionTypeCompat, EXTENSION, NORMAL
 
 ## Knowledge Gaps
-- **249 isolated node(s):** `Failed`, `Focused`, `Idle`, `Locked`, `Scanning` (+244 more)
+- **249 isolated node(s):** `MEDIASTORE_IMAGES`, `MEDIASTORE_VIDEOS`, `STORAGE_ACCESS_FRAMEWORK`, `pixels`, `offset_x` (+244 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1718 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **84 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CameraController` connect `CameraController` to `BasicApplicationInterface`, `Preview`, `Camera2RequestBuilderHelper`, `MainUI.kt`, `FocusFaceOverlayRendererTest.kt`, `Preshots.kt`, `DrawPreview`, `ViewportDimensions`, `Camera2CaptureCoordinator`, `.setCameraParameters`, `.cancelAutoFocus`, `CameraController1`, `TonemapProfile`, `CameraControllerManager2`, `Camera23AController`, `PopupView.kt`, `PreviewFaceDetectionEngine`, `TelemetryHudOverlayRendererTest`, `CameraFeaturesCache`, `Camera2InfoCache`, `MeteringAreaConverter`, `BasicApplicationInterface.kt`, `KeyEventHandler`, `Camera2DeviceQuirks`, `CameraSurface`, `Size`, `Camera2FocusMeteringCoordinator`, `Camera2RequestBuilderHelperUnitTest`, `MainActivityLegacyGlue.kt`, `Preview.kt`, `EffectOverlayRenderer`, `VideoQualityHandler`, `Camera2FocusMeteringCoordinatorUnitTest`, `.resolveCameraFeatures`, `PreviewCameraSetupHelperUnitTest`, `.getOptimalPreviewSize`, `SystemOrientation`, `DrawPreviewContext`, `MyApplicationInterface.kt`, `RectF`, `.getCameraIdPref`, `PreviewCameraSetupHelper`, `PreviewGestureHandler`, `SurfaceTexture`, `CameraControllerManager`, `RawImage`, `ApplicationInterface.kt`, `PreferenceSubProcessing.kt`, `MySurfaceView`, `VideoProfileResolver`, `.openCameraCore`, `OverlayRenderer`, `MyTextureView`, `CameraController.kt`?**
-  _High betweenness centrality (0.195) - this node is a cross-community bridge._
 - **Why does `Preview` connect `Preview` to `ApplicationInterface`, `CameraController`, `.setupCamera`, `MainActivityLegacyGlue`, `MainUI.kt`, `Preshots.kt`, `DrawPreview`, `PreviewSensorManager`, `PreviewFrameEffectsProcessor`, `ViewportDimensions`, `GyroTargetOverlayRenderer`, `CameraResolutionUnitTest`, `.cancelAutoFocus`, `KeyEventHandlerTest`, `PopupView.kt`, `VideoSessionOutput`, `PreviewFaceDetectionEngine`, `TelemetryHudOverlayRendererTest`, `CameraFeaturesCache`, `.initLegacy`, `CameraLifecycleCoordinator`, `CameraSurface`, `BluetoothRemoteControl.kt`, `VideoRecordingCoordinator`, `CaptureTimerCoordinator`, `MainActivityLegacyGlue.kt`, `CanvasView`, `Preview.kt`, `EffectOverlayRenderer`, `.closeCamera`, `VideoProfile`, `PreviewTouchCallback`, `VideoQualityHandler`, `.showToast`, `.getOptimalPreviewSize`, `SystemOrientation`, `DrawPreviewContext`, `OrientationLifecycleManager`, `MyApplicationInterface.kt`, `RectF`, `CameraCaptureStateMachine`, `SurfaceTexture`, `MyDebug`, `CameraControllerManager`, `.freePreviewBitmap`, `.takePhotoWhenFocused`, `MySurfaceView`, `.startVideoRecording`, `VideoProfileResolver`, `.openCameraCore`, `OverlayRenderer`, `MyTextureView`?**
-  _High betweenness centrality (0.160) - this node is a cross-community bridge._
-- **Why does `MyDebug` connect `MyDebug` to `Camera2EngineBridge`, `VideoRecorderEngine`, `Camera2RequestBuilderHelper`, `MagneticSensor`, `BitmapPostProcessor`, `MainUI.kt`, `ManualSeekbars`, `PanoramaProcessor`, `DrawPreview`, `PreviewSensorManager`, `PreviewFrameEffectsProcessor`, `CameraControllerException`, `Camera2SessionManager.kt`, `PreferenceSubPreview.kt`, `PreferenceSubScreen`, `MyWidgetProviderTakePhoto.kt`, `CameraController2.kt`, `CameraControllerManager2`, `PopupView.kt`, `Camera2PipelineManager`, `VideoSessionOutput`, `DeviceScanner`, `PreviewFaceDetectionEngine`, `ImageSaver`, `StorageUtils`, `CameraFeaturesCache`, `MyPreferenceFragment.kt`, `ImageSavePipeline`, `CameraLifecycleCoordinator`, `GyroSensor`, `KeyEventHandler`, `BluetoothRemoteControl.kt`, `VideoRecordingCoordinator`, `MainActivity.kt`, `MainActivityLegacyGlue.kt`, `CanvasView`, `Preview.kt`, `CaptureTimerCoordinator`, `PreferenceSubSettingsManager.kt`, `useScopedStorage`, `Camera2BurstCoordinator`, `AudioListener`, `CameraCaptureSession`, `PreviewTouchCallback`, `VideoQualityHandler`, `.resolveCameraFeatures`, `PreferenceSubVideo.kt`, `FolderChooserDialog`, `VideoProfileResolver`, `Camera2FacadeArchitectureUnitTest.kt`, `Camera2ThreadManager`, `OrientationLifecycleManager`, `MyApplicationInterface.kt`, `LocationSupplier`, `OpenKameraApplication`, `.onCreate`, `PreviewCameraSetupHelper`, `ApplyFunctionInterface`, `MyTileService.kt`, `MyTileServiceFrontCamera.kt`, `.onCreate`, `DialogCoordinator`, `BluetoothLeService`, `AudioControllerImpl`, `RawImage`, `FakeEditor`, `.onCreate`, `PreferenceSubProcessing.kt`, `.onCreate`, `ApplicationInterface.kt`, `MySurfaceView`, `MyTextureView`, `CameraController.kt`, `PipelineContext`, `Camera2VideoPipeline`?**
-  _High betweenness centrality (0.143) - this node is a cross-community bridge._
-- **What connects `Failed`, `Focused`, `Idle` to the rest of the system?**
+  _High betweenness centrality (0.164) - this node is a cross-community bridge._
+- **Why does `MyApplicationInterface` connect `MyApplicationInterface` to `BasicApplicationInterface`, `CameraController`, `CameraResolutionUnitTest`, `HDRProcessor`, `MainActivityLegacyGlue`, `MainUI.kt`, `PanoramaProcessor`, `DrawPreview`, `PreferenceKeys`, `OnScreenIcons`, `MainActivity`, `.cameraSetup`, `.createOutputVideoFile`, `.getCameraNoiseReductionModePref`, `.getDoubleTapCapturePref`, `.getEdgeModePref`, `.getExposureCompensationPref`, `.getPreviewSizePref`, `.getRecordAudioChannelsPref`, `.getRecordAudioPref`, `.getRecordAudioSourcePref`, `.getRepeatIntervalPref`, `.setNextPanoramaPoint`, `.getRepeatPref`, `.getStartupFocusPref`, `.getVideoFlashPref`, `.getVideoRestartTimesPref`, `CameraPreferencesRepository`, `.getWhiteBalancePref`, `.getWhiteBalanceTemperaturePref`, `UiHudPreferencesRepository`, `.initLegacy`, `VideoMethod`, `.onCaptureStarted`, `.onDestroy`, `.requestStoragePermission`, `VideoPreferencesRepository`, `.setExposureCompensationPref`, `.setSceneModePref`, `.setVideoPref`, `.setWhiteBalanceTemperaturePref`, `PhotoPreferencesRepository`, `.turnFrontScreenFlashOn`, `BluetoothRemoteControl.kt`, `ISensorRepository`, `PostProcessing`, `StorageUtils`, `Preview.kt`, `.putBoolean`, `.canTakeNewPhoto`, `ImageSaver`, `VideoProfile`, `.remove`, `TelemetryHudOverlayRendererTest`, `PreferenceSubVideo.kt`, `DrawPreviewContext`, `MyApplicationInterface.kt`, `LocationSupplier`, `CameraLifecycleCoordinator`, `.getCameraIdPref`, `GyroSensor`, `MyDebug`, `.saveImage`, `NoFreeStorageException`, `PhotoMode`, `FakeEditor`?**
+  _High betweenness centrality (0.159) - this node is a cross-community bridge._
+- **Why does `CameraController` connect `CameraController` to `BasicApplicationInterface`, `Preview`, `Camera2RequestBuilderHelper`, `MainUI.kt`, `FocusFaceOverlayRendererTest.kt`, `Preshots.kt`, `DrawPreview`, `ViewportDimensions`, `Camera2CaptureCoordinator`, `.setCameraParameters`, `.cancelAutoFocus`, `CameraController1`, `TonemapProfile`, `CameraControllerManager2`, `Camera23AController`, `PopupView.kt`, `PreviewFaceDetectionEngine`, `TelemetryHudOverlayRendererTest`, `CameraFeaturesCache`, `Camera2InfoCache`, `MeteringAreaConverter`, `BasicApplicationInterface.kt`, `KeyEventHandler`, `Camera2DeviceQuirks`, `CameraSurface`, `Size`, `Camera2FocusMeteringCoordinator`, `Camera2RequestBuilderHelperUnitTest`, `MainActivityLegacyGlue.kt`, `Preview.kt`, `EffectOverlayRenderer`, `VideoQualityHandler`, `Camera2FocusMeteringCoordinatorUnitTest`, `.resolveCameraFeatures`, `PreviewCameraSetupHelperUnitTest`, `.getOptimalPreviewSize`, `SystemOrientation`, `DrawPreviewContext`, `MyApplicationInterface.kt`, `RectF`, `.getCameraIdPref`, `PreviewCameraSetupHelper`, `PreviewGestureHandler`, `SurfaceTexture`, `CameraControllerManager`, `RawImage`, `ApplicationInterface.kt`, `PreferenceSubProcessing.kt`, `MySurfaceView`, `VideoProfileResolver`, `.openCameraCore`, `OverlayRenderer`, `MyTextureView`, `CameraController.kt`?**
+  _High betweenness centrality (0.132) - this node is a cross-community bridge._
+- **What connects `MEDIASTORE_IMAGES`, `MEDIASTORE_VIDEOS`, `STORAGE_ACCESS_FRAMEWORK` to the rest of the system?**
   _249 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `ApplicationInterface` be split into smaller, more focused modules?**
   _Cohesion score 0.015625 - nodes in this community are weakly interconnected._
