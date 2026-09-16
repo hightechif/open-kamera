@@ -9,14 +9,9 @@ package com.hightechif.openkamera.preview.analysis
 
 import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.Type
-import com.hightechif.openkamera.ScriptC_histogram_compute
-import com.hightechif.openkamera.processing.HDRProcessor
 import com.hightechif.openkamera.processing.JavaImageFunctionsPreview
 import com.hightechif.openkamera.processing.JavaImageProcessing
+import com.hightechif.openkamera.processing.NativeImageProcessorBridge
 
 /**
  * Encapsulates focus peaking edge detection and filtering bitmap generation.
@@ -27,12 +22,16 @@ object FocusPeakingProcessor {
         previewBitmap: Bitmap,
         outputBuffer: Bitmap,
         tempBuffer: Bitmap,
-        rotationDegrees: Int,
-        rs: RenderScript? = null,
-        histogramScript: ScriptC_histogram_compute? = null,
-        allocationIn: Allocation? = null
+        rotationDegrees: Int
     ): Bitmap {
-        if (!HDRProcessor.USE_RENDERSCRIPT || rs == null || histogramScript == null || allocationIn == null) {
+        // 1. Try Native C++17 NEON Engine
+        var processed = false
+        if (NativeImageProcessorBridge.isAvailable()) {
+            processed = NativeImageProcessorBridge.computeFocusPeaking(previewBitmap, tempBuffer, outputBuffer)
+        }
+
+        if (!processed) {
+            // 2. Fallback to CPU Kotlin/Java
             val function = JavaImageFunctionsPreview.FocusPeakingApplyFunction(previewBitmap)
             JavaImageProcessing.applyFunction(
                 function,
@@ -54,28 +53,6 @@ object FocusPeakingProcessor {
                 previewBitmap.width,
                 previewBitmap.height
             )
-        } else {
-            var outputAllocation = Allocation.createFromBitmap(rs, outputBuffer)
-            histogramScript.set_bitmap(allocationIn)
-            histogramScript.forEach_generate_focus_peaking(allocationIn, outputAllocation)
-
-            // Median filter
-            val filteredAllocation = Allocation.createTyped(
-                rs,
-                Type.createXY(
-                    rs,
-                    Element.RGBA_8888(rs),
-                    outputBuffer.width,
-                    outputBuffer.height
-                )
-            )
-            histogramScript.set_bitmap(outputAllocation)
-            histogramScript.forEach_generate_focus_peaking_filtered(outputAllocation, filteredAllocation)
-            outputAllocation.destroy()
-            outputAllocation = filteredAllocation
-
-            outputAllocation.copyTo(outputBuffer)
-            outputAllocation.destroy()
         }
 
         val matrix = Matrix()

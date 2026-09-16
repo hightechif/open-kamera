@@ -184,6 +184,18 @@ abstract class BaseInstrumentedTest {
         Log.d(TAG, "popup is now open")
     }
 
+    fun closePopupMenu() {
+        if (getActivityValue { activity -> activity.popupIsOpen() }) {
+            Log.d(TAG, "closePopupMenu")
+            onActivity { activity -> activity.closePopup() }
+            var done = false
+            val timeS = System.currentTimeMillis()
+            while (!done && System.currentTimeMillis() - timeS < 2000) {
+                done = getActivityValue { activity -> !activity.popupIsOpen() }
+            }
+        }
+    }
+
     fun switchToFlashValue(requiredFlashValue: String) {
         Log.d(TAG, "switchToFlashValue: $requiredFlashValue")
         val supportedFlashValues = getActivityValue { activity -> activity.preview.supportedFlashValues }
@@ -203,6 +215,7 @@ abstract class BaseInstrumentedTest {
                     assertEquals(flashButton!!.alpha, PopupView.ALPHA_BUTTON, 1.0e-5f)
                     clickView(flashButton)
                 }
+                closePopupMenu()
 
                 flashValue = getActivityValue { activity -> activity.preview.currentFlashValue }
                 Log.d(TAG, "changed flashValue to: $flashValue")
@@ -234,6 +247,7 @@ abstract class BaseInstrumentedTest {
                     assertNotNull(focusButton)
                     clickView(focusButton!!)
                 }
+                closePopupMenu()
 
                 focusValue = getActivityValue { activity -> activity.preview.currentFocusValue }
                 Log.d(TAG, "changed focusValue to: $focusValue")
@@ -293,17 +307,61 @@ abstract class BaseInstrumentedTest {
         waitUntilCameraOpened()
         assertFalse(getActivityValue { activity -> activity.preview.isVideo })
 
+        var needsUpdate = false
         onActivity { activity: MainActivity ->
+            activity.waitUntilImageQueueEmpty()
             val settings = PreferenceManager.getDefaultSharedPreferences(activity)
             val editor = settings.edit()
-            editor.putString(PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std")
+
+            if (settings.getString(PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std") != "preference_photo_mode_std") {
+                editor.putString(PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std")
+                needsUpdate = true
+            }
+            if (settings.getString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1") != "1") {
+                editor.putString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1")
+                needsUpdate = true
+            }
+            if (settings.getString(PreferenceKeys.STAMP_PREFERENCE_KEY, "preference_stamp_no") != "preference_stamp_no") {
+                editor.putString(PreferenceKeys.STAMP_PREFERENCE_KEY, "preference_stamp_no")
+                needsUpdate = true
+            }
+            if (settings.getString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, "") != "") {
+                editor.putString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, "")
+                needsUpdate = true
+            }
+            if (settings.getString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no") != "preference_raw_no") {
+                editor.putString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no")
+                needsUpdate = true
+            }
+            if (settings.getString(PreferenceKeys.TIMER_PREFERENCE_KEY, "0") != "0") {
+                editor.putString(PreferenceKeys.TIMER_PREFERENCE_KEY, "0")
+                needsUpdate = true
+            }
+            if (settings.getBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, false)) {
+                editor.putBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, false)
+                needsUpdate = true
+            }
+            if (settings.getBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, false)) {
+                editor.putBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, false)
+                needsUpdate = true
+            }
+            if (settings.getBoolean(PreferenceKeys.PAUSE_PREVIEW_PREFERENCE_KEY, false)) {
+                editor.putBoolean(PreferenceKeys.PAUSE_PREVIEW_PREFERENCE_KEY, false)
+                needsUpdate = true
+            }
+
             editor.apply()
             activity.testLastSavedImage = null
             activity.testLastSavedImageuri = null
         }
 
+        if (needsUpdate) {
+            updateForSettings()
+        }
+
         switchToFlashValue("flash_off")
         switchToFocusValue("focus_mode_continuous_picture")
+        closePopupMenu()
 
         try {
             Thread.sleep(200)

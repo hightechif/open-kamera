@@ -108,4 +108,62 @@ class DrawPreviewUnitTest {
         assertEquals(4.0f, formatFreeMemoryGb(4096L), 0.001f)
         assertEquals(-1.0f, formatFreeMemoryGb(-1L), 0.001f)
     }
+
+    @Test
+    fun hudOverlayState_fromCameraUiStateMapping() {
+        val uiState = CameraUiState(
+            gridType = GridType.PHI_GRID,
+            isRecording = true,
+            flashMode = FlashMode.TORCH,
+            focusState = FocusState.Focused(),
+            isRawEnabled = true,
+            timerSecondsRemaining = 5,
+            compassDegrees = 180.0f
+        )
+
+        val hudState = HudOverlayState(
+            gridType = uiState.gridType,
+            isRecordingVideo = uiState.isRecording,
+            flashMode = uiState.flashMode,
+            focusState = uiState.focusState,
+            isRawEnabled = uiState.isRawEnabled,
+            timerCountdownSeconds = uiState.timerSecondsRemaining,
+            compassDegrees = uiState.compassDegrees.toDouble()
+        )
+
+        assertEquals(GridType.PHI_GRID, hudState.gridType)
+        assertTrue(hudState.isRecordingVideo)
+        assertEquals(FlashMode.TORCH, hudState.flashMode)
+        assertEquals(FocusState.Focused(), hudState.focusState)
+        assertTrue(hudState.isRawEnabled)
+        assertEquals(5, hudState.timerCountdownSeconds)
+        assertEquals(180.0, hudState.compassDegrees, 0.001)
+    }
+
+    @Test
+    fun hudOverlayState_telemetryValuesMapping() {
+        val hudState = HudOverlayState(
+            showIso = true,
+            iso = 800,
+            exposureTimeNs = 20_000_000L,
+            showBattery = true,
+            batteryFraction = 0.85f,
+            showFreeMemory = true,
+            freeMemoryGb = 12.5f,
+            showTime = true,
+            showCameraId = true,
+            cameraIdString = "0"
+        )
+
+        assertTrue(hudState.showIso)
+        assertEquals(800, hudState.iso)
+        assertEquals(20_000_000L, hudState.exposureTimeNs)
+        assertTrue(hudState.showBattery)
+        assertEquals(0.85f, hudState.batteryFraction, 0.001f)
+        assertTrue(hudState.showFreeMemory)
+        assertEquals(12.5f, hudState.freeMemoryGb, 0.001f)
+        assertTrue(hudState.showTime)
+        assertTrue(hudState.showCameraId)
+        assertEquals("0", hudState.cameraIdString)
+    }
 }

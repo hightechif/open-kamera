@@ -8,6 +8,7 @@ package com.hightechif.openkamera.storage
 
 import com.hightechif.openkamera.di.DefaultDispatcher
 import com.hightechif.openkamera.di.IoDispatcher
+import com.hightechif.openkamera.domain.engine.IImageProcessor
 import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.PhotoResult
 import com.hightechif.openkamera.domain.repository.IMediaRepository
@@ -58,26 +59,32 @@ sealed interface MediaSaveTask {
 
         override fun hashCode(): Int = id.hashCode()
     }
+
+    data class ProcessDeferredHdr(
+        override val id: String,
+        override val config: CaptureConfig,
+        val frames: List<ByteArray>,
+        val customFilename: String? = null,
+        val onComplete: ((Result<PhotoResult>) -> Unit)? = null
+    ) : MediaSaveTask
+
+    data class ProcessDeferredPanorama(
+        override val id: String,
+        override val config: CaptureConfig,
+        val frames: List<ByteArray>,
+        val customFilename: String? = null,
+        val onComplete: ((Result<PhotoResult>) -> Unit)? = null
+    ) : MediaSaveTask
 }
 
 @Singleton
-class MediaProcessingWorker(
+class MediaProcessingWorker @Inject constructor(
     private val mediaRepository: IMediaRepository,
-    private val workerScope: CoroutineScope,
-    private val ioDispatcher: CoroutineDispatcher,
-    private val defaultDispatcher: CoroutineDispatcher
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    private val imageProcessor: IImageProcessor? = null,
+    private val workerScope: CoroutineScope = CoroutineScope(ioDispatcher + SupervisorJob())
 ) {
-    @Inject
-    constructor(
-        mediaRepository: IMediaRepository,
-        @IoDispatcher ioDispatcher: CoroutineDispatcher,
-        @DefaultDispatcher defaultDispatcher: CoroutineDispatcher
-    ) : this(
-        mediaRepository = mediaRepository,
-        workerScope = CoroutineScope(ioDispatcher + SupervisorJob()),
-        ioDispatcher = ioDispatcher,
-        defaultDispatcher = defaultDispatcher
-    )
 
     private val pendingCount = AtomicInteger(0)
 
@@ -105,6 +112,42 @@ class MediaProcessingWorker(
         }
     }
 
+    fun enqueueDeferredHdr(
+        frames: List<ByteArray>,
+        config: CaptureConfig,
+        customFilename: String? = null,
+        onComplete: ((Result<PhotoResult>) -> Unit)? = null
+    ): Job {
+        val id = "hdr_${System.currentTimeMillis()}"
+        return submitTask(
+            MediaSaveTask.ProcessDeferredHdr(
+                id = id,
+                config = config,
+                frames = frames,
+                customFilename = customFilename,
+                onComplete = onComplete
+            )
+        )
+    }
+
+    fun enqueueDeferredPanorama(
+        frames: List<ByteArray>,
+        config: CaptureConfig,
+        customFilename: String? = null,
+        onComplete: ((Result<PhotoResult>) -> Unit)? = null
+    ): Job {
+        val id = "pano_${System.currentTimeMillis()}"
+        return submitTask(
+            MediaSaveTask.ProcessDeferredPanorama(
+                id = id,
+                config = config,
+                frames = frames,
+                customFilename = customFilename,
+                onComplete = onComplete
+            )
+        )
+    }
+
     private suspend fun processTask(task: MediaSaveTask) {
         when (task) {
             is MediaSaveTask.SaveJpeg -> {
@@ -117,6 +160,44 @@ class MediaProcessingWorker(
                 val result =
                     mediaRepository.saveRawDng(task.dngBytes, task.config, task.customFilename)
                 task.onComplete?.invoke(result)
+            }
+
+            is MediaSaveTask.ProcessDeferredHdr -> {
+                val processor = imageProcessor
+                val processResult = processor?.processHdr(task.frames)
+                    ?: Result.failure(IllegalStateException("ImageProcessor not available for HDR processing"))
+                val saveResult = if (processResult.isSuccess) {
+                    mediaRepository.savePhoto(
+                        processResult.getOrThrow(),
+                        task.config,
+                        task.customFilename
+                    )
+                } else {
+                    Result.failure(
+                        processResult.exceptionOrNull()
+                            ?: IllegalStateException("HDR processing failed")
+                    )
+                }
+                task.onComplete?.invoke(saveResult)
+            }
+
+            is MediaSaveTask.ProcessDeferredPanorama -> {
+                val processor = imageProcessor
+                val processResult = processor?.processPanorama(task.frames)
+                    ?: Result.failure(IllegalStateException("ImageProcessor not available for Panorama processing"))
+                val saveResult = if (processResult.isSuccess) {
+                    mediaRepository.savePhoto(
+                        processResult.getOrThrow(),
+                        task.config,
+                        task.customFilename
+                    )
+                } else {
+                    Result.failure(
+                        processResult.exceptionOrNull()
+                            ?: IllegalStateException("Panorama processing failed")
+                    )
+                }
+                task.onComplete?.invoke(saveResult)
             }
         }
     }

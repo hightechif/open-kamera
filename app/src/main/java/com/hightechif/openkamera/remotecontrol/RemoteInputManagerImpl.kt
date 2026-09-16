@@ -6,12 +6,16 @@
  */
 package com.hightechif.openkamera.remotecontrol
 
+import com.hightechif.openkamera.domain.engine.BleConnectionState
 import com.hightechif.openkamera.domain.engine.IRemoteInputManager
 import com.hightechif.openkamera.domain.engine.RemoteInputType
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +29,11 @@ class RemoteInputManagerImpl @Inject constructor() : IRemoteInputManager {
     )
     override val remoteInputEventFlow: Flow<RemoteInputType> = _remoteInputEventFlow.asSharedFlow()
 
+    private val _connectionStateFlow =
+        MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
+    override val connectionStateFlow: StateFlow<BleConnectionState> =
+        _connectionStateFlow.asStateFlow()
+
     private var isListening = false
 
     override fun startListening() {
@@ -35,7 +44,25 @@ class RemoteInputManagerImpl @Inject constructor() : IRemoteInputManager {
         isListening = false
     }
 
-    fun dispatchInputEvent(type: RemoteInputType): Boolean {
+    override fun onBleConnectionStateChanged(state: BleConnectionState) {
+        _connectionStateFlow.value = state
+    }
+
+    override fun onRemoteCommandReceived(command: Int) {
+        val type = when (command) {
+            BluetoothLeService.COMMAND_SHUTTER -> RemoteInputType.SHUTTER_BUTTON
+            BluetoothLeService.COMMAND_UP -> RemoteInputType.ZOOM_IN
+            BluetoothLeService.COMMAND_DOWN -> RemoteInputType.ZOOM_OUT
+            BluetoothLeService.COMMAND_AFMF -> RemoteInputType.FOCUS_BUTTON
+            BluetoothLeService.COMMAND_MODE -> RemoteInputType.SWITCH_CAMERA
+            else -> null
+        }
+        if (type != null) {
+            dispatchInputEvent(type)
+        }
+    }
+
+    override fun dispatchInputEvent(type: RemoteInputType): Boolean {
         if (!isListening) return false
         return _remoteInputEventFlow.tryEmit(type)
     }

@@ -103,7 +103,17 @@ object TestUtils {
     }
 
     fun isEmulator(): Boolean {
-        return Build.MODEL.contains("Android SDK built for x86")
+        return Build.MODEL.contains("Android SDK built for x86") ||
+                Build.MODEL.contains("google_sdk") ||
+                Build.MODEL.contains("Emulator") ||
+                Build.MODEL.contains("sdk_gphone") ||
+                Build.HARDWARE.contains("goldfish") ||
+                Build.HARDWARE.contains("ranchu") ||
+                Build.PRODUCT.contains("sdk") ||
+                Build.PRODUCT.contains("google_sdk") ||
+                Build.PRODUCT.contains("sdk_gphone") ||
+                Build.FINGERPRINT.startsWith("generic") ||
+                Build.MANUFACTURER.contains("Genymotion")
     }
 
     /** Converts a path to a Uri for com.android.providers.media.documents.
@@ -1087,15 +1097,18 @@ object TestUtils {
             activity.applicationInterface.getRawPref() != ApplicationInterface.RawPref.RAWPREF_JPEG_ONLY
         val actualIsRaw = (isRaw || isRawPref) && activity.preview.supportsRaw()
         val expNNewFiles = getExpNNewFiles(activity, actualIsRaw)
+        val existingFiles = files?.toSet() ?: emptySet()
         var files2 = filesInSaveFolder(activity)
-        var nNewFiles = (files2?.size ?: 0) - nFiles
+        var newlyCreatedFiles = files2?.filter { !existingFiles.contains(it) } ?: emptyList()
+        var nNewFiles = if (files != null) newlyCreatedFiles.size else (files2?.size ?: 0) - nFiles
         val waitStartTime = System.currentTimeMillis()
         while (nNewFiles < expNNewFiles && System.currentTimeMillis() - waitStartTime < 5000) {
             Thread.sleep(200)
             files2 = filesInSaveFolder(activity)
-            nNewFiles = (files2?.size ?: 0) - nFiles
+            newlyCreatedFiles = files2?.filter { !existingFiles.contains(it) } ?: emptyList()
+            nNewFiles = if (files != null) newlyCreatedFiles.size else (files2?.size ?: 0) - nFiles
         }
-        Log.d(TAG, "n_new_files: $nNewFiles, exp: $expNNewFiles")
+        Log.d(TAG, "n_new_files: $nNewFiles, exp: $expNNewFiles, newlyCreatedFiles: $newlyCreatedFiles")
         assertEquals(expNNewFiles, nNewFiles)
 
         if (!activity.applicationInterface.isRawOnly) {
@@ -1144,14 +1157,14 @@ object TestUtils {
         expectGps: Boolean
     ) {
         var inputStream: InputStream? = null
-        val exif: ExifInterface
-        if (file != null) {
-            assertNull(uri)
-            exif = ExifInterface(file)
+        val exif: ExifInterface = if (uri != null) {
+            inputStream = activity.contentResolver.openInputStream(uri)
+            assertNotNull(inputStream)
+            ExifInterface(inputStream!!)
+        } else if (file != null) {
+            ExifInterface(file)
         } else {
-            assertNotNull(uri)
-            inputStream = activity.contentResolver.openInputStream(uri!!)
-            exif = ExifInterface(inputStream!!)
+            throw AssertionError("Both file and uri are null")
         }
 
         assertNotNull(exif.getAttribute(ExifInterface.TAG_ORIENTATION))

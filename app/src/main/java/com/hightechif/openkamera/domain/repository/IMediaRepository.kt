@@ -38,4 +38,5 @@ interface IMediaRepository {
     ): Result<RecordedVideo>
 
     suspend fun getLatestMediaUri(): Uri?
+    suspend fun getAvailableStorageBytes(): Long = Long.MAX_VALUE
 }

@@ -10,7 +10,14 @@ package com.hightechif.openkamera.cameracontroller.extension
 import android.os.Build
 
 /**
- * Encapsulates device- and manufacturer-specific quirks, workarounds, and vendor characteristics.
+ * Encapsulates device- and manufacturer-specific quirks, workarounds, and vendor characteristics
+ * for the Camera2 capture pipeline.
+ *
+ * All per-device decisions made in the capture path MUST be routed through this class.
+ * Call sites should never inspect [Build.MANUFACTURER] or [Build.MODEL] directly.
+ *
+ * @param manufacturer The device manufacturer string, defaults to [Build.MANUFACTURER].
+ * @param model The device model string, defaults to [Build.MODEL].
  */
 data class Camera2DeviceQuirks(
     val manufacturer: String = Build.MANUFACTURER,
@@ -27,14 +34,53 @@ data class Camera2DeviceQuirks(
 
     /**
      * Determines minimum tonemap curve points required for this hardware.
+     *
      * Samsung devices (e.g. S7 and S10e) glitch if more than 32 control points are used.
+     *
+     * @return 32 for Samsung devices, 64 for all others.
      */
     fun getMinTonemapPoints(): Int {
         return if (isSamsung) 32 else 64
     }
 
     /**
-     * Checks if post-capture trigger is required for auto-exposure convergence.
+     * Returns true if the device requires fake-precapture (torch-based AE convergence) instead
+     * of the standard Camera2 AE precapture trigger.
+     *
+     * Samsung devices require fake precapture for any burst mode (expo/focus/normal/continuous)
+     * because the standard precapture path produces incorrect exposures on their hardware.
+     *
+     * @param isBurstMode true when any burst type other than BURSTTYPE_NONE is active.
+     * @return true if fake precapture should be used for this device and mode.
+     */
+    fun requiresFakePrecapture(isBurstMode: Boolean): Boolean {
+        return isSamsung && isBurstMode
+    }
+
+    /**
+     * Returns true if the device benefits from setting [android.hardware.camera2.CaptureRequest.CONTROL_ENABLE_ZSL]
+     * to true on still-capture requests (enables HDR+ on Pixel devices, etc.).
+     *
+     * Callers must also check that API level ≥ O and the session is not an extension session,
+     * as those constraints are orthogonal to the device quirk.
+     *
+     * @return true for all currently known devices (placeholder for future device-specific exclusions).
+     */
+    fun supportsZslHint(): Boolean {
+        // Currently no known devices where ZSL causes problems — always return true.
+        // Add device-specific exclusions here if needed in the future.
+        return true
+    }
+
+    /**
+     * Checks if post-capture trigger is required for auto-exposure convergence after a still shot.
+     *
+     * Samsung devices in non-video mode require an explicit AE precapture trigger after capture
+     * to restore the preview exposure correctly.
+     *
+     * @param previewIsVideoMode true when the preview is in video-recording mode.
+     * @param testForceRunPostCapture when true, forces the trigger regardless of device (for testing).
+     * @return true if the post-capture AE trigger should be issued.
      */
     fun requiresPostCaptureTrigger(previewIsVideoMode: Boolean, testForceRunPostCapture: Boolean = false): Boolean {
         return (isSamsung || testForceRunPostCapture) && !previewIsVideoMode
@@ -42,13 +88,21 @@ data class Camera2DeviceQuirks(
 
     /**
      * Checks if burst noise reduction is supported on this hardware configuration.
+     *
+     * Samsung devices do not support burst noise reduction; enabling it causes capture failures.
+     *
+     * @return false for Samsung devices, true for all others.
      */
     fun allowsBurstNoiseReduction(): Boolean {
         return !isSamsung
     }
 
     /**
-     * Returns true if shutter sound should use video recording sound on Samsung devices.
+     * Returns true if the shutter sound should use the video-recording sound on this device.
+     *
+     * Samsung devices produce better user feedback with the video-recording sound for shutter clicks.
+     *
+     * @return true for Samsung devices, false for all others.
      */
     fun usesAlternativeShutterSound(): Boolean {
         return isSamsung

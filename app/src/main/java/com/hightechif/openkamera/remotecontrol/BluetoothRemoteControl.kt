@@ -21,6 +21,8 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MyApplicationInterface
+import com.hightechif.openkamera.domain.engine.BleConnectionState
+import com.hightechif.openkamera.domain.engine.IRemoteInputManager
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.ui.MainUI
 import com.hightechif.openkamera.utils.MyDebug
@@ -28,7 +30,12 @@ import kotlin.math.roundToInt
 
 /** Class for handling the Bluetooth LE remote control functionality.
  */
-class BluetoothRemoteControl(private val mainActivity: MainActivity) {
+class BluetoothRemoteControl(
+    private val mainActivity: MainActivity,
+    private val remoteInputManager: IRemoteInputManager? = null
+) {
+    private val actualRemoteInputManager: IRemoteInputManager?
+        get() = remoteInputManager ?: try { mainActivity.remoteInputManager } catch (_: Exception) { null }
 
     private var bluetoothLeService: BluetoothLeService? = null
     private var remoteDeviceAddress: String? = null
@@ -102,11 +109,13 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
             val mainUI: MainUI = mainActivity.mainUI
             if (BluetoothLeService.ACTION_GATT_CONNECTED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote connected")
+                actualRemoteInputManager?.onBleConnectionStateChanged(BleConnectionState.Connected)
                 // Tell the Bluetooth service what type of remote we want to use
                 bluetoothLeService!!.setRemoteDeviceType(remoteDeviceType!!)
                 mainActivity.setBrightnessForCamera(false)
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote disconnected")
+                actualRemoteInputManager?.onBleConnectionStateChanged(BleConnectionState.Disconnected)
                 isConnected = false
                 applicationInterface.drawPreview.onExtraOSDValuesChanged("-- \u00B0C", "-- m")
                 mainUI.updateRemoteConnectionIcon()
@@ -114,6 +123,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
                 if (mainUI.isExposureUIOpen) mainUI.toggleExposureUI()
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED == action) {
                 if (MyDebug.LOG) Log.d(TAG, "Remote services discovered")
+                actualRemoteInputManager?.onBleConnectionStateChanged(BleConnectionState.Connected)
                 // We let the BluetoothLEService subscribe to what is relevant, so we
                 // do nothing here, but we wait until this is done to update the UI
                 // icon
@@ -136,6 +146,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
                 applicationInterface.drawPreview.onExtraOSDValuesChanged(line1, line2)
             } else if (BluetoothLeService.ACTION_REMOTE_COMMAND == action) {
                 val command = intent.getIntExtra(BluetoothLeService.EXTRA_DATA, -1)
+                actualRemoteInputManager?.onRemoteCommandReceived(command)
                 // TODO: we could abstract this into a method provided by each remote control model
                 when (command) {
                     BluetoothLeService.COMMAND_SHUTTER ->
@@ -261,6 +272,7 @@ class BluetoothRemoteControl(private val mainActivity: MainActivity) {
     fun stopRemoteControl() {
         if (MyDebug.LOG) Log.d(TAG, "BLE Remote control service shutdown...")
         if (remoteEnabled()) {
+            actualRemoteInputManager?.onBleConnectionStateChanged(BleConnectionState.Disconnected)
             // Stop the service if necessary
             try {
                 mainActivity.unregisterReceiver(remoteControlCommandReceiver)

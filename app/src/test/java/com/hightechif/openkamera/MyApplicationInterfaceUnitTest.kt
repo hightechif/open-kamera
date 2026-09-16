@@ -103,4 +103,26 @@ class MyApplicationInterfaceUnitTest {
         val rawPref = applicationInterface.getRawPref()
         assertTrue(rawPref == RawPref.RAWPREF_JPEG_DNG || rawPref == RawPref.RAWPREF_JPEG_ONLY)
     }
+
+    @Test
+    fun useCamera2_returnsTrueWhenHardwareSupportsCamera2() {
+        // MainActivity in Robolectric environment supports Camera2
+        val useCamera2 = applicationInterface.useCamera2()
+        assertEquals(activity.supportsCamera2(), useCamera2)
+    }
+
+    @Test
+    fun constructor_injectsPreferenceRepositories() {
+        assertNotNull(applicationInterface.cameraPreferencesRepository)
+        assertNotNull(applicationInterface.photoPreferencesRepository)
+        assertNotNull(applicationInterface.videoPreferencesRepository)
+        assertNotNull(applicationInterface.uiHudPreferencesRepository)
+        assertNotNull(applicationInterface.locationPreferencesRepository)
+    }
+
+    @Test
+    fun focusPref_delegatesToCameraPreferencesRepo() {
+        applicationInterface.setFocusPref("focus_mode_continuous_picture", false)
+        assertEquals("focus_mode_continuous_picture", applicationInterface.getFocusPref(false))
+    }
 }

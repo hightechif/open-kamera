@@ -20,6 +20,7 @@ import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
+import com.hightechif.openkamera.performHapticFeedback
 
 /** This contains a custom preference to display a seekbar in place of a ListPreference.
  */
@@ -83,7 +84,7 @@ class ArraySeekBarPreference(context: Context?, attrs: AttributeSet) :
                 val newEntry = entries!![progress].toString()
                 textView.text = newEntry
                 if (fromUser) {
-                    lastHapticTime = MainActivity.performHapticFeedback(seekBar, lastHapticTime)
+                    lastHapticTime = performHapticFeedback(seekBar, lastHapticTime)
                 }
             }
 

@@ -66,4 +66,25 @@ class AudioListenerUnitTest {
         assertTrue(normalLevel < loudThreshold)
         assertTrue(shoutLevel > loudThreshold)
     }
+
+    @Test
+    fun testCalculateAverageNoise_helper() {
+        val buffer = shortArrayOf(-500, 500, -1000, 1000)
+        val avg = AudioListener.calculateAverageNoise(buffer, buffer.size)
+        assertEquals(750, avg)
+    }
+
+    @Test
+    fun testCalculateAverageNoise_emptyOrZero() {
+        val buffer = shortArrayOf()
+        val avg = AudioListener.calculateAverageNoise(buffer, 0)
+        assertEquals(0, avg)
+    }
+
+    @Test
+    fun testIsThresholdMet() {
+        assertTrue(AudioListener.isThresholdMet(1500, 1500))
+        assertTrue(AudioListener.isThresholdMet(2000, 1500))
+        org.junit.Assert.assertFalse(AudioListener.isThresholdMet(1499, 1500))
+    }
 }

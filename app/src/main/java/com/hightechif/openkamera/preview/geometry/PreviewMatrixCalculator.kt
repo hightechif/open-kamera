@@ -62,6 +62,36 @@ object PreviewMatrixCalculator {
     }
 
     /**
+     * Directly maps screen pixel coordinates (touchX, touchY) to clamped sensor coordinates in [-1000, 1000].
+     */
+    fun mapScreenToSensor(
+        touchX: Float,
+        touchY: Float,
+        dimensions: ViewportDimensions
+    ): FloatArray {
+        val matrix = calculatePreviewToCameraMatrix(dimensions)
+        val points = floatArrayOf(touchX, touchY)
+        matrix.mapPoints(points)
+        points[0] = points[0].coerceIn(-1000f, 1000f)
+        points[1] = points[1].coerceIn(-1000f, 1000f)
+        return points
+    }
+
+    /**
+     * Maps sensor coordinates in [-1000, 1000] to screen pixel coordinates.
+     */
+    fun mapSensorToScreen(
+        sensorX: Float,
+        sensorY: Float,
+        dimensions: ViewportDimensions
+    ): FloatArray {
+        val matrix = calculateCameraToPreviewMatrix(dimensions)
+        val points = floatArrayOf(sensorX, sensorY)
+        matrix.mapPoints(points)
+        return points
+    }
+
+    /**
      * Constructs a clamped focus and metering area around the specified focus coordinates.
      * Coordinate bounds are strictly clamped within `[-1000, 1000]`.
      */

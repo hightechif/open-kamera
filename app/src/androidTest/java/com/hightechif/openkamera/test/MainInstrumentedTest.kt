@@ -227,6 +227,7 @@ class MainInstrumentedTest : BaseInstrumentedTest() {
     fun testZoom() {
         Log.d(TAG, "testZoom")
         setToDefault()
+        closePopupMenu()
 
         if (!getActivityValue { it.preview.supportsZoom() }) {
             Log.d(TAG, "zoom not supported")
@@ -237,21 +238,49 @@ class MainInstrumentedTest : BaseInstrumentedTest() {
         assertTrue(maxZoom > 0)
 
         onActivity { activity ->
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            val showZoomPref = settings.getBoolean(PreferenceKeys.SHOW_ZOOM_SLIDER_CONTROLS_PREFERENCE_KEY, true)
+            if (!showZoomPref) {
+                settings.edit().putBoolean(PreferenceKeys.SHOW_ZOOM_SLIDER_CONTROLS_PREFERENCE_KEY, true).apply()
+                activity.updateForSettings(false)
+            }
             val zoomSeekBar = activity.findViewById<SeekBar>(R.id.zoom_seekbar)
             assertEquals(View.VISIBLE, zoomSeekBar.visibility)
             assertEquals(maxZoom, zoomSeekBar.max)
 
             activity.preview.scaleZoom(2.0f)
         }
-        Thread.sleep(500)
 
-        val zoom = getActivityValue { it.preview.cameraController?.zoom ?: 0 }
+        var zoom = 0
+        val startTime = System.currentTimeMillis()
+        while (zoom == 0 && System.currentTimeMillis() - startTime < 2000) {
+            zoom = getActivityValue { it.preview.cameraController?.zoom ?: 0 }
+            if (zoom == 0) {
+                try {
+                    Thread.sleep(100)
+                } catch (e: InterruptedException) {
+                    e.printStackTrace()
+                }
+            }
+        }
         assertTrue(zoom > 0)
 
         onActivity { activity ->
             activity.preview.scaleZoom(0.5f)
         }
-        Thread.sleep(500)
+
+        val startTime2 = System.currentTimeMillis()
+        while (zoom > 0 && System.currentTimeMillis() - startTime2 < 2000) {
+            val newZoom = getActivityValue { it.preview.cameraController?.zoom ?: 0 }
+            if (newZoom < zoom) {
+                break
+            }
+            try {
+                Thread.sleep(100)
+            } catch (e: InterruptedException) {
+                e.printStackTrace()
+            }
+        }
     }
 
     @Test

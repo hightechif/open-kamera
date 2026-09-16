@@ -30,7 +30,6 @@ import android.location.Location
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
 import android.net.Uri
-import android.os.AsyncTask
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -59,7 +58,6 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
-import com.hightechif.openkamera.ScriptC_histogram_compute
 import com.hightechif.openkamera.TakePhoto
 import com.hightechif.openkamera.cameracontroller.CameraController
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
@@ -67,11 +65,9 @@ import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeature
 import com.hightechif.openkamera.cameracontroller.CameraController.Facing
 import com.hightechif.openkamera.cameracontroller.CameraController.SupportedValues
 import com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfile
-import com.hightechif.openkamera.cameracontroller.CameraController1
 import com.hightechif.openkamera.cameracontroller.CameraController2
 import com.hightechif.openkamera.cameracontroller.CameraControllerException
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager
-import com.hightechif.openkamera.cameracontroller.CameraControllerManager1
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager2
 import com.hightechif.openkamera.cameracontroller.RawImage
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
@@ -81,24 +77,33 @@ import com.hightechif.openkamera.preview.analysis.HistogramType
 import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
-import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
-import com.hightechif.openkamera.preview.geometry.PreviewMatrixCalculator
-import com.hightechif.openkamera.preview.geometry.ViewportDimensions
+import com.hightechif.openkamera.preview.camerasurface.PreviewSurfaceManager
+import com.hightechif.openkamera.preview.faces.PreviewFaceDetectionEngine
 import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
+import com.hightechif.openkamera.preview.gesture.PreviewGestureHandler
 import com.hightechif.openkamera.preview.gesture.PreviewTouchCallback
 import com.hightechif.openkamera.preview.gesture.PreviewTouchGestureCoordinator
+import com.hightechif.openkamera.preview.setup.PreviewCameraSetupHelper
 import com.hightechif.openkamera.preview.timer.BurstScheduleConfig
 import com.hightechif.openkamera.preview.timer.CaptureTimerCoordinator
+import com.hightechif.openkamera.preview.video.VideoProfileResolver
+import com.hightechif.openkamera.preview.video.VideoRecordingCoordinator
 import com.hightechif.openkamera.preview.video.VideoSessionManager
 import com.hightechif.openkamera.preview.video.VideoSessionOutput
 import com.hightechif.openkamera.utils.MyDebug
 import com.hightechif.openkamera.utils.ToastBoxer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
 import java.text.DecimalFormat
@@ -107,20 +112,16 @@ import java.util.Hashtable
 import java.util.Locale
 import java.util.Timer
 import java.util.TimerTask
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
-import kotlin.math.asin
 import kotlin.math.atan
-import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 import kotlin.math.tan
+import kotlin.time.Duration.Companion.milliseconds
 
 private typealias VideoFileInfo = VideoSessionOutput
+internal typealias CameraOpenState = CameraCaptureStateMachine.CameraOpenState
 
 /** This class was originally named due to encapsulating the camera preview,
  * but in practice it's grown to more than this, and includes most of the
@@ -169,7 +170,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     private var rs: RenderScript? =
         null // lazily created, so we don't take up resources if application isn't using renderscript
-    private var histogramScript: ScriptC_histogram_compute? = null // lazily create for performance
     var isPreviewBitmapEnabled: Boolean =
         false // whether application has requested we generate bitmap for the preview
         private set
@@ -230,20 +230,21 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     // cache for CameraController2
     private val cameraFeaturesCaches: Map<String, CameraFeaturesCache> = Hashtable()
 
-    internal enum class CameraOpenState {
-        CAMERAOPENSTATE_CLOSED,  // have yet to attempt to open the camera (either at all, or since the camera was closed)
-        CAMERAOPENSTATE_OPENING,  // the camera is currently being opened (on a background thread)
-        CAMERAOPENSTATE_OPENED,  // either the camera is open (if cameraController!=null) or we failed to open the camera (if cameraController==null)
-        CAMERAOPENSTATE_CLOSING // the camera is currently being closed (on a background thread)
-    }
+    val cameraCaptureStateMachine by lazy { CameraCaptureStateMachine() }
+    val surfaceManager by lazy { PreviewSurfaceManager(cameraSurface) }
 
-    private var cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+    private var cameraOpenState: CameraOpenState
+        get() = cameraCaptureStateMachine.openState
+        set(value) {
+            cameraCaptureStateMachine.setOpenState(value)
+        }
 
-    // background task used for opening camera
-    private var openCameraTask: AsyncTask<Void?, Void?, CameraController?>? = null
-
-    // background task used for closing camera
-    private var closeCameraTask: CloseCameraTask? = null
+    // Coroutine scope and jobs for asynchronous camera open/close lifecycle operations
+    internal val previewLifecycleScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    internal var openCameraJob: Job? = null
+    internal var closeCameraJob: Job? = null
+    private var reopenAfterClose: Boolean = false
 
     // whether we have permissions necessary to operate the camera (camera, storage); assume true until we've been denied one of them
     private var hasPermissions = true
@@ -270,6 +271,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var videoRestartOnMaxFilesize = false
 
     val videoSessionManager by lazy { VideoSessionManager() }
+    val videoRecordingCoordinator by lazy { VideoRecordingCoordinator(sessionManager = videoSessionManager) }
+    val videoProfileResolver by lazy { VideoProfileResolver() }
     private var videoFileInfo: VideoFileInfo
         get() = videoSessionManager.activeOutput ?: VideoFileInfo()
         set(value) {
@@ -315,8 +318,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var currentRotation =
         0 // orientation relative to camera's orientation (used for parameters.setRotation())
     private var hasLevelAngle = false
-    private var naturalLevelAngle =
+    var naturalLevelAngle =
         0.0 // "level" angle of device in degrees, before applying any calibration and without accounting for screen orientation
+        private set
 
     /** Returns the level angle in degrees.
      */
@@ -467,6 +471,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     private var supportsFaceDetection = false
     private var usingFaceDetection = false
     private var _facesDetected: Array<CameraController.Face?> = emptyArray()
+    val faceDetectionEngine = PreviewFaceDetectionEngine()
     private val faceRect = RectF()
     private var supportsOpticalStabilization = false
     private var supportsVideoStabilization = false
@@ -537,15 +542,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         0 // time when focusSetForTargetDistance last changed
         private set
 
-    internal enum class FaceLocation {
-        FACELOCATION_UNSET,
-        FACELOCATION_UNKNOWN,
-        FACELOCATION_LEFT,
-        FACELOCATION_RIGHT,
-        FACELOCATION_TOP,
-        FACELOCATION_BOTTOM,
-        FACELOCATION_CENTRE
-    }
 
     // for testing; must be volatile for test project reading the state
     private var isTest = false // whether called from OpenKamera.test testing
@@ -610,35 +606,27 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     // and/or set "Rotate preview" option to 180 degrees.
     private fun calculateCameraToPreviewMatrix() {
         if (MyDebug.LOG) Log.d(TAG, "calculateCameraToPreviewMatrix")
-        if (cameraController == null) return
-        val dimensions = ViewportDimensions(
-            surfaceWidth = cameraSurface.view.width,
-            surfaceHeight = cameraSurface.view.height,
-            previewWidth = previewW,
-            previewHeight = previewH,
-            displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = cameraController!!.cameraOrientation,
-            displayOrientation = cameraController!!.displayOrientation,
-            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
-            isUsingCamera2 = usingAndroidL
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        _cameraToPreviewMatrix.set(
+            surfaceManager.calculateCameraToPreviewMatrix(
+                cameraController,
+                getDisplayRotationDegrees(false),
+                usingAndroidL
+            )
         )
-        _cameraToPreviewMatrix.set(PreviewMatrixCalculator.calculateCameraToPreviewMatrix(dimensions))
     }
 
     private fun calculatePreviewToCameraMatrix() {
-        if (cameraController == null) return
-        val dimensions = ViewportDimensions(
-            surfaceWidth = cameraSurface.view.width,
-            surfaceHeight = cameraSurface.view.height,
-            previewWidth = previewW,
-            previewHeight = previewH,
-            displayRotationDegrees = getDisplayRotationDegrees(false),
-            cameraOrientation = cameraController!!.cameraOrientation,
-            displayOrientation = cameraController!!.displayOrientation,
-            isCameraFacingFront = (cameraController!!.facing === Facing.FACING_FRONT),
-            isUsingCamera2 = usingAndroidL
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        _previewToCameraMatrix.set(
+            surfaceManager.calculatePreviewToCameraMatrix(
+                cameraController,
+                getDisplayRotationDegrees(false),
+                usingAndroidL
+            )
         )
-        _previewToCameraMatrix.set(PreviewMatrixCalculator.calculatePreviewToCameraMatrix(dimensions))
         calculateCameraToPreviewMatrix()
     }
 
@@ -649,12 +637,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
     /** Return a focus area from supplied point. Supplied coordinates should be in camera coordinates. */
     private fun getAreas(focusX: Float, focusY: Float): ArrayList<CameraController.Area> {
-        return PreviewMatrixCalculator.calculateFocusAreas(
-            focusX,
-            focusY,
-            focusSize = 50,
-            weight = 1000
-        )
+        return PreviewGestureHandler.getFocusMeteringAreas(focusX, focusY)
     }
 
     private var hasMultitouchStartZoomFactor = false
@@ -797,9 +780,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         android.graphics.PointF(normX, normY)
                     )
                 }
-                val coords = floatArrayOf(event.x, event.y)
                 calculatePreviewToCameraMatrix()
-                _previewToCameraMatrix.mapPoints(coords)
+                val coords = PreviewGestureHandler.mapTouchToSensorCoords(
+                    event.x,
+                    event.y,
+                    _previewToCameraMatrix
+                )
                 val focusX = coords[0]
                 val focusY = coords[1]
                 val areas: ArrayList<CameraController.Area> = getAreas(focusX, focusY)
@@ -1051,11 +1037,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             TAG,
             "configureTransform rotation: $rotation"
         )
-        val matrix = ViewportTransformHelper.calculateTextureTransform(
+        surfaceManager.previewWidth = previewW
+        surfaceManager.previewHeight = previewH
+        val matrix = surfaceManager.calculateTextureTransform(
             textureViewWidth = textureViewW,
             textureViewHeight = textureViewH,
-            previewWidth = previewW,
-            previewHeight = previewH,
             displayRotation = rotation
         )
         cameraSurface.setTransform(matrix)
@@ -1282,68 +1268,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         fun onClosed()
     }
 
-    private inner class CloseCameraTask(
-        val cameraControllerLocal: CameraController,
-        val closeCameraCallback: CloseCameraCallback?
-    ) : AsyncTask<Void?, Void?, Void?>() {
-        var reopen: Boolean = false // if set to true, reopen the camera once closed
-
-        private val tag = "CloseCameraTask"
-
-        override fun doInBackground(vararg voids: Void?): Void? {
-            var debugTime: Long = 0
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "doInBackground, async task: $this"
-                )
-                debugTime = System.currentTimeMillis()
-            }
-            cameraControllerLocal.stopPreview()
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "time to stop preview: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-            cameraControllerLocal.release()
-            if (MyDebug.LOG) {
-                Log.d(
-                    tag,
-                    "time to release camera controller: " + (System.currentTimeMillis() - debugTime)
-                )
-            }
-            return null
-        }
-
-        /** The system calls this to perform work in the UI thread and delivers
-         * the result from doInBackground()  */
-        override fun onPostExecute(result: Void?) {
-            if (MyDebug.LOG) Log.d(
-                tag,
-                "onPostExecute, async task: $this"
-            )
-            cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
-            closeCameraTask = null // just to be safe
-            if (closeCameraCallback != null) {
-                if (MyDebug.LOG) Log.d(
-                    tag,
-                    "onPostExecute, calling closeCameraCallback.onClosed"
-                )
-                closeCameraCallback.onClosed()
-            }
-            if (reopen) {
-                if (MyDebug.LOG) Log.d(tag, "onPostExecute, reOpen Kamera")
-                openCamera()
-            }
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "onPostExecute done, async task: $this"
-            )
-        }
-
-    }
-
     /** Closes the camera.
      * @param async Whether to close the camera on a background thread.
      * @param closeCameraCallback If async is true, closeCameraCallback.onClosed() will be called,
@@ -1404,11 +1328,43 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 val cameraControllerLocal: CameraController = cameraController!!
                 cameraController = null
                 if (async) {
-                    if (MyDebug.LOG) Log.d(TAG, "close camera on background async")
+                    if (MyDebug.LOG) Log.d(TAG, "close camera on background async coroutine")
                     cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSING
-                    closeCameraTask =
-                        CloseCameraTask(cameraControllerLocal, closeCameraCallback)
-                    closeCameraTask!!.execute()
+                    closeCameraJob?.cancel()
+                    closeCameraJob = previewLifecycleScope.launch {
+                        var asyncDebugTime: Long = 0
+                        if (MyDebug.LOG) {
+                            Log.d(TAG, "closing camera on background coroutine")
+                            asyncDebugTime = System.currentTimeMillis()
+                        }
+                        withContext(Dispatchers.IO) {
+                            cameraControllerLocal.stopPreview()
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "time to stop preview: " + (System.currentTimeMillis() - asyncDebugTime)
+                                )
+                            }
+                            cameraControllerLocal.release()
+                            if (MyDebug.LOG) {
+                                Log.d(
+                                    TAG,
+                                    "time to release camera controller: " + (System.currentTimeMillis() - asyncDebugTime)
+                                )
+                            }
+                        }
+                        cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+                        closeCameraJob = null
+                        if (closeCameraCallback != null) {
+                            if (MyDebug.LOG) Log.d(TAG, "calling closeCameraCallback.onClosed")
+                            closeCameraCallback.onClosed()
+                        }
+                        if (reopenAfterClose) {
+                            reopenAfterClose = false
+                            if (MyDebug.LOG) Log.d(TAG, "reopening camera after close")
+                            openCamera()
+                        }
+                    }
                 } else {
                     if (MyDebug.LOG) {
                         Log.d(
@@ -1425,6 +1381,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                     }
                     cameraControllerLocal.release()
                     cameraOpenState = CameraOpenState.CAMERAOPENSTATE_CLOSED
+                    (context as? com.hightechif.openkamera.MainActivity)?.cameraEngineBridge?.detachController()
                 }
             }
         } else {
@@ -1631,21 +1588,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
         // we restrict the checks to Android 6 or later just in case, see note in LocationSupplier.setupLocationListener()
         if (MyDebug.LOG) Log.d(TAG, "check for permissions")
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!applicationInterface.hasCameraPermission()) {
             if (MyDebug.LOG) Log.d(TAG, "camera permission not available")
             hasPermissions = false
             applicationInterface.requestCameraPermission()
             // return for now - the application should try to reopen the camera if permission is granted
             return
         }
-        if (applicationInterface.needsStoragePermission() && ContextCompat.checkSelfPermission(
-                context, Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (applicationInterface.needsStoragePermission() && !applicationInterface.hasStoragePermission()) {
             if (MyDebug.LOG) Log.d(TAG, "storage permission not available")
             hasPermissions = false
             applicationInterface.requestStoragePermission()
@@ -1703,46 +1653,38 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             val cameraIdF = cameraId
             val cameraIdSPhysicalF = cameraIdSPhysical
 
-            openCameraTask = object : AsyncTask<Void?, Void?, CameraController?>() {
-                private val TAG = "Preview/OpenKamera"
-
-                override fun doInBackground(vararg voids: Void?): CameraController? {
-                    if (MyDebug.LOG) Log.d(TAG, "doInBackground, async task: $this")
-                    return openCameraCore(cameraIdF, cameraIdSPhysicalF)
-                }
-
-                /** The system calls this to perform work in the UI thread and delivers
-                 * the result from doInBackground()  */
-                override fun onPostExecute(cameraController: CameraController?) {
-                    if (MyDebug.LOG) Log.d(TAG, "onPostExecute, async task: $this")
-                    // see note in OpenKameraCore() for why we set cameraController here
-                    this@Preview.cameraController = cameraController
-                    cameraOpened()
-                    // set cameraOpenState after cameraOpened, just in case a non-UI thread is listening for this - also
-                    // important for test code waitUntilCameraOpened(), as test code runs on a different thread
-                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
-                    openCameraTask = null // just to be safe
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "onPostExecute done, async task: $this"
-                    )
-                }
-
-                override fun onCancelled(cameraController: CameraController?) {
-                    if (MyDebug.LOG) {
-                        Log.d(TAG, "onCancelled, async task: $this")
-                        Log.d(TAG, "camera_controller: $cameraController")
+            openCameraJob?.cancel()
+            openCameraJob = previewLifecycleScope.launch {
+                if (MyDebug.LOG) Log.d(TAG, "openCamera coroutine started: $this")
+                var cameraControllerResult: CameraController? = null
+                try {
+                    cameraControllerResult = withContext(Dispatchers.IO) {
+                        openCameraCore(cameraIdF, cameraIdSPhysicalF)
                     }
-                    // this typically means the application has paused whilst we were opening camera in background - so should just
-                    // dispose of the camera controller
-                    // this is the local cameraController, not Preview.this.cameraController!
-                    cameraController?.release()
-                    cameraOpenState =
-                        CameraOpenState.CAMERAOPENSTATE_OPENED // n.b., still set OPENED state - important for test thread to know that this callback is complete
-                    openCameraTask = null // just to be safe
-                    if (MyDebug.LOG) Log.d(TAG, "onCancelled done, async task: $this")
+                    if (!isActive) {
+                        if (MyDebug.LOG) {
+                            Log.d(TAG, "openCamera coroutine cancelled while opening")
+                            Log.d(TAG, "camera_controller: $cameraControllerResult")
+                        }
+                        cameraControllerResult?.release()
+                        cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                        return@launch
+                    }
+                    this@Preview.cameraController = cameraControllerResult
+                    cameraOpened()
+                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                    if (MyDebug.LOG) Log.d(TAG, "openCamera coroutine done")
+                } catch (_: CancellationException) {
+                    if (MyDebug.LOG) {
+                        Log.d(TAG, "openCamera coroutine cancelled")
+                        Log.d(TAG, "camera_controller: $cameraControllerResult")
+                    }
+                    cameraControllerResult?.release()
+                    cameraOpenState = CameraOpenState.CAMERAOPENSTATE_OPENED
+                } finally {
+                    openCameraJob = null
                 }
-            }.execute()
+            }
         } else {
             this.cameraController = openCameraCore(cameraId, cameraIdSPhysical)
             if (MyDebug.LOG) {
@@ -1804,32 +1746,26 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         }
                     }
                 }
-            if (usingAndroidL) {
-                val previewErrorCallback: CameraController.ErrorCallback =
-                    object : CameraController.ErrorCallback {
-                        override fun onError() {
-                            if (MyDebug.LOG) Log.e(
-                                TAG,
-                                "error from CameraController: preview failed to start"
-                            )
-                            applicationInterface.onFailedStartPreview()
-                        }
+            val previewErrorCallback: CameraController.ErrorCallback =
+                object : CameraController.ErrorCallback {
+                    override fun onError() {
+                        if (MyDebug.LOG) Log.e(
+                            TAG,
+                            "error from CameraController: preview failed to start"
+                        )
+                        applicationInterface.onFailedStartPreview()
                     }
-                cameraControllerLocal = CameraController2(
-                    this@Preview.context,
-                    cameraId,
-                    cameraIdSPhysical,
-                    cameraFeaturesCaches,
-                    previewErrorCallback,
-                    cameraErrorCallback
-                )
-                if (applicationInterface.useCamera2FakeFlash()) {
-                    cameraControllerLocal.useCamera2FakeFlash = true
                 }
-            } else {
-                // Isolated legacy Camera1 fallback for legacy hardware/devices
-                cameraControllerLocal =
-                    CameraController1.createInstance(cameraId, cameraErrorCallback)
+            cameraControllerLocal = CameraController2(
+                this@Preview.context,
+                cameraId,
+                cameraIdSPhysical,
+                cameraFeaturesCaches,
+                previewErrorCallback,
+                cameraErrorCallback
+            )
+            if (applicationInterface.useCamera2FakeFlash()) {
+                cameraControllerLocal.useCamera2FakeFlash = true
             }
             //throw new CameraControllerException; // uncomment to test camera not opening
         } catch (e: CameraControllerException) {
@@ -1891,6 +1827,11 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
 
             if (MyDebug.LOG) Log.d(TAG, "call setPreviewDisplay")
             cameraSurface.setPreviewDisplay(cameraController)
+            (context as? com.hightechif.openkamera.MainActivity)?.let { mainActivity ->
+                (cameraController as? CameraController2)?.let { cc2 ->
+                    mainActivity.cameraEngineBridge.attachController(cc2)
+                }
+            }
             if (MyDebug.LOG) {
                 Log.d(
                     TAG,
@@ -2033,15 +1974,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 // also filter unsupported flash modes
                 if (supportedFlashValues != null) {
                     if (MyDebug.LOG) Log.d(TAG, "restrict flash modes for extension session")
-                    val newSupportedFlashValues: MutableList<String> = ArrayList()
-                    for (supportedFlashValue in supportedFlashValues!!) {
-                        when (supportedFlashValue) {
-                            "flash_off", "flash_frontscreen_torch" -> newSupportedFlashValues.add(
-                                supportedFlashValue
-                            )
-                        }
-                    }
-                    supportedFlashValues = newSupportedFlashValues
+                    supportedFlashValues =
+                        PreviewCameraSetupHelper.filterExtensionFlashModes(supportedFlashValues)
                 }
 
                 // also disallow focus modes
@@ -2151,46 +2085,16 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                             "current_size: " + currentSize.width + " x " + currentSize.height + " supports_burst? " + currentSize.supportsBurst
                         )
                     }
-                    if (!currentSize.supportsRequirements(isBurst, isExtension, extension)) {
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "current picture size doesn't support required burst and/or extension"
+                    val bestSupportingIndex =
+                        PreviewCameraSetupHelper.findBestSupportingPictureSizeIndex(
+                            photoSizes,
+                            currentSize,
+                            isBurst,
+                            isExtension,
+                            extension
                         )
-                        // set to next largest that supports what we need
-                        var newSize: CameraController.Size? = null
-                        for (i in photoSizes!!.indices) {
-                            val size: CameraController.Size = photoSizes!![i]
-                            if (size.supportsRequirements(
-                                    isBurst,
-                                    isExtension,
-                                    extension
-                                ) && size.width * size.height <= currentSize.width * currentSize.height
-                            ) {
-                                if (newSize == null || size.width * size.height > newSize.width * newSize.height) {
-                                    currentSizeIndex = i
-                                    newSize = size
-                                }
-                            }
-                        }
-                        if (newSize == null) {
-                            Log.e(
-                                TAG,
-                                "can't find supporting picture size smaller than the current picture size"
-                            )
-                            // just find largest that supports requirements
-                            for (i in photoSizes!!.indices) {
-                                val size: CameraController.Size = photoSizes!![i]
-                                if (size.supportsRequirements(isBurst, isExtension, extension)) {
-                                    if (newSize == null || size.width * size.height > newSize.width * newSize.height) {
-                                        currentSizeIndex = i
-                                        newSize = size
-                                    }
-                                }
-                            }
-                            if (newSize == null) {
-                                Log.e(TAG, "can't find supporting picture size")
-                            }
-                        }
+                    if (bestSupportingIndex != null) {
+                        currentSizeIndex = bestSupportingIndex
                         // if we set a new size, we don't save this to applicationinterface (so that if user switches to a burst mode or extension mode and back
                         // when the original resolution doesn't support burst/extension we revert to the original resolution)
                     }
@@ -2297,12 +2201,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
     }
 
     private fun find1xZoom(): Int {
-        for (i in zoomRatios!!.indices) {
-            if (zoomRatios!![i] == 100) {
-                return i
-            }
-        }
-        return 0 // shouldn't happen but just in case, choose smallest zoom value
+        return PreviewCameraSetupHelper.find1xZoom(zoomRatios)
     }
 
     fun setupBurstMode() {
@@ -2472,36 +2371,32 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                 )
             }
             if (this.usingFaceDetection) {
-                class MyFaceDetectionListener : CameraController.FaceDetectionListener {
-                    private val handler = Handler()
-                    private var lastNFaces = -1
-                    private var lastFaceLocation = FaceLocation.FACELOCATION_UNSET
-
-                    /** Note, at least for Camera2 API, onFaceDetection() isn't called on UI thread.
-                     */
+                cameraController!!.setFaceDetectionListener(object :
+                    CameraController.FaceDetectionListener {
                     override fun onFaceDetection(faces: Array<CameraController.Face?>) {
                         if (MyDebug.LOG) Log.d(
                             TAG,
                             "onFaceDetection: " + faces.size + " : " + faces.contentToString()
                         )
                         if (cameraController == null) {
-                            // can get a crash in some cases when switching camera when face detection is on (at least for Camera2)
                             val activity = this@Preview.context as Activity
                             activity.runOnUiThread { _facesDetected = emptyArray() }
                             return
                         }
 
-                        // don't assign to facesDetected yet, as that has to be done on the UI thread
-
-                        // We don't synchronize on facesDetected, as the array may be passed to other
-                        // classes via getFacesDetected(). Although that function could copy instead,
-                        // that would mean an allocation in every frame in DrawPreview.
-                        // Easier to just do the assignment on the UI thread.
                         val activity = this@Preview.context as Activity
                         activity.runOnUiThread {
-                            reportFaces(faces)
+                            faceDetectionEngine.reportFaces(
+                                faces = faces,
+                                context = this@Preview.context,
+                                view = this@Preview.view,
+                                matrix = getCameraToPreviewMatrix(),
+                                viewWidth = cameraSurface.view.width,
+                                viewHeight = cameraSurface.view.height,
+                                uiRotation = uiRotation,
+                                tempRect = faceRect
+                            )
                             if (_facesDetected.isEmpty() || _facesDetected.size != faces.size) {
-                                // avoid unnecessary reallocations
                                 if (MyDebug.LOG) Log.d(
                                     TAG,
                                     "allocate new faces_detected"
@@ -2511,133 +2406,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                             System.arraycopy(faces, 0, _facesDetected, 0, faces.size)
                         }
                     }
-
-                    /** Accessibility: report number of faces for talkback etc.
-                     */
-                    fun reportFaces(localFaces: Array<CameraController.Face?>) {
-                        run {
-                            val nFaces = localFaces.size
-                            var faceLocation = FaceLocation.FACELOCATION_UNKNOWN
-                            if (nFaces > 0) {
-                                // set faceLocation
-                                var avgX = 0f
-                                var avgY = 0f
-                                val bdryFracC = 0.35f
-                                var allCentre = true
-                                val matrix = getCameraToPreviewMatrix()
-                                for (face in localFaces) {
-                                    if (face != null) {
-                                        //float faceX = face.rect.centerX();
-                                        //float faceY = face.rect.centerY();
-                                        // convert to screen space coordinates
-                                        faceRect.set(face.rect)
-                                        matrix.mapRect(faceRect)
-                                        var faceX = faceRect.centerX()
-                                        var faceY = faceRect.centerY()
-
-                                        faceX /= cameraSurface.view.width.toFloat()
-                                        faceY /= cameraSurface.view.height.toFloat()
-                                        if (allCentre) {
-                                            if (faceX < bdryFracC || faceX > 1.0f - bdryFracC || faceY < bdryFracC || faceY > 1.0f - bdryFracC) allCentre =
-                                                false
-                                        }
-                                        avgX += faceX
-                                        avgY += faceY
-                                    }
-                                }
-                                avgX /= nFaces.toFloat()
-                                avgY /= nFaces.toFloat()
-                                if (MyDebug.LOG) {
-                                    Log.d(TAG, "    avg_x: $avgX")
-                                    Log.d(TAG, "    avg_y: $avgY")
-                                    Log.d(
-                                        TAG,
-                                        "    ui_rotation: $uiRotation"
-                                    )
-                                }
-                                if (allCentre) {
-                                    faceLocation = FaceLocation.FACELOCATION_CENTRE
-                                } else {
-                                    when (uiRotation) {
-                                        0 -> {}
-                                        90 -> {
-                                            val temp = avgX
-                                            avgX = avgY
-                                            avgY = 1.0f - temp
-                                        }
-
-                                        180 -> {
-                                            avgX = 1.0f - avgX
-                                            avgY = 1.0f - avgY
-                                        }
-
-                                        270 -> {
-                                            val temp = avgX
-                                            avgX = 1.0f - avgY
-                                            avgY = temp
-                                        }
-                                    }
-                                    if (MyDebug.LOG) {
-                                        Log.d(TAG, "    avg_x: $avgX")
-                                        Log.d(TAG, "    avg_y: $avgY")
-                                    }
-                                    if (avgX < bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_LEFT
-                                    else if (avgX > 1.0f - bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_RIGHT
-                                    else if (avgY < bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_TOP
-                                    else if (avgY > 1.0f - bdryFracC) faceLocation =
-                                        FaceLocation.FACELOCATION_BOTTOM
-                                }
-                            }
-                            if (nFaces != lastNFaces || faceLocation != lastFaceLocation) {
-                                if (nFaces == 0 && lastNFaces == -1) {
-                                    // only say 0 faces detected if previously the number was non-zero
-                                } else {
-                                    var string = "$nFaces " + this@Preview.context.resources
-                                        .getString(if (nFaces == 1) R.string.face_detected else R.string.faces_detected)
-                                    if (nFaces > 0 && faceLocation != FaceLocation.FACELOCATION_UNKNOWN) {
-                                        when (faceLocation) {
-                                            FaceLocation.FACELOCATION_CENTRE -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.centre_of_screen)
-
-                                            FaceLocation.FACELOCATION_LEFT -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.left_of_screen)
-
-                                            FaceLocation.FACELOCATION_RIGHT -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.right_of_screen)
-
-                                            FaceLocation.FACELOCATION_TOP -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.top_of_screen)
-
-                                            FaceLocation.FACELOCATION_BOTTOM -> string += " " + this@Preview.context.resources
-                                                .getString(R.string.bottom_of_screen)
-
-                                            else -> {}
-                                        }
-                                    }
-                                    val stringF = string
-                                    if (MyDebug.LOG) Log.d(TAG, string)
-                                    // to avoid having a big queue of saying "one face detected, two faces detected" etc., we only report
-                                    // after a delay, cancelling any that were previously queued
-                                    handler.removeCallbacksAndMessages(null)
-                                    handler.postDelayed({
-                                        if (MyDebug.LOG) Log.d(
-                                            TAG,
-                                            "announceForAccessibility: $stringF"
-                                        )
-                                        this@Preview.view.announceForAccessibility(stringF)
-                                    }, 500)
-                                }
-
-                                lastNFaces = nFaces
-                                lastFaceLocation = faceLocation
-                            }
-                        }
-                    }
-                }
-                cameraController!!.setFaceDetectionListener(MyFaceDetectionListener())
+                })
             } else {
                 cameraController!!.setFaceDetectionListener(null)
             }
@@ -4237,113 +4006,20 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         var newZoomFactor = 0
         if (this.cameraController != null && this.hasZoom) {
             val zoomFactor: Int = cameraController!!.zoom
-            var zoomRatio: Float
-            if (hasSmoothZoom) {
-                zoomRatio = smoothZoom
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "    use smooth_zoom: " + smoothZoom + " instead of: " + zoomRatios!![zoomFactor] / 100.0f
-                )
-            } else {
-                zoomRatio = zoomRatios!![zoomFactor] / 100.0f
-            }
-            zoomRatio *= scaleFactor
-            if (MyDebug.LOG) Log.d(
-                TAG,
-                "    zoom_ratio: $zoomRatio"
+            val (calculatedZoomFactor, calculatedSmoothZoom) = PreviewGestureHandler.getScaledZoomFactor(
+                scaleFactor = scaleFactor,
+                zoomFactor = zoomFactor,
+                zoomRatios = zoomRatios,
+                hasSmoothZoom = hasSmoothZoom,
+                currentSmoothZoom = smoothZoom,
+                maxZoom = maxZoom
             )
-
-            newZoomFactor = zoomFactor
-            if (zoomRatio <= zoomRatios!![0] / 100.0f) {
-                newZoomFactor = 0
-                if (hasSmoothZoom) smoothZoom = zoomRatios!![0] / 100.0f
-            } else if (zoomRatio >= zoomRatios!![maxZoom] / 100.0f) {
-                newZoomFactor = maxZoom
-                if (hasSmoothZoom) smoothZoom = zoomRatios!![maxZoom] / 100.0f
-            } else if (hasSmoothZoom) {
-                // Find the closest zoom level by rounding to nearest.
-                // Important to have same behavior whether zooming in or out, otherwise problem when touching with two fingers and not
-                // moving - we'll get very small scale factors alternately between zooming in and out.
-                // The only reason we have separate codepath for zooming in or out is for performance (since we know to only look at
-                // higher or lower zoom ratios).
-                var dist =
-                    abs((zoomRatio - zoomRatios!![zoomFactor] / 100.0f).toDouble()).toFloat()
-                if (MyDebug.LOG) Log.d(
-                    TAG,
-                    "    current dist: $dist"
-                )
-
-                if (scaleFactor > 1.0f) {
-                    // zooming in
-                    for (i in zoomFactor + 1..<zoomRatios!!.size) {
-                        val thisDist =
-                            abs((zoomRatio - zoomRatios!![i] / 100.0f).toDouble()).toFloat()
-                        if (MyDebug.LOG) Log.d(
-                            TAG,
-                            "    this_dist: $thisDist"
-                        )
-                        if (thisDist < dist) {
-                            newZoomFactor = i
-                            dist = thisDist
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom in, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " to " + zoomRatio + " , dist " + dist
-                            )
-                        } else if (thisDist > dist + 1.0e-5f) {
-                            break
-                        }
-                    }
-                } else {
-                    // zooming out
-                    for (i in zoomFactor - 1 downTo 0) {
-                        val thisDist =
-                            abs((zoomRatio - zoomRatios!![i] / 100.0f).toDouble()).toFloat()
-                        if (thisDist < dist) {
-                            newZoomFactor = i
-                            dist = thisDist
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom out, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " to " + zoomRatio + " , dist " + dist
-                            )
-                        } else if (thisDist > dist + 1.0e-5f) {
-                            break
-                        }
-                    }
-                }
-
-                smoothZoom = zoomRatio
-            } else {
-                // find the closest zoom level
-                // unclear if we need this code anymore (smoothZoom should always be true?)
-
-                if (scaleFactor > 1.0f) {
-                    // zooming in
-                    for (i in zoomFactor..<zoomRatios!!.size) {
-                        if (zoomRatios!![i] / 100.0f >= zoomRatio) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom in, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " >= " + zoomRatio
-                            )
-                            newZoomFactor = i
-                            break
-                        }
-                    }
-                } else {
-                    // zooming out
-                    for (i in zoomFactor downTo 0) {
-                        if (zoomRatios!![i] / 100.0f <= zoomRatio) {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "zoom out, found new zoom by comparing " + zoomRatios!![i] / 100.0f + " <= " + zoomRatio
-                            )
-                            newZoomFactor = i
-                            break
-                        }
-                    }
-                }
+            newZoomFactor = calculatedZoomFactor
+            if (hasSmoothZoom) {
+                smoothZoom = calculatedSmoothZoom
             }
             if (MyDebug.LOG) {
-                Log.d(TAG, "zoom_ratio is now $zoomRatio")
+                Log.d(TAG, "zoom_ratio is now $smoothZoom")
                 Log.d(
                     TAG,
                     "    old zoom_factor " + zoomFactor + " ratio " + zoomRatios!![zoomFactor] / 100.0f
@@ -6925,63 +6601,32 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         }
     }
 
+    val previewSensorManager: com.hightechif.openkamera.preview.sensor.PreviewSensorManager by lazy {
+        com.hightechif.openkamera.preview.sensor.PreviewSensorManager(applicationInterface)
+    }
+
     fun onAccelerometerSensorChanged(event: SensorEvent) {
-        /*if( MyDebug.LOG )
-    		Log.d(TAG, "onAccelerometerSensorChanged: " + event.values[0] + ", " + event.values[1] + ", " + event.values[2]);*/
-
-        this.hasGravity = true
-        for (i in 0..2) {
-            //this.gravity[i] = event.values[i];
-            gravity[i] = SENSOR_ALPHA * gravity[i] + (1.0f - SENSOR_ALPHA) * event.values[i]
-        }
-        calculateGeoDirection()
-
-        val x = gravity[0].toDouble()
-        val y = gravity[1].toDouble()
-        val z = gravity[2].toDouble()
-        val mag = sqrt(x * x + y * y + z * z)
-
-        /*if( MyDebug.LOG )
-			Log.d(TAG, "xyz: " + x + ", " + y + ", " + z);*/
-        this.hasPitchAngle = false
-        if (mag > 1.0e-8) {
-            this.hasPitchAngle = true
-            this.pitchAngle = asin(-z / mag) * 180.0 / Math.PI
-
-            /*if( MyDebug.LOG )
-				Log.d(TAG, "pitch: " + pitchAngle);*/
-            this.hasLevelAngle = true
-            this.naturalLevelAngle = atan2(-x, y) * 180.0 / Math.PI
-            if (this.naturalLevelAngle < -0.0) {
-                this.naturalLevelAngle += 360.0
-            }
-
-            //naturalLevelAngle = 0.0f; // test zero angle
-            updateLevelAngles()
-        } else {
-            Log.e(TAG, "accel sensor has zero mag: $mag")
-            this.hasLevelAngle = false
-        }
+        previewSensorManager.currentOrientation = this.currentOrientation
+        previewSensorManager.onAccelerometerSensorChanged(event)
+        this.hasGravity = previewSensorManager.hasGravity
+        this.hasPitchAngle = previewSensorManager.hasPitchAngle
+        this.pitchAngle = previewSensorManager.pitchAngle
+        this.hasLevelAngle = previewSensorManager.hasLevelAngle
+        this.naturalLevelAngle = previewSensorManager.naturalLevelAngle
+        this.levelAngle = previewSensorManager.levelAngle
+        this.origLevelAngle = previewSensorManager.origLevelAngle
+        this.hasGeoDirection = previewSensorManager.hasGeoDirection
     }
 
     /** This method should be called when the natural level angle, or the calibration angle, has been updated, to update the other level angle variables.
      *
      */
     fun updateLevelAngles() {
-        if (hasLevelAngle) {
-            this.levelAngle = this.naturalLevelAngle
-            val calibratedLevelAngle: Double = applicationInterface.getCalibratedLevelAngle()
-            this.levelAngle -= calibratedLevelAngle
-            this.origLevelAngle = this.levelAngle
-            this.levelAngle -= currentOrientation.toFloat().toDouble()
-            if (this.levelAngle < -180.0) {
-                this.levelAngle += 360.0
-            } else if (this.levelAngle > 180.0) {
-                this.levelAngle -= 360.0
-            }
-            /*if( MyDebug.LOG )
-				Log.d(TAG, "levelAngle is now: " + levelAngle);*/
-        }
+        previewSensorManager.currentOrientation = this.currentOrientation
+        previewSensorManager.updateLevelAngles()
+        this.hasLevelAngle = previewSensorManager.hasLevelAngle
+        this.levelAngle = previewSensorManager.levelAngle
+        this.origLevelAngle = previewSensorManager.origLevelAngle
     }
 
     fun hasLevelAngle(): Boolean {
@@ -6992,29 +6637,23 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * This is useful as the level angle becomes unstable when device is near vertical
      */
     fun hasLevelAngleStable(): Boolean {
-        if (!isTest && hasPitchAngle && abs(pitchAngle) > 70.0) {
-            // note that if isTest, we always set the level angle - since the device typically lies face down when running tests...
-            return false
-        }
-        return this.hasLevelAngle
+        previewSensorManager.isTest = this.isTest
+        return previewSensorManager.hasLevelAngleStable()
     }
 
     val levelAngleUncalibrated: Double
         /** Returns the uncalibrated level angle in degrees.
          */
-        get() = this.naturalLevelAngle - this.currentOrientation
+        get() = previewSensorManager.levelAngleUncalibrated
 
     fun hasPitchAngle(): Boolean {
         return this.hasPitchAngle
     }
 
     fun onMagneticSensorChanged(event: SensorEvent) {
-        this.hasGeomagnetic = true
-        for (i in 0..2) {
-            //this.geomagnetic[i] = event.values[i];
-            geomagnetic[i] = SENSOR_ALPHA * geomagnetic[i] + (1.0f - SENSOR_ALPHA) * event.values[i]
-        }
-        calculateGeoDirection()
+        previewSensorManager.onMagneticSensorChanged(event)
+        this.hasGeomagnetic = previewSensorManager.hasGeomagnetic
+        this.hasGeoDirection = previewSensorManager.hasGeoDirection
     }
 
     private fun calculateGeoDirection() {
@@ -7040,7 +6679,7 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         SensorManager.getOrientation(cameraRotation, newGeoDirection)
         /*if( MyDebug.LOG ) {
 			Log.d(TAG, "###");
-			Log.d(TAG, "old geoDirection: " + (_geoDirection[0]*180/Math.PI) + ", " + (_geoDirection[1]*180/Math.PI) + ", " + (_geoDirection[2]*180/Math.PI));
+			Log.d(TAG, "old geoDirection: " + (_geoDirection[0]*180/PI) + ", " + (_geoDirection[1]*180/PI) + ", " + (_geoDirection[2]*180/PI));
 		}*/
         for (i in 0..2) {
             var oldCompass = Math.toDegrees(_geoDirection[i].toDouble()).toFloat()
@@ -7053,8 +6692,8 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             _geoDirection[i] = Math.toRadians(oldCompass.toDouble()).toFloat()
         }
         /*if( MyDebug.LOG ) {
-			Log.d(TAG, "newGeoDirection: " + (newGeoDirection[0]*180/Math.PI) + ", " + (newGeoDirection[1]*180/Math.PI) + ", " + (newGeoDirection[2]*180/Math.PI));
-			Log.d(TAG, "geoDirection: " + (_geoDirection[0]*180/Math.PI) + ", " + (_geoDirection[1]*180/Math.PI) + ", " + (_geoDirection[2]*180/Math.PI));
+			Log.d(TAG, "newGeoDirection: " + (newGeoDirection[0]*180/PI) + ", " + (newGeoDirection[1]*180/PI) + ", " + (newGeoDirection[2]*180/PI));
+			Log.d(TAG, "geoDirection: " + (_geoDirection[0]*180/PI) + ", " + (_geoDirection[1]*180/PI) + ", " + (_geoDirection[2]*180/PI));
 		}*/
     }
 
@@ -7660,12 +7299,12 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             // when pausing, we close the camera on a background thread - so if this is still happening when we resume,
             // we won't be able to open the camera, so need to Open Kamera when it's closed
             if (MyDebug.LOG) Log.d(TAG, "camera still closing")
-            if (closeCameraTask != null) { // just to be safe
-                closeCameraTask!!.reopen = true
+            if (closeCameraJob != null) { // just to be safe
+                reopenAfterClose = true
             } else {
                 Log.e(
                     TAG,
-                    "onResume: state is CAMERAOPENSTATE_CLOSING, but close_camera_task is null"
+                    "onResume: state is CAMERAOPENSTATE_CLOSING, but closeCameraJob is null"
                 )
             }
         } else {
@@ -7688,13 +7327,13 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             true // note, if activityIsPaused==false, we don't change appIsPaused, in case app was paused indicated via a separate call to onPause
 
         if (cameraOpenState == CameraOpenState.CAMERAOPENSTATE_OPENING) {
-            if (MyDebug.LOG) Log.d(TAG, "cancel open_camera_task")
-            if (openCameraTask != null) { // just to be safe
-                openCameraTask!!.cancel(true)
+            if (MyDebug.LOG) Log.d(TAG, "cancel openCameraJob")
+            if (openCameraJob != null) { // just to be safe
+                openCameraJob!!.cancel()
             } else {
                 Log.e(
                     TAG,
-                    "onPause: state is CAMERAOPENSTATE_OPENING, but open_camera_task is null"
+                    "onPause: state is CAMERAOPENSTATE_OPENING, but openCameraJob is null"
                 )
             }
         }
@@ -7727,36 +7366,29 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         if (cameraOpenState == CameraOpenState.CAMERAOPENSTATE_CLOSING) {
             // If the camera is currently closing on a background thread, then wait until the camera has closed to be safe
             if (MyDebug.LOG) {
-                Log.d(TAG, "wait for close_camera_task")
+                Log.d(TAG, "wait for closeCameraJob")
             }
-            if (closeCameraTask != null) { // just to be safe
+            if (closeCameraJob != null && closeCameraJob!!.isActive) {
                 val timeS = System.currentTimeMillis()
                 try {
-                    closeCameraTask!![3000, TimeUnit.MILLISECONDS] // set timeout to avoid ANR (camera resource should be freed by the OS when destroyed anyway)
-                } catch (e: ExecutionException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
-                } catch (e: InterruptedException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
-                } catch (e: TimeoutException) {
-                    Log.e(TAG, "exception while waiting for close_camera_task to finish")
-                    e.printStackTrace()
+                    runBlocking {
+                        withTimeoutOrNull(3000.milliseconds) {
+                            closeCameraJob!!.join()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "exception while waiting for closeCameraJob to finish", e)
                 }
                 if (MyDebug.LOG) {
-                    Log.d(TAG, "done waiting for close_camera_task")
+                    Log.d(TAG, "done waiting for closeCameraJob")
                     Log.d(
                         TAG,
-                        "### time after waiting for close_camera_task: " + (System.currentTimeMillis() - timeS)
+                        "### time after waiting for closeCameraJob: " + (System.currentTimeMillis() - timeS)
                     )
                 }
-            } else {
-                Log.e(
-                    TAG,
-                    "onResume: state is CAMERAOPENSTATE_CLOSING, but close_camera_task is null"
-                )
             }
         }
+        previewLifecycleScope.cancel()
     }
 
     /*void updateUIPlacement() {
@@ -8062,7 +7694,6 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         isPreviewBitmapEnabled = false
         usePreviewBitmapSmall = false
         usePreviewBitmapFull = false
-        histogramScript = null // to help garbage collection
     }
 
     fun usePreviewBitmapSmall(): Boolean {
@@ -8355,27 +7986,15 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             Log.d(TAG, "is_test_junit4: $isTestJunit4")
         }
 
-        this.usingAndroidL = applicationInterface.useCamera2()
+        this.usingAndroidL = true
         if (MyDebug.LOG) {
             Log.d(TAG, "using_android_l?: $usingAndroidL")
         }
 
-        var usingTextureView = false
-        if (usingAndroidL) {
-            // use a TextureView for Android L - had bugs with SurfaceView not resizing properly on Nexus 7; and good to use a TextureView anyway
-            // ideally we'd use a TextureView for older camera API too, but sticking with SurfaceView to avoid risk of breaking behavior
-            usingTextureView = true
-        }
-
-        if (usingTextureView) {
-            this.cameraSurface = MyTextureView.createInstance(context, this)
-            // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
-            this.canvasView = CanvasView(context, this)
-            cameraControllerManager = CameraControllerManager2(context)
-        } else {
-            this.cameraSurface = MySurfaceView(context, this)
-            cameraControllerManager = CameraControllerManager1()
-        }
+        this.cameraSurface = MyTextureView.createInstance(context, this)
+        // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
+        this.canvasView = CanvasView(context, this)
+        cameraControllerManager = CameraControllerManager2(context)
 
         /*{
 			FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -8662,18 +8281,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
          */
         get() {
             if (_facesDetected.isNotEmpty()) {
-                // note, we don't store the screen coordinates, as they may become out of date in the
-                // screen orientation changes (if MainActivity.lockToLandscape==false)
                 val matrix = getCameraToPreviewMatrix()
-                for (face in _facesDetected) {
-                    if (face != null) {
-                        faceRect.set(face.rect)
-                        matrix.mapRect(faceRect)
-                        faceRect.round(face.temp)
-                    }
-                }
+                faceDetectionEngine.mapFacesToScreenCoordinates(_facesDetected, matrix, faceRect)
             }
-            // FindBugs warns about returning the array directly, but in fact we need to return direct access rather than copying, so that the on-screen display of faces rectangles updates
             return _facesDetected.filterNotNull().toTypedArray()
         }
 

@@ -111,6 +111,27 @@ class Camera2SessionManager {
     }
 
     /**
+     * Clears the active capture session reference without calling close().
+     */
+    fun clearCaptureSession() {
+        synchronized(sessionLock) {
+            this.captureSession = null
+            if (this.sessionState is CaptureSessionState.Configured) {
+                this.sessionState = CaptureSessionState.Closed
+            }
+        }
+    }
+
+    /**
+     * Clears the active extension session reference without calling close().
+     */
+    fun clearExtensionSession() {
+        synchronized(sessionLock) {
+            this.extensionSession = null
+        }
+    }
+
+    /**
      * Safely closes active capture and extension sessions.
      */
     fun closeCaptureSession() {

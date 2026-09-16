@@ -13,9 +13,13 @@ import androidx.lifecycle.viewModelScope
 import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
 import com.hightechif.openkamera.domain.engine.ICameraEngine
+import com.hightechif.openkamera.domain.engine.IRemoteInputManager
+import com.hightechif.openkamera.domain.engine.RemoteInputType
 import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.CaptureMode
+import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.GridType
+import com.hightechif.openkamera.domain.repository.ILocationRepository
 import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
@@ -28,7 +32,9 @@ import com.hightechif.openkamera.domain.usecase.SwitchCameraFacingUseCase
 import com.hightechif.openkamera.domain.usecase.TapToFocusUseCase
 import com.hightechif.openkamera.domain.usecase.ToggleFlashUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -40,8 +46,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @HiltViewModel
 class CameraViewModel @Inject constructor(
@@ -56,7 +64,9 @@ class CameraViewModel @Inject constructor(
     private val getCameraCapabilitiesUseCase: GetCameraCapabilitiesUseCase,
     private val settingsRepository: ISettingsRepository,
     private val mediaRepository: IMediaRepository,
-    private val sensorRepository: ISensorRepository
+    private val sensorRepository: ISensorRepository,
+    private val locationRepository: ILocationRepository? = null,
+    private val remoteInputManager: IRemoteInputManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraUiState())
@@ -68,6 +78,13 @@ class CameraViewModel @Inject constructor(
     val isRecordingVideo: StateFlow<Boolean> = cameraEngine.engineStateFlow
         .map { it is CameraEngineState.Recording }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    companion object {
+        const val LOW_STORAGE_THRESHOLD_BYTES = 50L * 1024 * 1024 // 50MB
+        const val CRITICAL_STORAGE_THRESHOLD_BYTES = 10L * 1024 * 1024 // 10MB
+    }
+
+    private var recordingTimerJob: Job? = null
 
     private val _uiEffect = MutableSharedFlow<CameraUiEffect>(
         replay = 0,
@@ -94,6 +111,14 @@ class CameraViewModel @Inject constructor(
                         horizonAngle = orientation.horizonAngle,
                         compassDegrees = orientation.compassDegrees
                     )
+                }
+            }
+        }
+
+        locationRepository?.let { locRepo ->
+            viewModelScope.launch {
+                locRepo.currentLocationFlow.collectLatest { loc ->
+                    _uiState.update { it.copy(location = loc) }
                 }
             }
         }
@@ -141,8 +166,65 @@ class CameraViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            cameraEngine.engineStateFlow.collectLatest { engineState ->
-                _uiState.update { it.copy(isRecording = engineState is CameraEngineState.Recording) }
+            settingsRepository.timerSecondsFlow.collectLatest { timer ->
+                _uiState.update { it.copy(timerSecondsRemaining = timer) }
+            }
+        }
+
+        viewModelScope.launch {
+            isRecordingVideo.collectLatest { isRecording ->
+                recordingTimerJob?.cancel()
+                if (isRecording) {
+                    _uiState.update { it.copy(isRecording = true, isVideoPaused = false) }
+                    recordingTimerJob = launch {
+                        while (isActive) {
+                            delay(1000.milliseconds)
+                            if (!_uiState.value.isVideoPaused) {
+                                _uiState.update { state ->
+                                    state.copy(recordingDurationSeconds = state.recordingDurationSeconds + 1)
+                                }
+                            }
+                            val availableBytes = mediaRepository.getAvailableStorageBytes()
+                            if (availableBytes in 1L until CRITICAL_STORAGE_THRESHOLD_BYTES) {
+                                handleLowStorageInterruption()
+                                break
+                            } else if (availableBytes in CRITICAL_STORAGE_THRESHOLD_BYTES until LOW_STORAGE_THRESHOLD_BYTES) {
+                                _uiState.update { it.copy(isStorageLow = true) }
+                            }
+                        }
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isRecording = false,
+                            isVideoPaused = false,
+                            recordingDurationSeconds = 0L
+                        )
+                    }
+                }
+            }
+        }
+
+        remoteInputManager?.let { remoteManager ->
+            remoteManager.startListening()
+            viewModelScope.launch {
+                remoteManager.remoteInputEventFlow.collectLatest { event ->
+                    when (event) {
+                        RemoteInputType.SHUTTER_BUTTON -> onEvent(CameraUiEvent.OnRemoteCaptureTriggered)
+                        RemoteInputType.ZOOM_IN -> onEvent(
+                            CameraUiEvent.OnZoomChanged(
+                                (_uiState.value.zoomRatio + 0.1f).coerceAtMost(_uiState.value.maxZoomRatio)
+                            )
+                        )
+                        RemoteInputType.ZOOM_OUT -> onEvent(
+                            CameraUiEvent.OnZoomChanged(
+                                (_uiState.value.zoomRatio - 0.1f).coerceAtLeast(1.0f)
+                            )
+                        )
+                        RemoteInputType.SWITCH_CAMERA -> onEvent(CameraUiEvent.OnSwitchCameraClicked)
+                        RemoteInputType.FOCUS_BUTTON -> onEvent(CameraUiEvent.OnFocusKeyPressed)
+                    }
+                }
             }
         }
     }
@@ -163,8 +245,42 @@ class CameraViewModel @Inject constructor(
         handleShutterClicked(customConfig)
     }
 
+    fun takePicture(customConfig: CaptureConfig? = null) {
+        capturePhoto(customConfig)
+    }
+
     fun toggleVideoRecording() {
         handleRecordVideoClicked()
+    }
+
+    fun toggleRecording() {
+        toggleVideoRecording()
+    }
+
+    fun switchCameraFacing() {
+        handleSwitchCameraClicked()
+    }
+
+    fun pauseVideoRecording() {
+        viewModelScope.launch {
+            val result = recordVideoUseCase.pauseRecording()
+            if (result.isSuccess) {
+                _uiState.update { it.copy(isVideoPaused = true) }
+            } else {
+                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to pause recording"))
+            }
+        }
+    }
+
+    fun resumeVideoRecording() {
+        viewModelScope.launch {
+            val result = recordVideoUseCase.resumeRecording()
+            if (result.isSuccess) {
+                _uiState.update { it.copy(isVideoPaused = false) }
+            } else {
+                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to resume recording"))
+            }
+        }
     }
 
     fun setZoom(ratio: Float) {
@@ -185,8 +301,19 @@ class CameraViewModel @Inject constructor(
 
     fun onEvent(event: CameraUiEvent) {
         when (event) {
-            is CameraUiEvent.OnShutterClicked -> handleShutterClicked()
+            is CameraUiEvent.OnShutterClicked,
+            is CameraUiEvent.OnShutterKeyPressed,
+            is CameraUiEvent.OnRemoteCaptureTriggered -> handleShutterClicked()
+            is CameraUiEvent.OnFocusKeyPressed -> {
+                // Focus key triggers autofocus or focus lock
+            }
+            is CameraUiEvent.OnVolumeKeyPressed -> {
+                // Volume key action dispatched based on configured preference
+            }
             is CameraUiEvent.OnRecordVideoClicked -> handleRecordVideoClicked()
+            is CameraUiEvent.OnPauseVideoRecordingClicked -> pauseVideoRecording()
+            is CameraUiEvent.OnResumeVideoRecordingClicked -> resumeVideoRecording()
+            is CameraUiEvent.OnLowStorageDetected -> handleLowStorageInterruption()
             is CameraUiEvent.OnSwitchCameraClicked -> handleSwitchCameraClicked()
             is CameraUiEvent.OnFlashModeToggleClicked -> handleFlashToggleClicked()
             is CameraUiEvent.OnZoomChanged -> handleZoomChanged(event.ratio)
@@ -236,22 +363,62 @@ class CameraViewModel @Inject constructor(
 
     private fun handleRecordVideoClicked() {
         viewModelScope.launch {
-            if (_uiState.value.isRecording) {
+            if (_uiState.value.isRecording || isRecordingVideo.value) {
+                recordingTimerJob?.cancel()
                 val stopResult = recordVideoUseCase.stopRecording()
-                _uiState.update { it.copy(isRecording = false, recordingDurationSeconds = 0L) }
+                _uiState.update {
+                    it.copy(
+                        isRecording = false,
+                        isVideoPaused = false,
+                        recordingDurationSeconds = 0L
+                    )
+                }
                 if (stopResult.isSuccess) {
                     _uiEffect.tryEmit(CameraUiEffect.ShowToast("Video saved"))
                 } else {
                     _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to save video"))
                 }
             } else {
+                val freeStorage = mediaRepository.getAvailableStorageBytes()
+                if (freeStorage in 1L until CRITICAL_STORAGE_THRESHOLD_BYTES) {
+                    _uiState.update { it.copy(isStorageLow = true) }
+                    _uiEffect.tryEmit(CameraUiEffect.ShowToast("Cannot record: Low storage space"))
+                    return@launch
+                }
                 val startResult = recordVideoUseCase.startRecording()
                 if (startResult.isSuccess) {
-                    _uiState.update { it.copy(isRecording = true) }
+                    _uiState.update {
+                        it.copy(
+                            isRecording = true,
+                            isVideoPaused = false,
+                            isStorageLow = freeStorage in CRITICAL_STORAGE_THRESHOLD_BYTES until LOW_STORAGE_THRESHOLD_BYTES
+                        )
+                    }
                     _uiEffect.tryEmit(CameraUiEffect.Vibrate(100))
                 } else {
                     _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to start recording"))
                 }
+            }
+        }
+    }
+
+    private fun handleLowStorageInterruption() {
+        viewModelScope.launch {
+            if (_uiState.value.isRecording || isRecordingVideo.value) {
+                recordingTimerJob?.cancel()
+                recordVideoUseCase.stopRecording()
+                _uiState.update {
+                    it.copy(
+                        isRecording = false,
+                        isVideoPaused = false,
+                        recordingDurationSeconds = 0L,
+                        isStorageLow = true
+                    )
+                }
+                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Recording stopped: Low storage space"))
+            } else {
+                _uiState.update { it.copy(isStorageLow = true) }
+                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Storage space low"))
             }
         }
     }
@@ -270,8 +437,14 @@ class CameraViewModel @Inject constructor(
 
     private fun handleFlashToggleClicked() {
         viewModelScope.launch {
-            val nextMode = toggleFlashUseCase()
-            _uiState.update { it.copy(flashMode = nextMode) }
+            if (_uiState.value.isRecording || isRecordingVideo.value) {
+                val targetMode = if (_uiState.value.flashMode == FlashMode.TORCH) FlashMode.OFF else FlashMode.TORCH
+                val nextMode = toggleFlashUseCase(targetMode)
+                _uiState.update { it.copy(flashMode = nextMode) }
+            } else {
+                val nextMode = toggleFlashUseCase()
+                _uiState.update { it.copy(flashMode = nextMode) }
+            }
         }
     }
 
@@ -316,10 +489,6 @@ class CameraViewModel @Inject constructor(
 
     private fun handleGalleryThumbnailClicked() {
         val uri = _uiState.value.latestThumbnailUri
-        if (uri != null) {
-            _uiEffect.tryEmit(CameraUiEffect.NavigateToGallery(uri))
-        } else {
-            _uiEffect.tryEmit(CameraUiEffect.ShowToast("No photos or videos yet"))
-        }
+        _uiEffect.tryEmit(CameraUiEffect.NavigateToGallery(uri))
     }
 }

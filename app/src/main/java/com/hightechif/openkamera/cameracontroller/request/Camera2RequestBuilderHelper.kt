@@ -28,6 +28,192 @@ object Camera2RequestBuilderHelper {
     const val MIN_WHITE_BALANCE_TEMPERATURE_C = 1000
     const val MAX_WHITE_BALANCE_TEMPERATURE_C = 15000
 
+    /**
+     * Enforces minimum points for tonemap curves to avoid hardware-specific pipeline bugs.
+     */
+    fun enforceMinTonemapCurvePoints(inValues: FloatArray, isSamsung: Boolean): FloatArray {
+        val minPointsC = if (isSamsung) 32 else 64
+        if (inValues.size >= 2 * minPointsC) {
+            return inValues
+        }
+        val points: MutableList<Pair<Float, Float>> = ArrayList()
+        for (i in 0 until inValues.size / 2) {
+            points.add(Pair(inValues[2 * i], inValues[2 * i + 1]))
+        }
+        if (points.size < 2) {
+            return inValues
+        }
+
+        while (points.size < minPointsC) {
+            var largestIndx = 0
+            var largestDist = 0.0f
+            for (i in 0 until points.size - 1) {
+                val p0 = points[i]
+                val p1 = points[i + 1]
+                val dist = p1.first - p0.first
+                if (dist > largestDist) {
+                    largestIndx = i
+                    largestDist = dist
+                }
+            }
+            val p0 = points[largestIndx]
+            val p1 = points[largestIndx + 1]
+            val midX = 0.5f * (p0.first + p1.first)
+            val midY = 0.5f * (p0.second + p1.second)
+            points.add(largestIndx + 1, Pair(midX, midY))
+        }
+
+        val outValues = FloatArray(2 * points.size)
+        for (i in points.indices) {
+            val point = points[i]
+            outValues[2 * i] = point.first
+            outValues[2 * i + 1] = point.second
+        }
+        return outValues
+    }
+
+    fun convertSceneModeToString(value2: Int): String? = when (value2) {
+        CameraMetadata.CONTROL_SCENE_MODE_ACTION -> "action"
+        CameraMetadata.CONTROL_SCENE_MODE_BARCODE -> "barcode"
+        CameraMetadata.CONTROL_SCENE_MODE_BEACH -> "beach"
+        CameraMetadata.CONTROL_SCENE_MODE_CANDLELIGHT -> "candlelight"
+        CameraMetadata.CONTROL_SCENE_MODE_DISABLED -> CameraController.SCENE_MODE_DEFAULT
+        CameraMetadata.CONTROL_SCENE_MODE_FIREWORKS -> "fireworks"
+        CameraMetadata.CONTROL_SCENE_MODE_LANDSCAPE -> "landscape"
+        CameraMetadata.CONTROL_SCENE_MODE_NIGHT -> "night"
+        CameraMetadata.CONTROL_SCENE_MODE_NIGHT_PORTRAIT -> "night-portrait"
+        CameraMetadata.CONTROL_SCENE_MODE_PARTY -> "party"
+        CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT -> "portrait"
+        CameraMetadata.CONTROL_SCENE_MODE_SNOW -> "snow"
+        CameraMetadata.CONTROL_SCENE_MODE_SPORTS -> "sports"
+        CameraMetadata.CONTROL_SCENE_MODE_STEADYPHOTO -> "steadyphoto"
+        CameraMetadata.CONTROL_SCENE_MODE_SUNSET -> "sunset"
+        CameraMetadata.CONTROL_SCENE_MODE_THEATRE -> "theatre"
+        else -> null
+    }
+
+    fun convertSceneModeToInt(value: String): Int = when (value) {
+        "action" -> CameraMetadata.CONTROL_SCENE_MODE_ACTION
+        "barcode" -> CameraMetadata.CONTROL_SCENE_MODE_BARCODE
+        "beach" -> CameraMetadata.CONTROL_SCENE_MODE_BEACH
+        "candlelight" -> CameraMetadata.CONTROL_SCENE_MODE_CANDLELIGHT
+        CameraController.SCENE_MODE_DEFAULT -> CameraMetadata.CONTROL_SCENE_MODE_DISABLED
+        "fireworks" -> CameraMetadata.CONTROL_SCENE_MODE_FIREWORKS
+        "landscape" -> CameraMetadata.CONTROL_SCENE_MODE_LANDSCAPE
+        "night" -> CameraMetadata.CONTROL_SCENE_MODE_NIGHT
+        "night-portrait" -> CameraMetadata.CONTROL_SCENE_MODE_NIGHT_PORTRAIT
+        "party" -> CameraMetadata.CONTROL_SCENE_MODE_PARTY
+        "portrait" -> CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT
+        "snow" -> CameraMetadata.CONTROL_SCENE_MODE_SNOW
+        "sports" -> CameraMetadata.CONTROL_SCENE_MODE_SPORTS
+        "steadyphoto" -> CameraMetadata.CONTROL_SCENE_MODE_STEADYPHOTO
+        "sunset" -> CameraMetadata.CONTROL_SCENE_MODE_SUNSET
+        "theatre" -> CameraMetadata.CONTROL_SCENE_MODE_THEATRE
+        else -> CameraMetadata.CONTROL_SCENE_MODE_DISABLED
+    }
+
+    fun convertColorEffectToString(value2: Int): String? = when (value2) {
+        CameraMetadata.CONTROL_EFFECT_MODE_AQUA -> "aqua"
+        CameraMetadata.CONTROL_EFFECT_MODE_BLACKBOARD -> "blackboard"
+        CameraMetadata.CONTROL_EFFECT_MODE_MONO -> "mono"
+        CameraMetadata.CONTROL_EFFECT_MODE_NEGATIVE -> "negative"
+        CameraMetadata.CONTROL_EFFECT_MODE_OFF -> CameraController.COLOR_EFFECT_DEFAULT
+        CameraMetadata.CONTROL_EFFECT_MODE_POSTERIZE -> "posterize"
+        CameraMetadata.CONTROL_EFFECT_MODE_SEPIA -> "sepia"
+        CameraMetadata.CONTROL_EFFECT_MODE_SOLARIZE -> "solarize"
+        CameraMetadata.CONTROL_EFFECT_MODE_WHITEBOARD -> "whiteboard"
+        else -> null
+    }
+
+    fun convertColorEffectToInt(value: String): Int = when (value) {
+        "aqua" -> CameraMetadata.CONTROL_EFFECT_MODE_AQUA
+        "blackboard" -> CameraMetadata.CONTROL_EFFECT_MODE_BLACKBOARD
+        "mono" -> CameraMetadata.CONTROL_EFFECT_MODE_MONO
+        "negative" -> CameraMetadata.CONTROL_EFFECT_MODE_NEGATIVE
+        CameraController.COLOR_EFFECT_DEFAULT -> CameraMetadata.CONTROL_EFFECT_MODE_OFF
+        "posterize" -> CameraMetadata.CONTROL_EFFECT_MODE_POSTERIZE
+        "sepia" -> CameraMetadata.CONTROL_EFFECT_MODE_SEPIA
+        "solarize" -> CameraMetadata.CONTROL_EFFECT_MODE_SOLARIZE
+        "whiteboard" -> CameraMetadata.CONTROL_EFFECT_MODE_WHITEBOARD
+        else -> CameraMetadata.CONTROL_EFFECT_MODE_OFF
+    }
+
+    fun convertWhiteBalanceToString(value2: Int): String? = when (value2) {
+        CameraMetadata.CONTROL_AWB_MODE_AUTO -> CameraController.WHITE_BALANCE_DEFAULT
+        CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> "cloudy-daylight"
+        CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT -> "daylight"
+        CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT -> "fluorescent"
+        CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT -> "incandescent"
+        CameraMetadata.CONTROL_AWB_MODE_SHADE -> "shade"
+        CameraMetadata.CONTROL_AWB_MODE_TWILIGHT -> "twilight"
+        CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT -> "warm-fluorescent"
+        CameraMetadata.CONTROL_AWB_MODE_OFF -> "manual"
+        else -> null
+    }
+
+    fun convertWhiteBalanceToInt(value: String): Int = when (value) {
+        CameraController.WHITE_BALANCE_DEFAULT -> CameraMetadata.CONTROL_AWB_MODE_AUTO
+        "cloudy-daylight" -> CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT
+        "daylight" -> CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT
+        "fluorescent" -> CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT
+        "incandescent" -> CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT
+        "shade" -> CameraMetadata.CONTROL_AWB_MODE_SHADE
+        "twilight" -> CameraMetadata.CONTROL_AWB_MODE_TWILIGHT
+        "warm-fluorescent" -> CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT
+        "manual" -> CameraMetadata.CONTROL_AWB_MODE_OFF
+        else -> CameraMetadata.CONTROL_AWB_MODE_AUTO
+    }
+
+    fun convertAntiBandingToString(value2: Int): String? = when (value2) {
+        CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO -> CameraController.ANTIBANDING_DEFAULT
+        CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ -> "50hz"
+        CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ -> "60hz"
+        CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF -> "off"
+        else -> null
+    }
+
+    fun convertAntiBandingToInt(value: String): Int = when (value) {
+        CameraController.ANTIBANDING_DEFAULT -> CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO
+        "50hz" -> CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ
+        "60hz" -> CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ
+        "off" -> CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_OFF
+        else -> CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_AUTO
+    }
+
+    fun convertEdgeModeToString(value2: Int): String? = when (value2) {
+        CameraMetadata.EDGE_MODE_FAST -> "edge_mode_fast"
+        CameraMetadata.EDGE_MODE_HIGH_QUALITY -> "edge_mode_high_quality"
+        CameraMetadata.EDGE_MODE_OFF -> "edge_mode_off"
+        CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG -> "edge_mode_zero_shutter_lag"
+        else -> null
+    }
+
+    fun convertEdgeModeToInt(value: String): Int = when (value) {
+        "edge_mode_fast", CameraController.EDGE_MODE_DEFAULT -> CameraMetadata.EDGE_MODE_FAST
+        "edge_mode_high_quality" -> CameraMetadata.EDGE_MODE_HIGH_QUALITY
+        "edge_mode_off" -> CameraMetadata.EDGE_MODE_OFF
+        "edge_mode_zero_shutter_lag" -> CameraMetadata.EDGE_MODE_ZERO_SHUTTER_LAG
+        else -> CameraMetadata.EDGE_MODE_FAST
+    }
+
+    fun convertNoiseReductionModeToString(value2: Int): String? = when (value2) {
+        CameraMetadata.NOISE_REDUCTION_MODE_FAST -> "noise_reduction_mode_fast"
+        CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY -> "noise_reduction_mode_high_quality"
+        CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL -> "noise_reduction_mode_minimal"
+        CameraMetadata.NOISE_REDUCTION_MODE_OFF -> "noise_reduction_mode_off"
+        CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG -> "noise_reduction_mode_zero_shutter_lag"
+        else -> null
+    }
+
+    fun convertNoiseReductionModeToInt(value: String): Int = when (value) {
+        "noise_reduction_mode_fast", CameraController.NOISE_REDUCTION_MODE_DEFAULT -> CameraMetadata.NOISE_REDUCTION_MODE_FAST
+        "noise_reduction_mode_high_quality" -> CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY
+        "noise_reduction_mode_minimal" -> CameraMetadata.NOISE_REDUCTION_MODE_MINIMAL
+        "noise_reduction_mode_off" -> CameraMetadata.NOISE_REDUCTION_MODE_OFF
+        "noise_reduction_mode_zero_shutter_lag" -> CameraMetadata.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG
+        else -> CameraMetadata.NOISE_REDUCTION_MODE_FAST
+    }
+
     fun getLogProfile(inVal: Float, logStrength: Float): Float {
         return ln1p(logStrength * inVal) / ln1p(logStrength)
     }

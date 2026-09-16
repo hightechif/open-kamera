@@ -34,8 +34,8 @@ import javax.inject.Singleton
 
 @Singleton
 class MediaStorageRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @param:ApplicationContext private val context: Context,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : IMediaRepository {
 
     private val _latestMediaThumbnailFlow = MutableStateFlow<Uri?>(null)
@@ -308,5 +308,14 @@ class MediaStorageRepositoryImpl @Inject constructor(
             // Permission or querying failure
         }
         return null
+    }
+
+    override suspend fun getAvailableStorageBytes(): Long = withContext(ioDispatcher) {
+        try {
+            val dir = context.cacheDir
+            dir.freeSpace
+        } catch (_: Exception) {
+            Long.MAX_VALUE
+        }
     }
 }

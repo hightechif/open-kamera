@@ -19,6 +19,7 @@ import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.utils.MyDebug
+import com.hightechif.openkamera.useScopedStorage
 
 
 /** Android 6+ permission handling:
@@ -138,7 +139,7 @@ class PermissionHandler internal constructor(private val mainActivity: MainActiv
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             if (MyDebug.LOG) Log.e(TAG, "shouldn't be requesting permissions for pre-Android M!")
             return
-        } else if (MainActivity.useScopedStorage()) {
+        } else if (useScopedStorage()) {
             if (MyDebug.LOG) Log.e(TAG, "shouldn't be requesting permissions for scoped storage!")
             return
         } else if (storageDenied && System.currentTimeMillis() < storageDeniedTimeMs + DENY_DELAY_MS) {

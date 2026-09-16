@@ -300,6 +300,8 @@ interface ApplicationInterface {
     fun setCameraResolutionPref(width: Int, height: Int)
     fun setVideoQualityPref(videoQuality: String?)
     fun setZoomPref(zoom: Int)
+    fun hasCameraPermission(): Boolean = true
+    fun hasStoragePermission(): Boolean = true
     fun requestCameraPermission() // for Android 6+: called when trying to Open Kamera, but CAMERA permission not available
     fun needsStoragePermission(): Boolean // return true if the preview should call requestStoragePermission() if WRITE_EXTERNAL_STORAGE not available (i.e., if the application needs storage permission, e.g., to save photos)
     fun requestStoragePermission() // for Android 6+: called when trying to Open Kamera, but WRITE_EXTERNAL_STORAGE permission not available

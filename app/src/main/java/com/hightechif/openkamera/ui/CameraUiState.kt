@@ -16,6 +16,7 @@ import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.FocusState
 import com.hightechif.openkamera.domain.model.GridType
 import com.hightechif.openkamera.domain.model.HorizonAngle
+import com.hightechif.openkamera.domain.model.LocationCoordinates
 
 /**
  * Immutable state representation for the Camera UI, adhering to MVVM / Unidirectional Data Flow.
@@ -35,15 +36,25 @@ data class CameraUiState(
     val latestThumbnailUri: Uri? = null,
     val horizonAngle: HorizonAngle? = null,
     val compassDegrees: Float = 0.0f,
+    val location: LocationCoordinates? = null,
     val frameMetadata: CameraFrameMetadata? = null,
     val isRawEnabled: Boolean = false,
     val timerSecondsRemaining: Int = 0,
+    val isStorageLow: Boolean = false,
+    val isVideoPaused: Boolean = false,
     val errorMessage: String? = null
 )
 
 sealed interface CameraUiEvent {
     object OnShutterClicked : CameraUiEvent
+    object OnShutterKeyPressed : CameraUiEvent
+    data class OnVolumeKeyPressed(val keyCode: Int) : CameraUiEvent
+    object OnFocusKeyPressed : CameraUiEvent
+    object OnRemoteCaptureTriggered : CameraUiEvent
     object OnRecordVideoClicked : CameraUiEvent
+    object OnPauseVideoRecordingClicked : CameraUiEvent
+    object OnResumeVideoRecordingClicked : CameraUiEvent
+    object OnLowStorageDetected : CameraUiEvent
     object OnSwitchCameraClicked : CameraUiEvent
     object OnFlashModeToggleClicked : CameraUiEvent
     data class OnZoomChanged(val ratio: Float) : CameraUiEvent
@@ -59,7 +70,7 @@ sealed interface CameraUiEvent {
 sealed interface CameraUiEffect {
     data class ShowToast(val message: String) : CameraUiEffect
     data class Vibrate(val durationMs: Long) : CameraUiEffect
-    data class NavigateToGallery(val uri: Uri) : CameraUiEffect
+    data class NavigateToGallery(val uri: Uri? = null) : CameraUiEffect
     object OpenSettings : CameraUiEffect
     data class ShowErrorDialog(val title: String, val message: String) : CameraUiEffect
 }

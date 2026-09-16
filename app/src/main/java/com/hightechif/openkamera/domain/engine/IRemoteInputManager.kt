@@ -7,6 +7,7 @@
 package com.hightechif.openkamera.domain.engine
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 enum class RemoteInputType {
     SHUTTER_BUTTON,
@@ -16,9 +17,20 @@ enum class RemoteInputType {
     SWITCH_CAMERA
 }
 
+sealed interface BleConnectionState {
+    object Disconnected : BleConnectionState
+    object Connecting : BleConnectionState
+    object Connected : BleConnectionState
+    data class Error(val message: String) : BleConnectionState
+}
+
 interface IRemoteInputManager {
     val remoteInputEventFlow: Flow<RemoteInputType>
+    val connectionStateFlow: StateFlow<BleConnectionState>
 
     fun startListening()
     fun stopListening()
+    fun onBleConnectionStateChanged(state: BleConnectionState)
+    fun onRemoteCommandReceived(command: Int)
+    fun dispatchInputEvent(type: RemoteInputType): Boolean
 }

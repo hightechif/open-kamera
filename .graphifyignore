@@ -1,0 +1,13 @@
+# Dependencies and build artifacts
+node_modules/
+vendor/
+dist/
+build/
+
+# Generated code
+*.generated.py
+
+# Heavy documentation (Optional - to save LLM costs)
+*.pdf
+*.png
+*.jpg

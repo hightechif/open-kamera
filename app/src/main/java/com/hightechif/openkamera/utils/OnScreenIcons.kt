@@ -14,12 +14,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
+import androidx.core.content.edit
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
-import androidx.core.content.edit
 
 /**
  * This contains functionality related to the (mainly customizable) on-screen icons.
@@ -35,6 +35,7 @@ import androidx.core.content.edit
  */
 class OnScreenIcons(private val mainActivity: MainActivity) {
 
+    private val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
     private val exposureLockToast = ToastBoxer()
     private val whiteBalanceLockToast = ToastBoxer()
     private val storeLocationToast = ToastBoxer()
@@ -84,20 +85,22 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val view = mainActivity.findViewById<ImageButton>(R.id.exposure_lock)
         val enabled = mainActivity.preview.isExposureLocked
         view.setImageResource(if (enabled) R.drawable.exposure_locked else R.drawable.exposure_unlocked)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.exposure_unlock else R.string.exposure_lock)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.exposure_unlock else R.string.exposure_lock)
     }
 
     private fun updateWhiteBalanceLockIcon() {
         val view = mainActivity.findViewById<ImageButton>(R.id.white_balance_lock)
         val enabled = mainActivity.preview.isWhiteBalanceLocked
         view.setImageResource(if (enabled) R.drawable.white_balance_locked else R.drawable.white_balance_unlocked)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.white_balance_unlock else R.string.white_balance_lock)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.white_balance_unlock else R.string.white_balance_lock)
     }
 
     private fun updateCycleRawIcon() {
-        val raw_pref = mainActivity.applicationInterface.getRawPref()
+        val rawPref = mainActivity.applicationInterface.getRawPref()
         val view = mainActivity.findViewById<ImageButton>(R.id.cycle_raw)
-        if (raw_pref == ApplicationInterface.RawPref.RAWPREF_JPEG_DNG) {
+        if (rawPref == ApplicationInterface.RawPref.RAWPREF_JPEG_DNG) {
             if (mainActivity.applicationInterface.isRawOnly) {
                 view.setImageResource(R.drawable.raw_only_icon)
             } else {
@@ -112,7 +115,8 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val view = mainActivity.findViewById<ImageButton>(R.id.store_location)
         val enabled = mainActivity.applicationInterface.getGeotaggingPref()
         view.setImageResource(if (enabled) R.drawable.ic_gps_fixed_red_48dp else R.drawable.ic_gps_fixed_white_48dp)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.preference_location_disable else R.string.preference_location_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.preference_location_disable else R.string.preference_location_enable)
     }
 
     private fun updateTextStampIcon() {
@@ -125,35 +129,38 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val view = mainActivity.findViewById<ImageButton>(R.id.stamp)
         val enabled = mainActivity.applicationInterface.stampPref == "preference_stamp_yes"
         view.setImageResource(if (enabled) R.drawable.ic_text_format_red_48dp else R.drawable.ic_text_format_white_48dp)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.stamp_disable else R.string.stamp_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.stamp_disable else R.string.stamp_enable)
     }
 
     private fun updateFocusPeakingIcon() {
         val view = mainActivity.findViewById<ImageButton>(R.id.focus_peaking)
         val enabled = mainActivity.applicationInterface.focusPeakingPref
         view.setImageResource(if (enabled) R.drawable.key_visualizer_red else R.drawable.key_visualizer)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.focus_peaking_disable else R.string.focus_peaking_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.focus_peaking_disable else R.string.focus_peaking_enable)
     }
 
     private fun updateAutoLevelIcon() {
         val view = mainActivity.findViewById<ImageButton>(R.id.auto_level)
         val enabled = mainActivity.applicationInterface.autoStabilisePref
         view.setImageResource(if (enabled) R.drawable.auto_stabilise_icon_red else R.drawable.auto_stabilise_icon)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.auto_level_disable else R.string.auto_level_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.auto_level_disable else R.string.auto_level_enable)
     }
 
     private fun updateCycleFlashIcon() {
-        val flash_value = mainActivity.preview.currentFlashValue
+        val flashValue = mainActivity.preview.currentFlashValue
         val view = mainActivity.findViewById<ImageButton>(R.id.cycle_flash)
-        if (flash_value != null) {
-            when (flash_value) {
+        if (flashValue != null) {
+            when (flashValue) {
                 "flash_off" -> view.setImageResource(R.drawable.flash_off)
                 "flash_auto", "flash_frontscreen_auto" -> view.setImageResource(R.drawable.flash_auto)
                 "flash_on", "flash_frontscreen_on" -> view.setImageResource(R.drawable.flash_on)
                 "flash_torch", "flash_frontscreen_torch" -> view.setImageResource(R.drawable.baseline_highlight_white_48)
                 "flash_red_eye" -> view.setImageResource(R.drawable.baseline_remove_red_eye_white_48)
                 else -> {
-                    Log.e(TAG, "unknown flash value $flash_value")
+                    Log.e(TAG, "unknown flash value $flashValue")
                     view.setImageResource(R.drawable.flash_off)
                 }
             }
@@ -166,13 +173,15 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val view = mainActivity.findViewById<ImageButton>(R.id.face_detection)
         val enabled = mainActivity.applicationInterface.getFaceDetectionPref()
         view.setImageResource(if (enabled) R.drawable.ic_face_red_48dp else R.drawable.ic_face_white_48dp)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.face_detection_disable else R.string.face_detection_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.face_detection_disable else R.string.face_detection_enable)
     }
 
     private fun updateCycleLockOrientationIcon() {
         val view = mainActivity.findViewById<ImageButton>(R.id.cycle_lock_orientation)
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val pref = sharedPreferences.getString(PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY, "none") ?: "none"
+        val pref =
+            sharedPreferences.getString(PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY, "none")
+                ?: "none"
 
         when (pref) {
             "portrait" -> view.setImageResource(R.drawable.mobile_lock_portrait_48px_red)
@@ -187,17 +196,19 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
 
     private fun updatePreviewShotsIcon() {
         val view = mainActivity.findViewById<ImageButton>(R.id.preview_shots)
-        val enabled = mainActivity.applicationInterface.getPreShotsPref(mainActivity.applicationInterface.photoMode)
+        val enabled =
+            mainActivity.applicationInterface.getPreShotsPref(mainActivity.applicationInterface.photoMode)
         view.setImageResource(if (enabled) R.drawable.motion_photos_on_48px_red else R.drawable.motion_photos_on_48px)
-        view.contentDescription = mainActivity.resources.getString(if (enabled) R.string.preview_shots_disable else R.string.preview_shots_enable)
+        view.contentDescription =
+            mainActivity.resources.getString(if (enabled) R.string.preview_shots_disable else R.string.preview_shots_enable)
     }
 
     /**
      * Sets the visibility flag for on-screen icons.
      * @param visibility Visibility flag.
-     * @param visibility_video Visibility flag to use for icons that are still allowed when recording video
+     * @param visibilityVideo Visibility flag to use for icons that are still allowed when recording video
      */
-    fun setVisibility(visibility: Int, visibility_video: Int) {
+    fun setVisibility(visibility: Int, visibilityVideo: Int) {
         val exposureLockButton = mainActivity.findViewById<View>(R.id.exposure_lock)
         val whiteBalanceLockButton = mainActivity.findViewById<View>(R.id.white_balance_lock)
         val cycleRawButton = mainActivity.findViewById<View>(R.id.cycle_raw)
@@ -209,11 +220,12 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val cycleFlashButton = mainActivity.findViewById<View>(R.id.cycle_flash)
         val faceDetectionButton = mainActivity.findViewById<View>(R.id.face_detection)
         val audioControlButton = mainActivity.findViewById<View>(R.id.audio_control)
-        val cycleLockOrientationButton = mainActivity.findViewById<View>(R.id.cycle_lock_orientation)
+        val cycleLockOrientationButton =
+            mainActivity.findViewById<View>(R.id.cycle_lock_orientation)
         val previewShotsButton = mainActivity.findViewById<View>(R.id.preview_shots)
 
-        if (showExposureLockIcon()) exposureLockButton.visibility = visibility_video
-        if (showWhiteBalanceLockIcon()) whiteBalanceLockButton.visibility = visibility_video
+        if (showExposureLockIcon()) exposureLockButton.visibility = visibilityVideo
+        if (showWhiteBalanceLockIcon()) whiteBalanceLockButton.visibility = visibilityVideo
         if (showCycleRawIcon()) cycleRawButton.visibility = visibility
         if (showStoreLocationIcon()) storeLocationButton.visibility = visibility
         if (showTextStampIcon()) textStampButton.visibility = visibility
@@ -235,7 +247,7 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
     fun checkDisableGUIIcons(): Boolean {
         if (MyDebug.LOG) Log.d(TAG, "checkDisableGUIIcons")
         var changed = false
-        
+
         fun checkAndHide(buttonId: Int, condition: Boolean) {
             if (!condition) {
                 val button = mainActivity.findViewById<View>(buttonId)
@@ -269,85 +281,86 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
     private fun showExposureLockIcon(): Boolean {
         if (!mainActivity.preview.supportsExposureLock()) return false
         if (mainActivity.applicationInterface.isCameraExtensionPref()) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_EXPOSURE_LOCK_PREFERENCE_KEY, true)
     }
 
     private fun showWhiteBalanceLockIcon(): Boolean {
         if (!mainActivity.preview.supportsWhiteBalanceLock()) return false
         if (mainActivity.applicationInterface.isCameraExtensionPref()) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_WHITE_BALANCE_LOCK_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_WHITE_BALANCE_LOCK_PREFERENCE_KEY,
+            false
+        )
     }
 
     private fun showCycleRawIcon(): Boolean {
         if (!mainActivity.preview.supportsRaw()) return false
         if (!mainActivity.applicationInterface.isRawAllowed(mainActivity.applicationInterface.photoMode)) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_CYCLE_RAW_PREFERENCE_KEY, false)
     }
 
     private fun showStoreLocationIcon(): Boolean {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_STORE_LOCATION_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_STORE_LOCATION_PREFERENCE_KEY,
+            false
+        )
     }
 
     private fun showTextStampIcon(): Boolean {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_TEXT_STAMP_PREFERENCE_KEY, false)
     }
 
     private fun showStampIcon(): Boolean {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_STAMP_PREFERENCE_KEY, false)
     }
 
     private fun showFocusPeakingIcon(): Boolean {
         if (!mainActivity.supportsPreviewBitmaps()) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_FOCUS_PEAKING_PREFERENCE_KEY, false)
     }
 
     fun showAutoLevelIcon(): Boolean {
         if (!mainActivity.supportsAutoStabilise()) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_AUTO_LEVEL_PREFERENCE_KEY, false)
     }
 
     fun showCycleFlashIcon(): Boolean {
         if (!mainActivity.preview.supportsFlash()) return false
         if (mainActivity.preview.isVideo) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_CYCLE_FLASH_PREFERENCE_KEY, false)
     }
 
     private fun showFaceDetectionIcon(): Boolean {
         if (!mainActivity.preview.supportsFaceDetection()) return false
         if (mainActivity.applicationInterface.isCameraExtensionPref()) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_FACE_DETECTION_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_FACE_DETECTION_PREFERENCE_KEY,
+            false
+        )
     }
 
     fun showAudioControlIcon(): Boolean {
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val audio_control = sharedPreferences.getString(PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none")
-        return audio_control == "noise"
+        val audioControl =
+            sharedPreferences.getString(PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none")
+        return audioControl == "noise"
     }
 
     private fun showCycleLockOrientationIcon(): Boolean {
         if (mainActivity.applicationInterface.photoMode == MyApplicationInterface.PhotoMode.Panorama) return false
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        return sharedPreferences.getBoolean(PreferenceKeys.SHOW_CYCLE_LOCK_ORIENTATION_PREFERENCE_KEY, false)
+        return sharedPreferences.getBoolean(
+            PreferenceKeys.SHOW_CYCLE_LOCK_ORIENTATION_PREFERENCE_KEY,
+            false
+        )
     }
 
     private fun showPreviewShotsIcon(): Boolean {
         if (!mainActivity.supportsPreShots()) return false
-        val photo_mode = mainActivity.applicationInterface.photoMode
-        if (mainActivity.preview.isVideo || photo_mode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
-            photo_mode == MyApplicationInterface.PhotoMode.FocusBracketing || photo_mode == MyApplicationInterface.PhotoMode.Panorama) {
+        val photoMode = mainActivity.applicationInterface.photoMode
+        if (mainActivity.preview.isVideo || photoMode == MyApplicationInterface.PhotoMode.ExpoBracketing ||
+            photoMode == MyApplicationInterface.PhotoMode.FocusBracketing || photoMode == MyApplicationInterface.PhotoMode.Panorama
+        ) {
             return false
         }
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
         return sharedPreferences.getBoolean(PreferenceKeys.SHOW_PREVIEW_SHOTS_PREFERENCE_KEY, false)
     }
 
@@ -355,34 +368,46 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         if (MyDebug.LOG) Log.d(TAG, "clickedExposureLock")
         mainActivity.preview.toggleExposureLock()
         updateExposureLockIcon()
-        mainActivity.preview.showToast(exposureLockToast, if (mainActivity.preview.isExposureLocked) R.string.exposure_locked else R.string.exposure_unlocked, true)
+        mainActivity.preview.showToast(
+            exposureLockToast,
+            if (mainActivity.preview.isExposureLocked) R.string.exposure_locked else R.string.exposure_unlocked,
+            true
+        )
     }
 
     fun clickedWhiteBalanceLock() {
         if (MyDebug.LOG) Log.d(TAG, "clickedWhiteBalanceLock")
         mainActivity.preview.toggleWhiteBalanceLock()
         updateWhiteBalanceLockIcon()
-        mainActivity.preview.showToast(whiteBalanceLockToast, if (mainActivity.preview.isWhiteBalanceLocked) R.string.white_balance_locked else R.string.white_balance_unlocked, true)
+        mainActivity.preview.showToast(
+            whiteBalanceLockToast,
+            if (mainActivity.preview.isWhiteBalanceLocked) R.string.white_balance_locked else R.string.white_balance_unlocked,
+            true
+        )
     }
 
     fun clickedCycleRaw() {
         if (MyDebug.LOG) Log.d(TAG, "clickedCycleRaw")
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        var new_value: String? = null
+
+        var newValue: String? = null
         when (sharedPreferences.getString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no")) {
-            "preference_raw_no" -> new_value = "preference_raw_yes"
-            "preference_raw_yes" -> new_value = "preference_raw_only"
-            "preference_raw_only" -> new_value = "preference_raw_no"
+            "preference_raw_no" -> newValue = "preference_raw_yes"
+            "preference_raw_yes" -> newValue = "preference_raw_only"
+            "preference_raw_only" -> newValue = "preference_raw_no"
             else -> Log.e(TAG, "unrecognised raw preference")
         }
-        if (new_value != null) {
-            val editor = sharedPreferences.edit()
-            editor.putString(PreferenceKeys.RAW_PREFERENCE_KEY, new_value)
-            editor.apply()
+        if (newValue != null) {
+            sharedPreferences.edit {
+                putString(PreferenceKeys.RAW_PREFERENCE_KEY, newValue)
+            }
 
-            val isRaw = new_value != "preference_raw_no"
-            mainActivity.cameraViewModel.onEvent(com.hightechif.openkamera.ui.CameraUiEvent.OnRawToggled(isRaw))
+            val isRaw = newValue != "preference_raw_no"
+            mainActivity.cameraViewModel.onEvent(
+                com.hightechif.openkamera.ui.CameraUiEvent.OnRawToggled(
+                    isRaw
+                )
+            )
 
             updateCycleRawIcon()
             mainActivity.applicationInterface.drawPreview.updateSettings()
@@ -395,17 +420,20 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         var value = mainActivity.applicationInterface.getGeotaggingPref()
         value = !value
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, value)
-        editor.apply()
+
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.LOCATION_PREFERENCE_KEY, value)
+        }
 
         updateStoreLocationIcon()
         mainActivity.applicationInterface.drawPreview.updateSettings()
         mainActivity.initLocation()
         mainActivity.closePopup()
 
-        val message = mainActivity.resources.getString(R.string.preference_location) + ": " + mainActivity.resources.getString(if (value) R.string.on else R.string.off)
+        val message =
+            mainActivity.resources.getString(R.string.preference_location) + ": " + mainActivity.resources.getString(
+                if (value) R.string.on else R.string.off
+            )
         mainActivity.preview.showToast(storeLocationToast, message, true)
     }
 
@@ -416,19 +444,20 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         val alertDialog = AlertDialog.Builder(mainActivity)
         alertDialog.setTitle(R.string.preference_textstamp)
 
-        val dialog_view = LayoutInflater.from(mainActivity).inflate(R.layout.alertdialog_edittext, null)
-        val editText = dialog_view.findViewById<EditText>(R.id.edit_text)
+        val dialogView =
+            LayoutInflater.from(mainActivity).inflate(R.layout.alertdialog_edittext, null)
+        val editText = dialogView.findViewById<EditText>(R.id.edit_text)
         editText.hint = mainActivity.resources.getString(R.string.preference_textstamp)
         editText.setText(mainActivity.applicationInterface.textStampPref)
-        alertDialog.setView(dialog_view)
+        alertDialog.setView(dialogView)
         alertDialog.setPositiveButton(android.R.string.ok) { _, _ ->
             if (MyDebug.LOG) Log.d(TAG, "custom text stamp clicked okay")
 
-            val custom_text = editText.text.toString()
-            val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-            val editor = sharedPreferences.edit()
-            editor.putString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, custom_text)
-            editor.apply()
+            val customText = editText.text.toString()
+
+            sharedPreferences.edit {
+                putString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, customText)
+            }
 
             updateTextStampIcon()
         }
@@ -453,14 +482,21 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
 
         var value = mainActivity.applicationInterface.stampPref == "preference_stamp_yes"
         value = !value
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.STAMP_PREFERENCE_KEY, if (value) "preference_stamp_yes" else "preference_stamp_no")
-        editor.apply()
+
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.STAMP_PREFERENCE_KEY,
+                if (value) "preference_stamp_yes" else "preference_stamp_no"
+            )
+        }
 
         updateStampIcon()
         mainActivity.applicationInterface.drawPreview.updateSettings()
-        mainActivity.preview.showToast(stampToast, if (value) R.string.stamp_enabled else R.string.stamp_disabled, true)
+        mainActivity.preview.showToast(
+            stampToast,
+            if (value) R.string.stamp_enabled else R.string.stamp_disabled,
+            true
+        )
     }
 
     fun clickedFocusPeaking() {
@@ -468,10 +504,13 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         var value = mainActivity.applicationInterface.focusPeakingPref
         value = !value
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putString(PreferenceKeys.FOCUS_PEAKING_PREFERENCE_KEY, if (value) "preference_focus_peaking_on" else "preference_focus_peaking_off")
-        editor.apply()
+
+        sharedPreferences.edit {
+            putString(
+                PreferenceKeys.FOCUS_PEAKING_PREFERENCE_KEY,
+                if (value) "preference_focus_peaking_on" else "preference_focus_peaking_off"
+            )
+        }
 
         updateFocusPeakingIcon()
         mainActivity.applicationInterface.drawPreview.updateSettings()
@@ -482,23 +521,35 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
         var value = mainActivity.applicationInterface.autoStabilisePref
         value = !value
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, value)
-        editor.apply()
 
-        var done_dialog = false
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, value)
+        }
+
+        var doneDialog = false
         if (value) {
-            val done_auto_stabilise_info = sharedPreferences.contains(PreferenceKeys.AUTO_STABILISE_INFO_PREFERENCE_KEY)
-            if (!done_auto_stabilise_info) {
-                mainActivity.mainUI.showInfoDialog(R.string.preference_auto_stabilise, R.string.auto_stabilise_info, PreferenceKeys.AUTO_STABILISE_INFO_PREFERENCE_KEY)
-                done_dialog = true
+            val doneAutoStabiliseInfo =
+                sharedPreferences.contains(PreferenceKeys.AUTO_STABILISE_INFO_PREFERENCE_KEY)
+            if (!doneAutoStabiliseInfo) {
+                mainActivity.mainUI.showInfoDialog(
+                    R.string.preference_auto_stabilise,
+                    R.string.auto_stabilise_info,
+                    PreferenceKeys.AUTO_STABILISE_INFO_PREFERENCE_KEY
+                )
+                doneDialog = true
             }
         }
 
-        if (!done_dialog) {
-            val message = mainActivity.resources.getString(R.string.preference_auto_stabilise) + ": " + mainActivity.resources.getString(if (value) R.string.on else R.string.off)
-            mainActivity.preview.showToast(mainActivity.changedAutoStabiliseToastBoxer, message, true)
+        if (!doneDialog) {
+            val message =
+                mainActivity.resources.getString(R.string.preference_auto_stabilise) + ": " + mainActivity.resources.getString(
+                    if (value) R.string.on else R.string.off
+                )
+            mainActivity.preview.showToast(
+                mainActivity.changedAutoStabiliseToastBoxer,
+                message,
+                true
+            )
         }
 
         updateAutoLevelIcon()
@@ -508,7 +559,7 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
 
     fun clickedCycleFlash() {
         if (MyDebug.LOG) Log.d(TAG, "clickedCycleFlash")
-        mainActivity.preview.cycleFlash(true, true)
+        mainActivity.preview.cycleFlash(skipTorch = true, save = true)
         updateCycleFlashIcon()
     }
 
@@ -518,13 +569,17 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
 
         var value = mainActivity.applicationInterface.getFaceDetectionPref()
         value = !value
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, value)
-        editor.apply()
+
+        sharedPreferences.edit {
+            putBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, value)
+        }
 
         updateFaceDetectionIcon()
-        mainActivity.preview.showToast(faceDetectionToast, if (value) R.string.face_detection_enabled else R.string.face_detection_disabled, true)
+        mainActivity.preview.showToast(
+            faceDetectionToast,
+            if (value) R.string.face_detection_enabled else R.string.face_detection_disabled,
+            true
+        )
         mainActivity.reOpenKamera(true)
     }
 
@@ -535,9 +590,10 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
             return
         }
         mainActivity.closePopup()
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        val audio_control = sharedPreferences.getString(PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none")
-        if (audio_control == "noise") {
+
+        val audioControl =
+            sharedPreferences.getString(PreferenceKeys.AUDIO_CONTROL_PREFERENCE_KEY, "none")
+        if (audioControl == "noise") {
             if (mainActivity.hasAudioListener()) {
                 mainActivity.freeAudioListener(false)
             } else {
@@ -549,28 +605,34 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
     fun clickedCycleLockOrientation() {
         if (MyDebug.LOG) Log.d(TAG, "clickedCycleLockOrientation")
 
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
-        var new_value: String? = null
+
+        var newValue: String? = null
 
         when (sharedPreferences.getString(PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY, "none")) {
-            "none" -> new_value = "portrait"
-            "portrait" -> new_value = "landscape"
-            "landscape" -> new_value = "none"
+            "none" -> newValue = "portrait"
+            "portrait" -> newValue = "landscape"
+            "landscape" -> newValue = "none"
             else -> Log.e(TAG, "unrecognised lock orientation preference")
         }
 
-        if (new_value != null) {
-            val editor = sharedPreferences.edit()
-            editor.putString(PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY, new_value)
-            editor.apply()
+        if (newValue != null) {
+            sharedPreferences.edit {
+                putString(PreferenceKeys.LOCK_ORIENTATION_PREFERENCE_KEY, newValue)
+            }
 
             updateCycleLockOrientationIcon()
-            
-            val entries_array = mainActivity.resources.getStringArray(R.array.preference_lock_orientation_entries)
-            val values_array = mainActivity.resources.getStringArray(R.array.preference_lock_orientation_values)
-            val index = values_array.indexOf(new_value)
+
+            val entriesArray =
+                mainActivity.resources.getStringArray(R.array.preference_lock_orientation_entries)
+            val valuesArray =
+                mainActivity.resources.getStringArray(R.array.preference_lock_orientation_values)
+            val index = valuesArray.indexOf(newValue)
             if (index != -1) {
-                mainActivity.preview.showToast(cycleLockOrientationToast, entries_array[index], true)
+                mainActivity.preview.showToast(
+                    cycleLockOrientationToast,
+                    entriesArray[index],
+                    true
+                )
             }
         }
     }
@@ -578,9 +640,10 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
     fun clickedPreviewShots() {
         if (MyDebug.LOG) Log.d(TAG, "clickedPreviewShots")
 
-        var value = mainActivity.applicationInterface.getPreShotsPref(mainActivity.applicationInterface.photoMode)
+        var value =
+            mainActivity.applicationInterface.getPreShotsPref(mainActivity.applicationInterface.photoMode)
         value = !value
-        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(mainActivity)
+
         sharedPreferences.edit {
             putString(
                 PreferenceKeys.PRE_SHOTS_PREFERENCE_KEY,
@@ -590,7 +653,11 @@ class OnScreenIcons(private val mainActivity: MainActivity) {
 
         updatePreviewShotsIcon()
         mainActivity.applicationInterface.drawPreview.updateSettings()
-        mainActivity.preview.showToast(previewShotsToast, if (value) R.string.preview_shots_enabled else R.string.preview_shots_disabled, true)
+        mainActivity.preview.showToast(
+            previewShotsToast,
+            if (value) R.string.preview_shots_enabled else R.string.preview_shots_disabled,
+            true
+        )
     }
 
     companion object {

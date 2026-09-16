@@ -17,11 +17,12 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.graphics.createBitmap
 
 @Singleton
 class ImageProcessorImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
+    @param:ApplicationContext private val context: Context,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
 ) : IImageProcessor {
 
     private val hdrProcessor: HDRProcessor by lazy {
@@ -51,11 +52,33 @@ class ImageProcessorImpl @Inject constructor(
                     return@withContext Result.failure(IllegalStateException("Failed to decode bitmaps for HDR"))
                 }
 
-                val outputStream = ByteArrayOutputStream()
-                val resultBitmap = bitmaps.first()
-                resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                val first = bitmaps.first()
+                val outBitmap = createBitmap(first.width, first.height)
 
-                bitmaps.drop(1).forEach { it.recycle() }
+                val success = if (NativeImageProcessorBridge.isAvailable() && bitmaps.size >= 2) {
+                    NativeImageProcessorBridge.processHdrFusion(
+                        frameBitmaps = bitmaps.toTypedArray(),
+                        offsetsX = IntArray(bitmaps.size),
+                        offsetsY = IntArray(bitmaps.size),
+                        paramsA = FloatArray(bitmaps.size) { 1.0f },
+                        paramsB = FloatArray(bitmaps.size),
+                        outBitmap = outBitmap,
+                        tonemapAlgorithm = 2, // Reinhard
+                        tonemapScale = 1.0f,
+                        linearScale = 1.0f
+                    )
+                } else {
+                    false
+                }
+
+                val finalBitmap = if (success) outBitmap else first
+                val outputStream = ByteArrayOutputStream()
+                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+
+                bitmaps.forEach { it.recycle() }
+                if (finalBitmap !== outBitmap) {
+                    outBitmap.recycle()
+                }
 
                 Result.success(outputStream.toByteArray())
             } catch (e: Exception) {
@@ -82,11 +105,30 @@ class ImageProcessorImpl @Inject constructor(
                     return@withContext Result.failure(IllegalStateException("Failed to decode bitmaps for Panorama"))
                 }
 
-                val outputStream = ByteArrayOutputStream()
-                val resultBitmap = bitmaps.first()
-                resultBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                val first = bitmaps.first()
+                val second = bitmaps.getOrNull(1) ?: first
+                val outBitmap = createBitmap(first.width, first.height)
 
-                bitmaps.drop(1).forEach { it.recycle() }
+                val success = if (NativeImageProcessorBridge.isAvailable() && bitmaps.size >= 2) {
+                    NativeImageProcessorBridge.blendPyramidSeam(
+                        lhsBitmap = first,
+                        rhsBitmap = second,
+                        outBitmap = outBitmap,
+                        bestPathMidX = null,
+                        blendWidth = first.width / 4
+                    )
+                } else {
+                    false
+                }
+
+                val finalBitmap = if (success) outBitmap else first
+                val outputStream = ByteArrayOutputStream()
+                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+
+                bitmaps.forEach { it.recycle() }
+                if (finalBitmap !== outBitmap) {
+                    outBitmap.recycle()
+                }
 
                 Result.success(outputStream.toByteArray())
             } catch (e: Exception) {

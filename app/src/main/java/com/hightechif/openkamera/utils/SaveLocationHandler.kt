@@ -20,6 +20,7 @@ import com.hightechif.openkamera.R
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.storage.SaveLocationHistory
 import com.hightechif.openkamera.storage.StorageUtils
+import com.hightechif.openkamera.useScopedStorage
 
 /** Functionality related to the save location. */
 class SaveLocationHandler(private val main_activity: MainActivity) {
@@ -52,7 +53,7 @@ class SaveLocationHandler(private val main_activity: MainActivity) {
      */
     private fun checkSaveLocations() {
         if (MyDebug.LOG) Log.d(TAG, "checkSaveLocations")
-        if (MainActivity.useScopedStorage()) {
+        if (useScopedStorage()) {
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(main_activity)
             var any_changes = false
             val save_location = main_activity.storageUtils.saveLocation
@@ -232,7 +233,7 @@ class SaveLocationHandler(private val main_activity: MainActivity) {
         } else {
             // The strings can either be a sub-folder of DCIM, or (pre-scoped-storage) a full path, so normally either can be displayed.
             // But with scoped storage, an empty string is used to mean DCIM, so seems clearer to say that instead of displaying a blank line!
-            if (MainActivity.useScopedStorage() && folder.isEmpty()) {
+            if (useScopedStorage() && folder.isEmpty()) {
                 folder = "DCIM"
             }
         }

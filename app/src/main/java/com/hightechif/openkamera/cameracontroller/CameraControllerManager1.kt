@@ -15,6 +15,10 @@ import com.hightechif.openkamera.R
 /** Provides support using Android's original camera API
  * android.hardware.Camera.
  */
+@Deprecated(
+    message = "Legacy Camera1 HAL Manager. Use CameraControllerManager2.",
+    level = DeprecationLevel.WARNING
+)
 class CameraControllerManager1 : CameraControllerManager() {
     override val numberOfCameras: Int
         get() = Camera.getNumberOfCameras()
