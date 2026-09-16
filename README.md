@@ -59,6 +59,15 @@ The codebase is organized into modular packages under `com.hightechif.openkamera
 com.hightechif.openkamera/
 ├── audio/            # Audio trigger, speech recognition, and sound effects
 ├── cameracontroller/ # Unified abstraction for Camera1 and Camera2 APIs
+│   └── capabilities/ # Camera feature resolution (zoom, focus, flash, etc.)
+├── di/               # Hilt dependency injection modules (camera, coroutines, prefs, etc.)
+├── domain/           # Clean architecture domain layer
+│   ├── engine/       # Camera engine interfaces
+│   ├── interactor/   # Use-case orchestrators
+│   ├── model/        # Pure domain models
+│   ├── repository/   # Repository interfaces
+│   └── usecase/      # Individual business logic use cases
+├── lifecycle/        # Lifecycle coordinators (camera, orientation)
 ├── preferences/      # SharedPreferences management, keys, and settings UI
 ├── preview/          # Camera preview surface, rendering, and lifecycle
 ├── processing/       # Image processing, HDR alignment, and computations
@@ -78,11 +87,14 @@ com.hightechif.openkamera/
 
 - **Language:** [Kotlin](https://kotlinlang.org/) `2.0.21`
 - **Build System:** Gradle with Version Catalogs (`gradle/libs.versions.toml`)
-- **Android Gradle Plugin (AGP):** `8.9`
+- **Android Gradle Plugin (AGP):** `8.7.3`
 - **JDK / Toolchain:** Java 17
-- **Target SDK:** 36 (Android 15 / 16 Preview)
+- **Target SDK:** 36 (Android 16)
 - **Minimum SDK:** 23 (Android 6.0 Marshmallow)
-- **Testing:** JUnit 4, Robolectric `4.14.1`, MockK `1.13.16`, AndroidX Test & Espresso
+- **Dependency Injection:** [Hilt](https://dagger.dev/hilt/) `2.51.1` (via KSP `2.0.21-1.0.27`)
+- **Async / Reactive:** Kotlin Coroutines `1.9.0` + `StateFlow` / `SharedFlow`
+- **Lifecycle:** AndroidX Lifecycle `2.8.7` (ViewModel, `repeatOnLifecycle`)
+- **Testing:** JUnit 4, Robolectric `4.14.1`, MockK `1.13.16`, Turbine `1.2.0`, AndroidX Test & Espresso
 
 ---
 
@@ -112,14 +124,26 @@ Clone the repository and open the `OpenKamera` directory:
 
 ## 🧪 Testing
 
-OpenKamera includes unit tests, Robolectric JVM tests, and instrumentation tests:
+OpenKamera has a multi-layer test suite covering unit logic, ViewModel state, and real-device UI flows:
+
+| Suite | Type | Key areas |
+|---|---|---|
+| `MainInstrumentedTest` | Instrumented (Espresso) | Camera lifecycle, zoom, focus, flash, UI controls |
+| `PhotoInstrumentedTest` | Instrumented (Espresso) | Photo capture, EXIF tags, burst mode |
+| `Camera2InstrumentedTest` | Instrumented | Camera2 API feature resolution |
+| `EspressoCameraUiInstrumentedTest` | Instrumented (Espresso) | Full UI interaction flows |
+| `*UnitTest` / `*RobolectricTest` | JVM (Robolectric + MockK + Turbine) | ViewModel, use cases, capabilities |
 
 ```bash
-# Run JVM unit tests with Robolectric and MockK
-./gradlew test
+# Run all JVM unit tests (Robolectric, MockK, Turbine)
+./gradlew testDebugUnitTest
 
-# Run Android connected device instrumentation tests
-./gradlew connectedAndroidTest
+# Run all connected instrumentation tests (requires connected device/emulator)
+./gradlew connectedDebugAndroidTest
+
+# Run a specific instrumented test class
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.hightechif.openkamera.test.MainInstrumentedTest
 ```
 
 ---
