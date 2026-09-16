@@ -27,11 +27,6 @@ import android.util.Range
 import android.util.Size
 import android.util.SizeF
 import com.hightechif.openkamera.cameracontroller.CameraController
-import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
-import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
-import com.hightechif.openkamera.cameracontroller.CameraController.Facing
-import com.hightechif.openkamera.cameracontroller.CameraController.RangeSorter
-import com.hightechif.openkamera.cameracontroller.CameraController.SizeSorter
 import com.hightechif.openkamera.cameracontroller.CameraControllerException
 import com.hightechif.openkamera.cameracontroller.extension.Camera2VendorTagsExtension
 import com.hightechif.openkamera.cameracontroller.request.Camera2RequestBuilderHelper
@@ -54,7 +49,7 @@ object Camera2CapabilitiesResolver {
     const val MAX_EXPO_BRACKETING_N_IMAGES = 5
 
     data class ResolvedCameraFeatures(
-        val cameraFeatures: CameraFeatures,
+        val cameraFeatures: CameraController.CameraFeatures,
         val zoomValue1x: Int,
         val fullZoomRatios: List<Int>?,
         val zoomRatios: List<Int>?,
@@ -75,7 +70,7 @@ object Camera2CapabilitiesResolver {
         val maxExposureTime: Long,
         val supportsTonemapPresetCurve: Boolean,
         val wantJpegR: Boolean,
-        val createdCache: CameraFeaturesCache?
+        val createdCache: CameraController.CameraFeaturesCache?
     )
 
     /**
@@ -322,8 +317,8 @@ object Camera2CapabilitiesResolver {
         characteristics: CameraCharacteristics?,
         cameraIdS: String,
         cameraIdSPhysical: String?,
-        facing: Facing?,
-        cameraFeaturesCache: CameraFeaturesCache?,
+        facing: CameraController.Facing?,
+        cameraFeaturesCache: CameraController.CameraFeaturesCache?,
         extensionCharacteristics: CameraExtensionCharacteristics?,
         useFakePrecapture: Boolean,
         allowManualWB: Boolean,
@@ -334,7 +329,7 @@ object Camera2CapabilitiesResolver {
         jtlog2ValuesSize: Int
     ): ResolvedCameraFeatures {
         if (MyDebug.LOG) Log.d(TAG, "resolveCameraFeatures()")
-        val cameraFeatures = CameraFeatures()
+        val cameraFeatures = CameraController.CameraFeatures()
 
         if (MyDebug.LOG) {
             val hardwareLevel =
@@ -372,7 +367,7 @@ object Camera2CapabilitiesResolver {
         val zoomRange = resolveZoomRange(characteristics, cameraIdSPhysical != null)
         val minZoom = zoomRange.first
         val maxZoom = zoomRange.second
-        cameraFeatures.isZoomSupported = maxZoom > 0.0f && minZoom > 0.0f
+        cameraFeatures.isZoomSupported = maxZoom > 0.0f && minZoom > 0.0f && maxZoom > minZoom
         if (MyDebug.LOG) {
             Log.d(TAG, "min_zoom: $minZoom")
             Log.d(TAG, "max_zoom: $maxZoom")
@@ -387,14 +382,20 @@ object Camera2CapabilitiesResolver {
 
             cameraFeatures.zoomRatios = ratios
             cameraFeatures.maxZoom = (cameraFeatures.zoomRatios?.size ?: 0) - 1
-            if (cameraFeatures.maxZoom == 0) {
+            if (cameraFeatures.maxZoom <= 0) {
                 cameraFeatures.isZoomSupported = false
+                cameraFeatures.maxZoom = 0
+                cameraFeatures.zoomRatios = null
+            } else {
+                fullZoomRatios = cameraFeatures.zoomRatios
+                zoomRatios = cameraFeatures.zoomRatios
             }
-            fullZoomRatios = cameraFeatures.zoomRatios
-            zoomRatios = cameraFeatures.zoomRatios
             if (MyDebug.LOG) {
                 Log.d(TAG, "zoom_ratios: $zoomRatios")
             }
+        } else {
+            cameraFeatures.zoomRatios = null
+            cameraFeatures.maxZoom = 0
         }
 
         val faceModes =
@@ -544,8 +545,7 @@ object Camera2CapabilitiesResolver {
                 }
 
                 if (cameraFeatures.supportsJpegR) {
-                    val profiles =
-                        characteristics?.get(CameraCharacteristics.REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES)
+                    val profiles = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES)
                     if (profiles == null) {
                         if (MyDebug.LOG) Log.d(TAG, "don't support JPEG_R: no DynamicRangeProfiles")
                         cameraFeatures.supportsJpegR = false
@@ -602,7 +602,7 @@ object Camera2CapabilitiesResolver {
                 cameraFeatures.pictureSizes.add(CameraController.Size(cameraSize.width, cameraSize.height))
             }
         }
-        Collections.sort(cameraFeatures.pictureSizes, SizeSorter())
+        Collections.sort(cameraFeatures.pictureSizes, CameraController.SizeSorter())
 
         var rawSize: Size? = null
         var wantRaw = true
@@ -635,11 +635,11 @@ object Camera2CapabilitiesResolver {
         }
 
         val aeFpsRanges: MutableList<IntArray> = ArrayList()
-        for (r in (characteristics?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+        for (r in (characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
             ?: emptyArray<Range<Int>>())) {
             aeFpsRanges.add(intArrayOf(r.lower ?: 0, r.upper ?: 0))
         }
-        Collections.sort(aeFpsRanges, RangeSorter())
+        Collections.sort(aeFpsRanges, CameraController.RangeSorter())
         if (MyDebug.LOG) {
             Log.d(TAG, "Supported AE video fps ranges: ")
             for (f in aeFpsRanges) {
@@ -673,7 +673,7 @@ object Camera2CapabilitiesResolver {
                 }
             }
         }
-        Collections.sort(cameraFeatures.videoSizes, SizeSorter())
+        Collections.sort(cameraFeatures.videoSizes, CameraController.SizeSorter())
 
         var hsFpsRanges: MutableList<IntArray>? = null
         if (capabilitiesHighSpeedVideo && cameraIdSPhysical == null) {
@@ -687,7 +687,7 @@ object Camera2CapabilitiesResolver {
                 }
                 hsFpsRanges.add(intArrayOf(r.lower, r.upper))
             }
-            Collections.sort(hsFpsRanges, RangeSorter())
+            Collections.sort(hsFpsRanges, CameraController.RangeSorter())
             if (MyDebug.LOG) {
                 Log.d(TAG, "Supported high speed video fps ranges: ")
                 for (f in hsFpsRanges) {
@@ -727,7 +727,7 @@ object Camera2CapabilitiesResolver {
                 }
                 cameraFeatures.videoSizesHighSpeed?.add(hsVideoSize)
             }
-            cameraFeatures.videoSizesHighSpeed?.let { Collections.sort(it, SizeSorter()) }
+            cameraFeatures.videoSizesHighSpeed?.let { Collections.sort(it, CameraController.SizeSorter()) }
         }
 
         val cameraPreviewSizes = configs.getOutputSizes(SurfaceTexture::class.java)
@@ -755,7 +755,7 @@ object Camera2CapabilitiesResolver {
             }
         }
 
-        var createdCache: CameraFeaturesCache? = null
+        var createdCache: CameraController.CameraFeaturesCache? = null
         val useCache = true
         if (extensionCharacteristics == null) {
             // no extension characteristics
@@ -791,8 +791,8 @@ object Camera2CapabilitiesResolver {
             if (MyDebug.LOG) Log.d(TAG, "done read vendor extensions info from cache")
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (MyDebug.LOG) Log.d(TAG, "check for vendor extensions")
-            val extensionPictureSizesMap: MutableMap<Int, List<android.util.Size>> = Hashtable()
-            val extensionPreviewSizesMap: MutableMap<Int, List<android.util.Size>> = Hashtable()
+            val extensionPictureSizesMap: MutableMap<Int, List<Size>> = Hashtable()
+            val extensionPreviewSizesMap: MutableMap<Int, List<Size>> = Hashtable()
 
             var extensions: List<Int>? = null
             try {
@@ -867,7 +867,7 @@ object Camera2CapabilitiesResolver {
                 }
             }
 
-            createdCache = CameraFeaturesCache(
+            createdCache = CameraController.CameraFeaturesCache(
                 cameraFeatures,
                 extensionPictureSizesMap,
                 extensionPreviewSizesMap
@@ -877,7 +877,7 @@ object Camera2CapabilitiesResolver {
 
         val supportedExtensionsZoom = cameraFeatures.supportedExtensionsZoom
 
-        if (characteristics?.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true) {
+        if (characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true) {
             val supportedFlashModesArr =
                 characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)
             if (supportedFlashModesArr != null) {
@@ -899,7 +899,7 @@ object Camera2CapabilitiesResolver {
                     }
                 }
             }
-        } else if (facing === Facing.FACING_FRONT) {
+        } else if (facing === CameraController.Facing.FACING_FRONT) {
             cameraFeatures.supportedFlashValues = ArrayList()
             cameraFeatures.supportedFlashValues!!.add("flash_off")
             cameraFeatures.supportedFlashValues!!.add("flash_frontscreen_auto")
@@ -908,13 +908,13 @@ object Camera2CapabilitiesResolver {
         }
 
         val minimumFocusDistanceF =
-            characteristics?.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+            characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
         val minimumFocusDistance = minimumFocusDistanceF ?: 0.0f
         cameraFeatures.minimumFocusDistance = minimumFocusDistance
         if (MyDebug.LOG) Log.d(TAG, "minimum_focus_distance: $minimumFocusDistance")
 
         val supportedFocusModes: IntArray? =
-            characteristics?.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+            characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
         if (supportedFocusModes != null) {
             cameraFeatures.supportedFocusValues =
                 convertFocusModesToValues(supportedFocusModes, minimumFocusDistance)
@@ -934,14 +934,14 @@ object Camera2CapabilitiesResolver {
         if (MyDebug.LOG) Log.d(TAG, "initial_focus_mode: $initialFocusMode")
 
         cameraFeatures.maxNumFocusAreas =
-            characteristics?.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+            characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
 
         cameraFeatures.isExposureLockSupported = true
         cameraFeatures.isWhiteBalanceLockSupported = true
 
         cameraFeatures.isOpticalStabilizationSupported = false
         val supportedOpticalStabilizationModes =
-            characteristics?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
+            characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
         if (supportedOpticalStabilizationModes != null) {
             for (supportedOpticalStabilizationMode in supportedOpticalStabilizationModes) {
                 if (supportedOpticalStabilizationMode == CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON) {
@@ -955,7 +955,7 @@ object Camera2CapabilitiesResolver {
 
         cameraFeatures.isVideoStabilizationSupported = false
         val supportedVideoStabilizationModes =
-            characteristics?.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
+            characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
         if (supportedVideoStabilizationModes != null) {
             for (supportedVideoStabilizationMode in supportedVideoStabilizationModes) {
                 if (supportedVideoStabilizationMode == CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON) {
@@ -973,7 +973,7 @@ object Camera2CapabilitiesResolver {
         val supportsPhotoVideoRecording = cameraFeatures.isPhotoVideoRecordingSupported
 
         val whiteBalanceModes =
-            characteristics?.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
+            characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
         if (whiteBalanceModes != null) {
             for (value in whiteBalanceModes) {
                 if (value == CameraMetadata.CONTROL_AWB_MODE_OFF && capabilitiesManualPostProcessing && allowManualWB) {
@@ -989,12 +989,12 @@ object Camera2CapabilitiesResolver {
         var minExposureTime: Long = 0
         var maxExposureTime: Long = 0
         if (isHardwareLevelSupported(characteristics, CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED)) {
-            val isoRange = characteristics?.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+            val isoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
             if (isoRange != null) {
                 cameraFeatures.supportsIsoRange = true
                 cameraFeatures.minIso = isoRange.lower
                 cameraFeatures.maxIso = isoRange.upper
-                val exposureTimeRange = characteristics?.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+                val exposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
                 if (exposureTimeRange != null) {
                     cameraFeatures.supportsExposureTime = true
                     cameraFeatures.supportsExpoBracketing = true
@@ -1013,25 +1013,25 @@ object Camera2CapabilitiesResolver {
             }
         }
 
-        val exposureRange = characteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+        val exposureRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
         if (exposureRange != null) {
             cameraFeatures.minExposure = exposureRange.lower
             cameraFeatures.maxExposure = exposureRange.upper
         }
         cameraFeatures.exposureStep =
-            characteristics?.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)?.toFloat() ?: 0f
+            characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)?.toFloat() ?: 0f
 
         cameraFeatures.canDisableShutterSound = true
 
         var supportsTonemapPresetCurve = false
         if (capabilitiesManualPostProcessing) {
             val tonemapMaxCurvePoints =
-                characteristics?.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS)
+                characteristics.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS)
             if (tonemapMaxCurvePoints != null) {
                 if (MyDebug.LOG) Log.d(TAG, "tonemap_max_curve_points: $tonemapMaxCurvePoints")
 
                 val tonemapModes =
-                    characteristics?.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)
+                    characteristics.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)
                 if (tonemapModes == null) {
                     if (MyDebug.LOG) Log.d(TAG, "tonemap_modes is null")
                 } else {
@@ -1063,13 +1063,13 @@ object Camera2CapabilitiesResolver {
         }
         if (MyDebug.LOG) Log.d(TAG, "supports_tonemap_curve?: " + cameraFeatures.supportsTonemapCurve)
 
-        val apertures = characteristics?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
+        val apertures = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
         if (MyDebug.LOG) Log.d(TAG, "apertures: " + apertures?.contentToString())
         if (apertures != null && apertures.size > 1) {
             cameraFeatures.apertures = apertures
         }
 
-        val viewAngle: SizeF = computeViewAngles(characteristics!!)
+        val viewAngle: SizeF = computeViewAngles(characteristics)
         cameraFeatures.viewAngleX = viewAngle.width
         cameraFeatures.viewAngleY = viewAngle.height
 

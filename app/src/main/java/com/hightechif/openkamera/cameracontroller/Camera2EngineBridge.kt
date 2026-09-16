@@ -431,11 +431,15 @@ class Camera2EngineBridge @Inject constructor(
                         closestIdx = i
                     }
                 }
-                controller.zoom = closestIdx
+                if (controller.zoom != closestIdx) {
+                    controller.zoom = closestIdx
+                }
             } else {
                 val maxZoom = controller.cameraFeatures.maxZoom
                 val zoomVal = (zoomRatio * 10).toInt().coerceIn(0, maxZoom)
-                controller.zoom = zoomVal
+                if (controller.zoom != zoomVal) {
+                    controller.zoom = zoomVal
+                }
             }
             _currentZoomRatio.value = zoomRatio
         } catch (e: Exception) {

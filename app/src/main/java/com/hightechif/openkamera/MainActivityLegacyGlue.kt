@@ -1918,11 +1918,6 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
     fun clickedTakePhoto(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhoto")
-        if (preview.isVideo) {
-            cameraViewModel.toggleRecording()
-        } else {
-            cameraViewModel.takePicture()
-        }
         this.takePicture(false)
     }
 
@@ -2484,6 +2479,9 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     fun clickedSettings(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedSettings")
         cameraViewModel.onEvent(CameraUiEvent.OnSettingsClicked)
+    }
+
+    fun openSettingsWithKeyguard() {
         KeyguardUtils.requireKeyguard(this) { this.openSettings() }
     }
 
@@ -4426,13 +4424,12 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     fun clickedGallery(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedGallery")
         cameraViewModel.onEvent(CameraUiEvent.OnGalleryThumbnailClicked)
-        openGallery()
     }
 
-    private fun openGallery() {
+    fun openGallery(targetUri: Uri? = null) {
         if (MyDebug.LOG) Log.d(TAG, "openGallery")
         //Intent intent = new Intent(Intent.ACTION_VIEW, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        var uri: Uri? = applicationInterface.storageUtils.lastMediaScanned
+        var uri: Uri? = targetUri ?: applicationInterface.storageUtils.lastMediaScanned
         var isRaw = uri != null && applicationInterface.storageUtils.lastMediaScannedIsRaw
         if (MyDebug.LOG && uri != null) {
             Log.d(TAG, "found cached most recent uri: $uri")

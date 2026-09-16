@@ -94,16 +94,27 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         Thread.sleep(500)
 
         onActivity { activity ->
+            activity.waitUntilImageQueueEmpty()
             activity.testLastSavedImage = null
             activity.testLastSavedImageuri = null
             val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
+            var changed = false
+            val editor = sharedPreferences.edit()
             if (!isRaw && sharedPreferences.getString(
                     PreferenceKeys.RAW_PREFERENCE_KEY,
                     "preference_raw_no"
                 ) != "preference_raw_no"
             ) {
-                sharedPreferences.edit()
-                    .putString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no").apply()
+                editor.putString(PreferenceKeys.RAW_PREFERENCE_KEY, "preference_raw_no")
+                changed = true
+            }
+            if (sharedPreferences.getString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1") != "1") {
+                editor.putString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1")
+                changed = true
+            }
+            if (changed) {
+                editor.apply()
+                activity.updateForSettings(false)
             }
         }
 
@@ -226,6 +237,12 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
 
         waitForTakePhoto()
         assertEquals(savedCount + 1, getActivityValue { it.preview.countCameraTakePicture })
+
+        onActivity { activity ->
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putString(PreferenceKeys.TIMER_PREFERENCE_KEY, "0").apply()
+        }
+        updateForSettings()
     }
 
     @Test
@@ -261,6 +278,12 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         }
 
         subTestTakePhoto(touchToFocus = true, waitAfterFocus = true)
+
+        onActivity { activity ->
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putString(PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std").apply()
+        }
+        updateForSettings()
     }
 
     @Test
@@ -288,6 +311,12 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         }
 
         subTestTakePhoto(touchToFocus = true, waitAfterFocus = true)
+
+        onActivity { activity ->
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putString(PreferenceKeys.PHOTO_MODE_PREFERENCE_KEY, "preference_photo_mode_std").apply()
+        }
+        updateForSettings()
     }
 
     @Test
@@ -326,6 +355,12 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
         }
 
         subTestTakePhoto(touchToFocus = true, waitAfterFocus = true)
+
+        onActivity { activity ->
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putString(PreferenceKeys.STAMP_PREFERENCE_KEY, "preference_stamp_no").apply()
+        }
+        updateForSettings()
     }
 
     @Test
@@ -347,7 +382,9 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
                 "OpenKamera Kotlin Test",
                 settings.getString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, "")
             )
+            settings.edit().putString(PreferenceKeys.TEXT_STAMP_PREFERENCE_KEY, "").apply()
         }
+        updateForSettings()
     }
 
     @Test
@@ -365,7 +402,10 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
 
         onActivity { activity ->
             assertEquals("3", activity.applicationInterface.getRepeatPref())
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putString(PreferenceKeys.REPEAT_MODE_PREFERENCE_KEY, "1").apply()
         }
+        updateForSettings()
     }
 
     @Test
@@ -387,7 +427,10 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
 
         onActivity { activity ->
             assertTrue(activity.applicationInterface.autoStabilisePref)
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putBoolean(PreferenceKeys.AUTO_STABILISE_PREFERENCE_KEY, false).apply()
         }
+        updateForSettings()
     }
 
     @Test
@@ -409,6 +452,9 @@ class PhotoInstrumentedTest : BaseInstrumentedTest() {
 
         onActivity { activity ->
             assertTrue(activity.applicationInterface.getFaceDetectionPref())
+            val settings = PreferenceManager.getDefaultSharedPreferences(activity)
+            settings.edit().putBoolean(PreferenceKeys.FACE_DETECTION_PREFERENCE_KEY, false).apply()
         }
+        updateForSettings()
     }
 }

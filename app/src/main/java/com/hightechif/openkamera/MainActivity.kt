@@ -169,11 +169,11 @@ class MainActivity : MainActivityLegacyGlue() {
                             }
 
                             is CameraUiEffect.NavigateToGallery -> {
-                                clickedGallery(null)
+                                openGallery(effect.uri)
                             }
 
                             is CameraUiEffect.OpenSettings -> {
-                                clickedSettings(null)
+                                openSettingsWithKeyguard()
                             }
 
                             is CameraUiEffect.ShowErrorDialog -> {

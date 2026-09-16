@@ -1242,7 +1242,9 @@ class CameraController2(
             this.supportsFaceDetectModeSimple = resolved.supportsFaceDetectModeSimple
             this.supportsFaceDetectModeFull = resolved.supportsFaceDetectModeFull
             this.rawSize = resolved.rawSize
-            this.wantRaw = resolved.wantRaw
+            if (this.rawSize == null) {
+                this.wantRaw = false
+            }
             this.aeFpsRanges = resolved.aeFpsRanges
             this.hsFpsRanges = resolved.hsFpsRanges ?: ArrayList()
             this.supportedExtensionsZoom = resolved.supportedExtensionsZoom

@@ -184,15 +184,18 @@ class Camera2InstrumentedTest : BaseInstrumentedTest() {
         assertTrue(maxExp > minExp)
 
         val targetExp = (minExp + maxExp) / 2
+        val minISO = getActivityValue { it.preview.minimumISO }
+        val targetISO = minISO.toString()
         onActivity { activity ->
             val settings = PreferenceManager.getDefaultSharedPreferences(activity)
             val editor = settings.edit()
-            editor.putString(PreferenceKeys.ISO_PREFERENCE_KEY, "manual")
+            editor.putString(PreferenceKeys.ISO_PREFERENCE_KEY, targetISO)
             editor.putLong(PreferenceKeys.EXPOSURE_TIME_PREFERENCE_KEY, targetExp)
             editor.apply()
         }
         updateForSettings()
 
-        assertEquals("manual", getActivityValue { it.applicationInterface.getISOPref() })
+        assertEquals(targetISO, getActivityValue { it.applicationInterface.getISOPref() })
+        assertEquals(targetExp, getActivityValue { it.applicationInterface.getExposureTimePref() })
     }
 }

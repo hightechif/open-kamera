@@ -70,7 +70,7 @@ sealed interface CameraUiEvent {
 sealed interface CameraUiEffect {
     data class ShowToast(val message: String) : CameraUiEffect
     data class Vibrate(val durationMs: Long) : CameraUiEffect
-    data class NavigateToGallery(val uri: Uri) : CameraUiEffect
+    data class NavigateToGallery(val uri: Uri? = null) : CameraUiEffect
     object OpenSettings : CameraUiEffect
     data class ShowErrorDialog(val title: String, val message: String) : CameraUiEffect
 }

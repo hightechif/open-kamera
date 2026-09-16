@@ -152,7 +152,7 @@ class MainActivityInteractionUnitTest {
     }
 
     @Test
-    fun galleryThumbnailClicked_withoutUri_emitsToastEffect() = runTest(testDispatcher) {
+    fun galleryThumbnailClicked_withoutUri_emitsNavigateEffectWithNullUri() = runTest(testDispatcher) {
         testMediaThumbnailFlow.value = null
         advanceUntilIdle()
 
@@ -161,8 +161,8 @@ class MainActivityInteractionUnitTest {
             advanceUntilIdle()
 
             val effect = awaitItem()
-            assertTrue(effect is CameraUiEffect.ShowToast)
-            assertEquals("No photos or videos yet", (effect as CameraUiEffect.ShowToast).message)
+            assertTrue(effect is CameraUiEffect.NavigateToGallery)
+            assertEquals(null, (effect as CameraUiEffect.NavigateToGallery).uri)
             cancelAndIgnoreRemainingEvents()
         }
     }

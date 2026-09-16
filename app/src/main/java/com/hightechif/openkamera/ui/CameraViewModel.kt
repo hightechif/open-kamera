@@ -489,10 +489,6 @@ class CameraViewModel @Inject constructor(
 
     private fun handleGalleryThumbnailClicked() {
         val uri = _uiState.value.latestThumbnailUri
-        if (uri != null) {
-            _uiEffect.tryEmit(CameraUiEffect.NavigateToGallery(uri))
-        } else {
-            _uiEffect.tryEmit(CameraUiEffect.ShowToast("No photos or videos yet"))
-        }
+        _uiEffect.tryEmit(CameraUiEffect.NavigateToGallery(uri))
     }
 }
