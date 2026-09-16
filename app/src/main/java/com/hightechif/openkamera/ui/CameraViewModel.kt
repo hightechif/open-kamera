@@ -51,6 +51,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * ViewModel managing reactive UI state, user actions, and hardware telemetry consumption.
+ *
+ * 📖 Learn more: `docs/module-05-advanced/02-reactive-metadata-flows.md`
+ */
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val cameraEngine: ICameraEngine,

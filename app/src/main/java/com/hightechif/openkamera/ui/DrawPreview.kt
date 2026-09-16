@@ -88,6 +88,12 @@ import kotlin.math.tan
 import com.hightechif.openkamera.LOCK_TO_LANDSCAPE
 import com.hightechif.openkamera.getRotationFromSystemOrientation
 
+/**
+ * Master coordinator for preview canvas rendering and HUD overlays, delegating
+ * drawing passes to modular renderers (grids, histograms, telemetry, guides).
+ *
+ * 📖 Learn more: `docs/module-05-advanced/03-overlay-and-hud-rendering.md`
+ */
 class DrawPreview(mainActivity: MainActivity, applicationInterface: MyApplicationInterface) {
     private val mainActivity: MainActivity
     private val applicationInterface: MyApplicationInterface

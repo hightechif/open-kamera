@@ -22,6 +22,8 @@ import android.util.Log
  * 3. Call [onJpegReceived] / [onRawReceived] each time an image arrives.
  * 4. Query [isBurstJpegComplete] / [isBurstRawComplete] to determine when the sequence is done.
  * 5. Call [reset] to clear state after a completed or canceled capture.
+ *
+ * 📖 Learn more: `docs/module-03-photography/03-burst-and-bracketing.md`
  */
 class Camera2BurstCoordinator {
 
