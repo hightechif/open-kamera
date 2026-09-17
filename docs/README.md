@@ -10,9 +10,24 @@ The concepts taught here are grounded in real, production-quality code. Every do
 
 ## 🗺️ Curriculum Map
 
+### [Module 00 — Photography Primer](./module-00-photography-primer/)
+
+The optical, physical, and creative fundamentals. **Start here if you want to understand how cameras and manual controls actually work.**
+
+| # | Document | What You'll Learn |
+|---|---|---|
+| 01 | [Light, Sensors, & Exposure](./module-00-photography-primer/01-light-sensors-and-exposure.md) | Photons to pixels, dynamic range, clipping, and reading histograms |
+| 02 | [The Exposure Triangle](./module-00-photography-primer/02-the-exposure-triangle.md) | Aperture, shutter speed, ISO, and the smartphone fixed-aperture reality |
+| 03 | [Shooting Modes & EV Compensation](./module-00-photography-primer/03-shooting-modes-and-ev-compensation.md) | Auto, Tv/S, Av/A, Manual, 18% gray metering, and +/- EV dials |
+| 04 | [Focus, Sharpness, & Depth of Field](./module-00-photography-primer/04-focus-sharpness-and-depth-of-field.md) | Optical DoF vs computational bokeh, AF modes, and focus peaking |
+| 05 | [Color Science & White Balance](./module-00-photography-primer/05-color-science-and-white-balance.md) | Kelvin color temperature, light spectra, and manual white balance |
+| 06 | [Practical Field Cookbook](./module-00-photography-primer/06-practical-recipes-and-camera-craft.md) | Field recipes for action freezing, waterfalls, astrophotography, and sunsets |
+
+---
+
 ### [Module 01 — Foundations](./module-01-foundations/)
 
-The building blocks. Start here before reading anything else.
+The building blocks of Android Camera development. Start here after the primer.
 
 | # | Document | What You'll Learn |
 |---|---|---|

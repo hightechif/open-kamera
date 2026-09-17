@@ -24,6 +24,7 @@ OpenKamera is designed with privacy and user control in mind: **no ads, no track
 OpenKamera is not just an app — it's an **educational resource** for intermediate Android developers who want to understand how camera applications really work.
 
 The [`docs/`](docs/README.md) folder contains a structured curriculum covering:
+- **Photography Primer** — optics, the Exposure Triangle, smartphone fixed-aperture physics, shooting modes, and practical field recipes
 - **Camera2 API** fundamentals and the session/capture model
 - **Preview lifecycle** and coroutine-based async camera management
 - **Photo capture** pipelines, flash sequencing, burst mode, and HDR processing
