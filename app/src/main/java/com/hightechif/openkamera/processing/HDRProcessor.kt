@@ -41,6 +41,12 @@ import kotlin.math.sqrt
 //import android.os.Environment;
 //import android.renderscript.ScriptIntrinsicResize;
 
+/**
+ * Core image processing engine for High Dynamic Range (HDR) fusion,
+ * alignment (MTB), tone-mapping, and noise reduction.
+ *
+ * 📖 Learn more: `docs/module-03-photography/04-hdr-image-processing.md`
+ */
 class HDRProcessor(private val context: Context, private val isTest: Boolean) {
     //public final static boolean useRenderscript = true;
     private var rs: RenderScript? =

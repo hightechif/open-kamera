@@ -62,6 +62,8 @@ import kotlin.math.exp
  * - Calculating and streaming preview histogram telemetry via [histogramFlow]
  * - Routing domain use cases (CapturePhoto, RecordVideo, Zoom, Focus, Exposure) to the active controller
  * - Eliminating dual-client Camera2 HAL contention
+ *
+ * 📖 Learn more: `docs/module-05-advanced/01-camera-engine-abstraction.md` and `02-reactive-metadata-flows.md`
  */
 @Singleton
 class Camera2EngineBridge @Inject constructor(

@@ -1268,11 +1268,14 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
         fun onClosed()
     }
 
+
     /** Closes the camera.
      * @param async Whether to close the camera on a background thread.
      * @param closeCameraCallback If async is true, closeCameraCallback.onClosed() will be called,
      * from the UI thread, once the camera is closed. If async is false,
      * this field is ignored.
+     *
+     * 📖 **Learn more:** [Module 02 — Preview Lifecycle](../../../../../../docs/module-02-preview/02-preview-lifecycle.md)
      */
     private fun closeCamera(async: Boolean, closeCameraCallback: CloseCameraCallback?) {
         var debugTime: Long = 0
@@ -1476,6 +1479,9 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
      * The camera will be opened on a background thread, so won't be available upon
      * exit of this function.
      * If cameraOpenState is already CAMERAOPENSTATE_OPENING, this method does nothing.
+     *
+     * 📖 **Learn more:** [Module 02 — Preview Lifecycle](../../../../../../docs/module-02-preview/02-preview-lifecycle.md)
+     * 📖 **Learn more:** [Module 02 — Coroutines for Camera Async Work](../../../../../../docs/module-02-preview/03-coroutines-camera-async.md)
      */
     private fun openCamera() {
         var debugTime: Long = 0

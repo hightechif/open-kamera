@@ -8,6 +8,8 @@
 package com.hightechif.openkamera.preferences
 
 /** Stores all the string keys used for SharedPreferences.
+ *
+ * 📖 Learn more: `docs/module-05-advanced/05-settings-architecture.md`
  */
 object PreferenceKeys {
     // must be static, to safely call from other Activities

@@ -15,6 +15,8 @@ import com.hightechif.openkamera.utils.MyDebug
 
 /** This is essentially similar to CamcorderProfile in that it encapsulates a set of video settings
  * to be passed to MediaRecorder, but allows us to store additional fields.
+ *
+ * 📖 Learn more: `docs/module-04-video/02-mediarecorder-and-codecs.md`
  */
 class VideoProfile {
     var recordAudio: Boolean = false

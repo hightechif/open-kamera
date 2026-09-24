@@ -53,6 +53,8 @@ interface CaptureStateListener {
  * Methods that touch camera state must be called while holding [CameraController2.backgroundCameraLock].
  * The public entry point [initiate] follows the same lock-release-callback pattern as CC2.
  *
+ * 📖 Learn more: `docs/module-03-photography/01-photo-capture-pipeline.md` and `02-flash-and-precapture.md`
+ *
  * @param context Access to the live camera state managed by [CameraController2].
  * @param deviceQuirks Device-specific behavior flags.
  */

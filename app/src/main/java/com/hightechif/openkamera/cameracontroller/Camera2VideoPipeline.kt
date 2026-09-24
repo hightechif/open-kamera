@@ -35,6 +35,8 @@ import java.util.concurrent.Executor
  * - Video snapshot (still picture capture during active recording) capture request creation
  * - Audio cues for video start/stop
  *
+ * 📖 Learn more: `docs/module-04-video/01-video-pipeline-overview.md`
+ *
  * @param controller Reference to the backing [CameraController2]
  * @param sessionManager Lifecycle and session coordinator
  * @param cameraSettings Settings manager for capture request builders
