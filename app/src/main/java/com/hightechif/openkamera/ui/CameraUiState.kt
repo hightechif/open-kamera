@@ -8,6 +8,7 @@ package com.hightechif.openkamera.ui
 
 import android.graphics.PointF
 import android.net.Uri
+import com.hightechif.openkamera.domain.engine.RemoteButton
 import com.hightechif.openkamera.domain.model.CameraFacing
 import com.hightechif.openkamera.domain.model.CameraFrameMetadata
 import com.hightechif.openkamera.domain.model.CaptureMode
@@ -51,6 +52,10 @@ sealed interface CameraUiEvent {
     data class OnVolumeKeyPressed(val keyCode: Int) : CameraUiEvent
     object OnFocusKeyPressed : CameraUiEvent
     object OnRemoteCaptureTriggered : CameraUiEvent
+    object OnVideoSnapshotClicked : CameraUiEvent
+    object OnContinuousBurstRequested : CameraUiEvent
+    object OnAudioTrigger : CameraUiEvent
+    data class OnRemoteButton(val button: RemoteButton) : CameraUiEvent
     object OnRecordVideoClicked : CameraUiEvent
     object OnPauseVideoRecordingClicked : CameraUiEvent
     object OnResumeVideoRecordingClicked : CameraUiEvent
@@ -73,4 +78,23 @@ sealed interface CameraUiEffect {
     data class NavigateToGallery(val uri: Uri? = null) : CameraUiEffect
     object OpenSettings : CameraUiEffect
     data class ShowErrorDialog(val title: String, val message: String) : CameraUiEffect
+}
+
+/**
+ * Instructions from [CameraViewModel] to the legacy camera pipeline, which still executes them.
+ *
+ * Unlike [CameraUiEffect] (cosmetic feedback that may be dropped), a command changes camera state,
+ * so it is emitted with `replay = 0`: a command issued while the Activity is stopped is dropped,
+ * never replayed later.
+ */
+sealed interface CameraCommand {
+    data class TakePicture(
+        val photoSnapshot: Boolean = false,
+        val continuousFastBurst: Boolean = false
+    ) : CameraCommand
+
+    /** Remote shutter: captures, or pauses/resumes video if the remote pause preference is on. */
+    object RemoteShutter : CameraCommand
+    data class RemoteButton(val button: com.hightechif.openkamera.domain.engine.RemoteButton) : CameraCommand
+    object PauseResumeVideo : CameraCommand
 }

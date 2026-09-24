@@ -64,6 +64,27 @@ With `ICameraEngine`, business rules live in isolated domain use cases:
 
 ---
 
+## Strangler Fig in Practice: Intent vs. Execution
+
+The domain boundary above is the *destination*. The live app is mid-migration (a "strangler fig": new code grows around the old until the old can be removed), so today capture is split in two roles:
+
+```
+            ┌────────────── intent ──────────────┐        ┌──── execution ────┐
+ input ──► CameraUiEvent ──► CameraViewModel ──► CameraCommand ──► MainActivity ──► legacy takePicture()
+                                  ▲                                                   │
+                                  └───────── state feedback (onCaptureStarted, …) ◄───┘
+```
+
+- **The ViewModel owns intent.** Every shutter, key, remote and audio trigger becomes exactly one `CameraUiEvent`, which [`CameraViewModel.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt) translates into a `CameraCommand`.
+- **The legacy pipeline still executes.** `MainActivity` collects `cameraCommands` and calls the battle-tested `takePicture()` → `Preview` → `CameraController2` → `ImageSaver` path, which is what applies EXIF orientation, stamps, HDR/DRO/NR and save-location preferences.
+- **The domain `CapturePhotoUseCase` is not on the live path.** It cannot yet match `ImageSaver`, so routing *intent* first and replacing *execution* later is safer than a rewrite.
+
+### Sidebar: two callers, one camera
+
+Before this change, one `KEYCODE_HEADSETHOOK` press called the ViewModel *and* the legacy `takePicture()`. The result was two JPEGs, one of them with `Orientation=1` (sideways in portrait). A strangler needs a **single entry point**: while two callers can reach the same camera, migrating either one is unsafe.
+
+---
+
 ## Next Steps
 
 Discover how camera frame telemetry flows reactively to the presentation layer in [Lesson 02 — Reactive Metadata Flows](./02-reactive-metadata-flows.md).

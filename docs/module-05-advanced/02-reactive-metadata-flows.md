@@ -63,6 +63,21 @@ Using `StateFlow` and sampling operators prevents the UI from over-rendering whi
 
 ---
 
+## Commands vs. Effects, and Legacy Feedback
+
+`CameraViewModel` exposes two one-shot streams, and the difference matters:
+
+| Stream | Purpose | If nobody is collecting |
+|---|---|---|
+| `uiEffect` (`CameraUiEffect`) | Cosmetic feedback: toast, haptic, navigation | May be dropped |
+| `cameraCommands` (`CameraCommand`) | Instructions that change camera state (`TakePicture`, `PauseResumeVideo`, `RemoteButton`) | Must **not** be replayed later |
+
+Both use `replay = 0`. A shutter press while the Activity is stopped is dropped rather than firing a photo when the user returns. `MainActivity` collects `cameraCommands` inside `repeatOnLifecycle(STARTED)`.
+
+State flows back the other way. Legacy callbacks in `MyApplicationInterface` (`onCaptureStarted`, `onPictureCompleted`, `startedVideo`, `stoppedVideo`, pause/resume) call `onLegacyCaptureStarted()`, `onLegacyVideoStarted()` and friends on the ViewModel. `captureState`, `isRecording` and `isVideoPaused` therefore reflect what the camera is really doing, and the UI keeps observing plain `StateFlow`s.
+
+---
+
 ## Next Steps
 
 Learn how these real-time streams are drawn over the preview surface in [Lesson 03 — Overlay & HUD Rendering](./03-overlay-and-hud-rendering.md).

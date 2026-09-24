@@ -7,6 +7,7 @@
 package com.hightechif.openkamera.ui.activity
 
 import android.view.KeyEvent
+import com.hightechif.openkamera.domain.engine.RemoteButton
 import com.hightechif.openkamera.ui.CameraUiEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -21,6 +22,10 @@ class KeyEventHandlerUnitTest {
         val volumeEvent: CameraUiEvent = CameraUiEvent.OnVolumeKeyPressed(KeyEvent.KEYCODE_VOLUME_DOWN)
         val focusEvent: CameraUiEvent = CameraUiEvent.OnFocusKeyPressed
         val remoteEvent: CameraUiEvent = CameraUiEvent.OnRemoteCaptureTriggered
+        val snapshotEvent: CameraUiEvent = CameraUiEvent.OnVideoSnapshotClicked
+        val burstEvent: CameraUiEvent = CameraUiEvent.OnContinuousBurstRequested
+        val audioEvent: CameraUiEvent = CameraUiEvent.OnAudioTrigger
+        val remoteButtonEvent: CameraUiEvent = CameraUiEvent.OnRemoteButton(RemoteButton.MENU)
 
         assertNotNull(shutterEvent)
         assertNotNull(volumeEvent)
@@ -32,5 +37,9 @@ class KeyEventHandlerUnitTest {
         assertEquals(KeyEvent.KEYCODE_VOLUME_DOWN, (volumeEvent as CameraUiEvent.OnVolumeKeyPressed).keyCode)
         assertTrue(focusEvent is CameraUiEvent.OnFocusKeyPressed)
         assertTrue(remoteEvent is CameraUiEvent.OnRemoteCaptureTriggered)
+        assertTrue(snapshotEvent is CameraUiEvent.OnVideoSnapshotClicked)
+        assertTrue(burstEvent is CameraUiEvent.OnContinuousBurstRequested)
+        assertTrue(audioEvent is CameraUiEvent.OnAudioTrigger)
+        assertEquals(RemoteButton.MENU, (remoteButtonEvent as CameraUiEvent.OnRemoteButton).button)
     }
 }

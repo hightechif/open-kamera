@@ -2863,32 +2863,23 @@ class MainUI(val mainActivity: MainActivity) {
 
                 when (volumeKeys) {
                     "volume_take_photo" -> {
-                        mainActivity.cameraViewModel.onEvent(
-                            CameraUiEvent.OnVolumeKeyPressed(
-                                keyCode
-                            )
-                        )
-                        var done = false
                         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mainActivity.preview
                                 .isVideoRecording
                         ) {
-                            done = true
-                            mainActivity.pauseVideo()
-                        }
-                        if (!done) {
-                            mainActivity.takePicture(false)
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
+                        } else {
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                         }
                         return true
                     }
 
                     "volume_focus" -> {
-                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnFocusKeyPressed)
                         if (keydownVolumeUp && keydownVolumeDown) {
                             if (MyDebug.LOG) Log.d(
                                 TAG,
                                 "take photo rather than focus, as both volume keys are down"
                             )
-                            mainActivity.takePicture(false)
+                            mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                         } else if (mainActivity.preview.currentFocusValue != null
                             && mainActivity.preview.currentFocusValue.equals("focus_mode_manual2")
                         ) {
@@ -2984,7 +2975,7 @@ class MainUI(val mainActivity: MainActivity) {
             KeyEvent.KEYCODE_CAMERA -> {
                 run {
                     if (event.repeatCount == 0) {
-                        mainActivity.takePicture(false)
+                        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                         return true
                     }
                 }
@@ -3026,7 +3017,7 @@ class MainUI(val mainActivity: MainActivity) {
                     commandMenuPopup()
                     return true
                 } else if (event.repeatCount == 0) {
-                    mainActivity.takePicture(false)
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                     return true
                 }
             }

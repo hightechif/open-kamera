@@ -81,11 +81,6 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                     if (audioManager != null && !audioManager.isWiredHeadsetOn) return false
                 }
 
-                if (isVolumeKey(keyCode)) {
-                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnVolumeKeyPressed(keyCode))
-                } else if (isMediaKey(keyCode) && volumeKeys == "volume_take_photo") {
-                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
-                }
                 return processVolumeKeyAction(volumeKeys, keyCode, event, sharedPreferences)
             }
 
@@ -96,9 +91,8 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
             }
 
             KeyEvent.KEYCODE_CAMERA -> {
-                mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                 if (event.repeatCount == 0) {
-                    mainActivity.takePicture(false)
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                     return true
                 }
                 if (event.downTime == event.eventTime && !mainActivity.preview.isFocusWaiting) {
@@ -109,7 +103,6 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
             }
 
             KeyEvent.KEYCODE_FOCUS -> {
-                mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnFocusKeyPressed)
                 if (event.downTime == event.eventTime && !mainActivity.preview.isFocusWaiting) {
                     if (MyDebug.LOG) Log.d(TAG, "request focus due to focus key")
                     mainActivity.preview.requestAutoFocus()
@@ -134,16 +127,13 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
     ): Boolean {
         when (volumeKeys) {
             "volume_take_photo" -> {
-                var done = false
                 if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN &&
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
                     mainActivity.preview.isVideoRecording
                 ) {
-                    done = true
-                    mainActivity.pauseVideo()
-                }
-                if (!done) {
-                    mainActivity.takePicture(false)
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
+                } else {
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                 }
                 return true
             }
@@ -154,7 +144,7 @@ class KeyEventHandler(private val mainActivity: MainActivity) {
                         TAG,
                         "take photo rather than focus, as both volume keys are down"
                     )
-                    mainActivity.takePicture(false)
+                    mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
                 } else if (mainActivity.preview.currentFocusValue == "focus_mode_manual2") {
                     if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) mainActivity.changeFocusDistance(
                         -1,

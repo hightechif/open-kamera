@@ -36,6 +36,7 @@ import com.hightechif.openkamera.domain.usecase.TapToFocusUseCase
 import com.hightechif.openkamera.domain.usecase.ToggleFlashUseCase
 import com.hightechif.openkamera.preferences.SettingsRepositoryImpl
 import com.hightechif.openkamera.preferences.FakeSharedPreferences
+import com.hightechif.openkamera.ui.CameraCommand
 import com.hightechif.openkamera.ui.CameraUiEffect
 import com.hightechif.openkamera.ui.CameraUiEvent
 import com.hightechif.openkamera.ui.CameraViewModel
@@ -131,32 +132,23 @@ class CameraUdfIntegrationTest {
     }
 
     @Test
-    fun fullEndToEndUdfFlow_shutterCaptureAndMediaPersistence() = runTest(testDispatcher) {
-        val sampleJpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
-
-        coEvery { mockCameraEngine.captureStillImage(any()) } returns flow {
-            emit(CaptureProgress.Processing(20))
-            emit(CaptureProgress.Completed(jpegBytes = sampleJpeg))
-        }
-
-        viewModel.uiEffect.test {
-            // Trigger shutter
+    fun shutterIntent_flowsToSingleCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            // Intent: shutter -> exactly one command for the legacy executor
             viewModel.onEvent(CameraUiEvent.OnShutterClicked)
-            advanceUntilIdle()
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            expectNoEvents()
 
-            // Verify side-effect
-            val effect = awaitItem()
-            assertTrue(effect is CameraUiEffect.Vibrate)
+            // Feedback: legacy callbacks drive state back into the ViewModel
+            viewModel.onLegacyCaptureStarted()
+            assertEquals(CaptureProgress.Starting, viewModel.captureState.value)
+            assertTrue(viewModel.uiState.value.isCapturing)
 
-            // Verify media saved
-            assertTrue(fakeMediaRepository.savePhotoCalled)
-            assertEquals(sampleJpeg.size.toLong(), fakeMediaRepository.savedPhotoBytes?.size?.toLong())
-
-            // Verify state reset
+            viewModel.onLegacyCaptureCompleted()
+            assertEquals(CaptureProgress.Idle, viewModel.captureState.value)
             assertFalse(viewModel.uiState.value.isCapturing)
-
-            cancelAndIgnoreRemainingEvents()
         }
+        assertFalse(fakeMediaRepository.savePhotoCalled)
     }
 
     @Test

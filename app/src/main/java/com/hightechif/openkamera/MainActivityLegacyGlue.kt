@@ -109,6 +109,7 @@ import com.hightechif.openkamera.system.MyTileService
 import com.hightechif.openkamera.system.MyTileServiceFrontCamera
 import com.hightechif.openkamera.system.MyTileServiceVideo
 import com.hightechif.openkamera.system.PermissionHandler
+import com.hightechif.openkamera.domain.engine.RemoteButton
 import com.hightechif.openkamera.ui.CameraUiEvent
 import com.hightechif.openkamera.ui.CameraViewModel
 import com.hightechif.openkamera.ui.DrawPreview
@@ -1298,7 +1299,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                     TAG,
                     "taking picture due to audio trigger"
                 )
-                takePicture(false)
+                cameraViewModel.onEvent(CameraUiEvent.OnAudioTrigger)
             }
         }
     }
@@ -1903,7 +1904,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                 } else if (photoMode === PhotoMode.Standard ||
                     photoMode === PhotoMode.FastBurst
                 ) {
-                    this.takePicturePressed(photoSnapshot = false, continuousFastBurst = true)
+                    cameraViewModel.onEvent(CameraUiEvent.OnContinuousBurstRequested)
                     return true
                 }
             } else {
@@ -1918,14 +1919,14 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
     fun clickedTakePhoto(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhoto")
-        this.takePicture(false)
+        cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
     }
 
     /** User has clicked button to take a photo snapshot whilst video recording.
      */
     fun clickedTakePhotoVideoSnapshot(view: View?) {
         if (MyDebug.LOG) Log.d(TAG, "clickedTakePhotoVideoSnapshot")
-        this.takePicture(true)
+        cameraViewModel.onEvent(CameraUiEvent.OnVideoSnapshotClicked)
     }
 
     fun clickedPauseVideo(view: View?) {
@@ -1937,6 +1938,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         if (MyDebug.LOG) Log.d(TAG, "pauseVideo")
         if (preview.isVideoRecording) { // just in case
             preview.pauseVideo()
+            cameraViewModel.onLegacyVideoPaused(preview.isVideoRecordingPaused)
             mainUI.setPauseVideoContentDescription()
         }
     }
@@ -1964,6 +1966,67 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         }
 
         takePicture(false)
+    }
+
+    /**
+     * Executes a remote-control button with the upstream context-dependent behaviour
+     * (popup navigation, zoom vs. manual focus). Next strangler seam: needs [MainUI] state.
+     */
+    fun handleRemoteButton(button: RemoteButton) {
+        when (button) {
+            RemoteButton.SHUTTER -> triggerRemoteControlAction()
+
+            // "Mode" key: either toggles photo/video mode, or closes the settings screen that is currently open
+            RemoteButton.MODE ->
+                if (mainUI.popupIsOpen()) {
+                    mainUI.togglePopupSettings()
+                } else if (mainUI.isExposureUIOpen) {
+                    mainUI.toggleExposureUI()
+                } else {
+                    clickedSwitchVideo(null)
+                }
+
+            // Open the exposure UI (ISO/Exposure) or select the current line on an open UI or
+            // select the current option on a button on a selected line
+            RemoteButton.MENU ->
+                if (!mainUI.popupIsOpen()) {
+                    if (!mainUI.isExposureUIOpen) {
+                        mainUI.toggleExposureUI()
+                    } else {
+                        mainUI.commandMenuExposure()
+                    }
+                } else {
+                    mainUI.commandMenuPopup()
+                }
+
+            RemoteButton.UP -> if (!mainUI.processRemoteUpButton()) {
+                // Default up behavior:
+                // - if we are on manual focus, then adjust focus.
+                // - if we are on autofocus, then adjust zoom.
+                if (preview.currentFocusValue != null &&
+                    preview.currentFocusValue.equals("focus_mode_manual2")
+                ) {
+                    changeFocusDistance(-25, false)
+                } else {
+                    zoomIn()
+                }
+            }
+
+            RemoteButton.DOWN -> if (!mainUI.processRemoteDownButton()) {
+                if (preview.currentFocusValue != null &&
+                    preview.currentFocusValue.equals("focus_mode_manual2")
+                ) {
+                    changeFocusDistance(25, false)
+                } else {
+                    zoomOut()
+                }
+            }
+
+            // Open the camera settings popup menu (not the app settings)
+            // or selects the current line/icon in the popup menu, and finally
+            // clicks the icon
+            RemoteButton.AFMF -> mainUI.togglePopupSettings()
+        }
     }
 
     fun clickedCancelPanorama(view: View?) {

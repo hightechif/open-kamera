@@ -17,6 +17,15 @@ Capturing a high-quality still picture involves three distinct phases:
        User Taps Shutter
               │
               ▼
+   CameraUiEvent.OnShutterClicked
+              │
+              ▼
+        CameraViewModel  (owns intent)
+              │  CameraCommand.TakePicture
+              ▼
+   MainActivity → legacy takePicture()  (executes)
+              │
+              ▼
 ┌───────────────────────────────┐
 │     1. Precapture Phase       │
 │  - Check flash / torch mode   │

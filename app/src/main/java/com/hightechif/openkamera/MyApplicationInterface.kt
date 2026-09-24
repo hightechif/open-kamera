@@ -9,6 +9,7 @@ package com.hightechif.openkamera
 
 //import android.location.Address; // don't use until we have info for data privacy!
 //import android.location.Geocoder; // don't use until we have info for data privacy!
+import com.hightechif.openkamera.ui.CameraUiEvent
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
@@ -2290,6 +2291,7 @@ class MyApplicationInterface internal constructor(
 
     override fun startedVideo() {
         if (MyDebug.LOG) Log.d(TAG, "startedVideo()")
+        mainActivity.cameraViewModel.onLegacyVideoStarted()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             if (!(mainActivity.mainUI
                     .inImmersiveMode() && mainActivity.usingKitKatImmersiveModeEverything())
@@ -2340,6 +2342,7 @@ class MyApplicationInterface internal constructor(
             Log.d(TAG, "uri $uri")
             Log.d(TAG, "filename $filename")
         }
+        mainActivity.cameraViewModel.onLegacyVideoStopped()
         val pauseVideoButton: View = mainActivity.findViewById(R.id.pause_video)
         pauseVideoButton.visibility = View.GONE
         val takePhotoVideoButton: View =
@@ -2718,6 +2721,7 @@ class MyApplicationInterface internal constructor(
 
     override fun onCaptureStarted() {
         if (MyDebug.LOG) Log.d(TAG, "onCaptureStarted")
+        mainActivity.cameraViewModel.onLegacyCaptureStarted()
         nCaptureImages = 0
         nCaptureImagesRaw = 0
         drawPreview.onCaptureStarted()
@@ -2730,6 +2734,7 @@ class MyApplicationInterface internal constructor(
 
     override fun onPictureCompleted() {
         if (MyDebug.LOG) Log.d(TAG, "onPictureCompleted")
+        mainActivity.cameraViewModel.onLegacyCaptureCompleted()
 
         // clear any toasts displayed during progress (e.g., preferenceNrModeLowLightMessage, or onExtensionProgress())
         mainActivity.preview.clearActiveFakeToast()
@@ -2820,7 +2825,7 @@ class MyApplicationInterface internal constructor(
 
     override fun requestTakePhoto() {
         if (MyDebug.LOG) Log.d(TAG, "requestTakePhoto")
-        mainActivity.takePicture(false)
+        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
     }
 
     /** Switch to the first available camera that is front or back facing as desired.

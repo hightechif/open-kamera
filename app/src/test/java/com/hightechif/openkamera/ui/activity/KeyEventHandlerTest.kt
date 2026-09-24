@@ -9,6 +9,7 @@ package com.hightechif.openkamera.ui.activity
 import android.view.KeyEvent
 import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.preview.Preview
+import com.hightechif.openkamera.ui.CameraUiEvent
 import com.hightechif.openkamera.ui.MainUI
 import io.mockk.every
 import io.mockk.mockk
@@ -72,7 +73,8 @@ class KeyEventHandlerTest {
         val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_CAMERA, mockEvent)
 
         assertTrue(handled)
-        verify { mockActivity.takePicture(false) }
+        verify(exactly = 1) { mockCameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed) }
+        verify(exactly = 0) { mockActivity.takePicture(any()) }
     }
 
     @Test
@@ -94,7 +96,8 @@ class KeyEventHandlerTest {
         val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_HEADSETHOOK, mockEvent)
 
         assertTrue(handled)
-        verify { mockActivity.takePicture(false) }
+        verify(exactly = 1) { mockCameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed) }
+        verify(exactly = 0) { mockActivity.takePicture(any()) }
     }
 
     @Test
@@ -103,7 +106,22 @@ class KeyEventHandlerTest {
         val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, mockEvent)
 
         assertTrue(handled)
-        verify { mockActivity.takePicture(false) }
+        verify(exactly = 1) { mockCameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed) }
+        verify(exactly = 0) { mockActivity.takePicture(any()) }
+    }
+
+    @Test
+    fun volumeDown_whileRecording_dispatchesPauseOnly() {
+        every { mockPreview.isVideoRecording } returns true
+        val mockEvent = mockk<KeyEvent>(relaxed = true)
+
+        val handled = keyEventHandler.handleKeyEventInternal(KeyEvent.KEYCODE_VOLUME_DOWN, mockEvent)
+
+        assertTrue(handled)
+        verify(exactly = 1) { mockCameraViewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked) }
+        verify(exactly = 0) { mockCameraViewModel.onEvent(CameraUiEvent.OnShutterKeyPressed) }
+        verify(exactly = 0) { mockActivity.takePicture(any()) }
+        verify(exactly = 0) { mockActivity.pauseVideo() }
     }
 
     @Test

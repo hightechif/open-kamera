@@ -147,69 +147,6 @@ class BluetoothRemoteControl(
             } else if (BluetoothLeService.ACTION_REMOTE_COMMAND == action) {
                 val command = intent.getIntExtra(BluetoothLeService.EXTRA_DATA, -1)
                 actualRemoteInputManager?.onRemoteCommandReceived(command)
-                // TODO: we could abstract this into a method provided by each remote control model
-                when (command) {
-                    BluetoothLeService.COMMAND_SHUTTER ->
-                        mainActivity.triggerRemoteControlAction()
-
-                    BluetoothLeService.COMMAND_MODE ->                         // "Mode" key :either toggles photo/video mode, or
-                        // closes the settings screen that is currently open
-                        if (mainUI.popupIsOpen()) {
-                            mainUI.togglePopupSettings()
-                        } else if (mainUI.isExposureUIOpen) {
-                            mainUI.toggleExposureUI()
-                        } else {
-                            mainActivity.clickedSwitchVideo(null)
-                        }
-
-                    BluetoothLeService.COMMAND_MENU ->                         // Open the exposure UI (ISO/Exposure) or
-                        // select the current line on an open UI or
-                        // select the current option on a button on a selected line
-                        if (!mainUI.popupIsOpen()) {
-                            if (!mainUI.isExposureUIOpen) {
-                                mainUI.toggleExposureUI()
-                            } else {
-                                mainUI.commandMenuExposure()
-                            }
-                        } else {
-                            mainUI.commandMenuPopup()
-                        }
-
-                    BluetoothLeService.COMMAND_UP -> if (!mainUI.processRemoteUpButton()) {
-                        // Default up behavior:
-                        // - if we are on manual focus, then adjust focus.
-                        // - if we are on autofocus, then adjust zoom.
-                        if (mainActivity.preview
-                                .currentFocusValue != null && mainActivity.preview
-                                .currentFocusValue.equals("focus_mode_manual2")
-                        ) {
-                            mainActivity.changeFocusDistance(-25, false)
-                        } else {
-                            // Adjust zoom
-                            mainActivity.zoomIn()
-                        }
-                    }
-
-                    BluetoothLeService.COMMAND_DOWN -> if (!mainUI.processRemoteDownButton()) {
-                        if (mainActivity.preview
-                                .currentFocusValue != null && mainActivity.preview
-                                .currentFocusValue.equals("focus_mode_manual2")
-                        ) {
-                            mainActivity.changeFocusDistance(25, false)
-                        } else {
-                            // Adjust zoom
-                            mainActivity.zoomOut()
-                        }
-                    }
-
-                    BluetoothLeService.COMMAND_AFMF ->                         // Open the camera settings popup menu (not the app settings)
-                        // or selects the current line/icon in the popup menu, and finally
-                        // clicks the icon
-                        //if( !mainUI.popupIsOpen() ) {
-                        mainUI.togglePopupSettings()
-
-                    else -> {}
-                }
             } else {
                 if (MyDebug.LOG) Log.d(TAG, "Other remote event")
             }

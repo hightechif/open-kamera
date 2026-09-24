@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -180,20 +181,12 @@ class MainActivityInteractionUnitTest {
 
     @Test
     fun recordVideoClicked_togglesRecordingState() = runTest(testDispatcher) {
-        val mockFile = mockk<File>(relaxed = true)
-        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockFile)
-        coEvery { mockRecordVideoUseCase.stopRecording(any(), any()) } returns Result.success(
-            mockk(
-                relaxed = true
-            )
-        )
-
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
+        viewModel.onLegacyVideoStarted()
+        advanceTimeBy(10)
         assertTrue(viewModel.uiState.value.isRecording)
 
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
+        viewModel.onLegacyVideoStopped()
+        advanceTimeBy(10)
         assertFalse(viewModel.uiState.value.isRecording)
     }
 }

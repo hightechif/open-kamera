@@ -12,7 +12,7 @@ import app.cash.turbine.test
 import com.hightechif.openkamera.domain.engine.CameraEngineState
 import com.hightechif.openkamera.domain.engine.CaptureProgress
 import com.hightechif.openkamera.domain.engine.ICameraEngine
-import com.hightechif.openkamera.domain.engine.RemoteInputType
+import com.hightechif.openkamera.domain.engine.RemoteButton
 import com.hightechif.openkamera.remotecontrol.RemoteInputManagerImpl
 import com.hightechif.openkamera.domain.model.CaptureMode
 import com.hightechif.openkamera.domain.model.ExposureCompensation
@@ -153,21 +153,87 @@ class CameraViewModelUnitTest {
     }
 
     @Test
-    fun onShutterClicked_executesCaptureAndEmitsVibrate() = runTest(testDispatcher) {
-        coEvery { mockCapturePhotoUseCase(any()) } returns flowOf(
-            CaptureProgress.Processing(10),
-            CaptureProgress.Completed(jpegBytes = byteArrayOf(1, 2))
-        )
-
-        viewModel.uiEffect.test {
-            viewModel.capturePhoto()
-            advanceUntilIdle()
-
-            val effect = awaitItem()
-            assertTrue(effect is CameraUiEffect.Vibrate)
-            assertFalse(viewModel.uiState.value.isCapturing)
-            cancelAndIgnoreRemainingEvents()
+    fun onShutterClicked_emitsSingleTakePictureCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnShutterClicked)
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            expectNoEvents()
         }
+    }
+
+    @Test
+    fun shutterKeyAndAudioTrigger_emitTakePictureCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            viewModel.onEvent(CameraUiEvent.OnAudioTrigger)
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun shutterWhileBusy_stillEmitsCommand() = runTest(testDispatcher) {
+        viewModel.onLegacyCaptureStarted()
+        assertTrue(viewModel.uiState.value.isCapturing)
+
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnShutterClicked)
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+        }
+    }
+
+    @Test
+    fun videoSnapshot_emitsSnapshotCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnVideoSnapshotClicked)
+            assertEquals(CameraCommand.TakePicture(photoSnapshot = true), awaitItem())
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun continuousBurst_emitsBurstCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnContinuousBurstRequested)
+            assertEquals(CameraCommand.TakePicture(continuousFastBurst = true), awaitItem())
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun shutter_neverInvokesCapturePhotoUseCase() = runTest(testDispatcher) {
+        viewModel.onEvent(CameraUiEvent.OnShutterClicked)
+        viewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
+        viewModel.onEvent(CameraUiEvent.OnAudioTrigger)
+        viewModel.onEvent(CameraUiEvent.OnVideoSnapshotClicked)
+        viewModel.onEvent(CameraUiEvent.OnContinuousBurstRequested)
+        viewModel.onEvent(CameraUiEvent.OnRemoteCaptureTriggered)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { mockCapturePhotoUseCase(any()) }
+    }
+
+    @Test
+    fun commandsEmittedWithoutCollector_areNotReplayed() = runTest(testDispatcher) {
+        viewModel.onEvent(CameraUiEvent.OnShutterClicked)
+
+        viewModel.cameraCommands.test {
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun legacyCallbacks_driveCaptureState() = runTest(testDispatcher) {
+        assertEquals(CaptureProgress.Idle, viewModel.captureState.value)
+
+        viewModel.onLegacyCaptureStarted()
+        assertEquals(CaptureProgress.Starting, viewModel.captureState.value)
+        assertTrue(viewModel.uiState.value.isCapturing)
+
+        viewModel.onLegacyCaptureCompleted()
+        assertEquals(CaptureProgress.Idle, viewModel.captureState.value)
+        assertFalse(viewModel.uiState.value.isCapturing)
     }
 
     @Test
@@ -216,19 +282,16 @@ class CameraViewModelUnitTest {
     }
 
     @Test
-    fun videoRecording_pauseAndResume_updatesPausedState() = runTest(testDispatcher) {
-        coEvery { mockRecordVideoUseCase.pauseRecording() } returns Result.success(Unit)
-        coEvery { mockRecordVideoUseCase.resumeRecording() } returns Result.success(Unit)
-
-        viewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isVideoPaused)
-        coVerify { mockRecordVideoUseCase.pauseRecording() }
-
-        viewModel.onEvent(CameraUiEvent.OnResumeVideoRecordingClicked)
-        advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.isVideoPaused)
-        coVerify { mockRecordVideoUseCase.resumeRecording() }
+    fun videoRecording_pauseAndResume_emitsPauseResumeCommands() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
+            assertEquals(CameraCommand.PauseResumeVideo, awaitItem())
+            viewModel.onEvent(CameraUiEvent.OnResumeVideoRecordingClicked)
+            assertEquals(CameraCommand.PauseResumeVideo, awaitItem())
+            expectNoEvents()
+        }
+        coVerify(exactly = 0) { mockRecordVideoUseCase.pauseRecording() }
+        coVerify(exactly = 0) { mockRecordVideoUseCase.resumeRecording() }
     }
 
     @Test
@@ -299,9 +362,8 @@ class CameraViewModelUnitTest {
     }
 
     @Test
-    fun videoRecording_timerIncrementsWhileRecording() = runTest(testDispatcher) {
-        // Engine state transition into Recording triggers ticker
-        engineStateFlow.value = CameraEngineState.Recording
+    fun legacyVideoCallbacks_driveRecordingState() = runTest(testDispatcher) {
+        viewModel.onLegacyVideoStarted()
         testScheduler.runCurrent()
 
         assertTrue(viewModel.uiState.value.isRecording)
@@ -311,15 +373,20 @@ class CameraViewModelUnitTest {
         testScheduler.runCurrent()
         assertEquals(3L, viewModel.uiState.value.recordingDurationSeconds)
 
-        // Transition back to Ready stops and resets duration
-        engineStateFlow.value = CameraEngineState.Ready
+        viewModel.onLegacyVideoPaused(true)
+        assertTrue(viewModel.uiState.value.isVideoPaused)
+        advanceTimeBy(2000.milliseconds)
         testScheduler.runCurrent()
+        assertEquals(3L, viewModel.uiState.value.recordingDurationSeconds)
+
+        viewModel.onLegacyVideoStopped()
         assertFalse(viewModel.uiState.value.isRecording)
+        assertFalse(viewModel.uiState.value.isVideoPaused)
         assertEquals(0L, viewModel.uiState.value.recordingDurationSeconds)
     }
 
     @Test
-    fun remoteInputManager_shutterButton_triggersPhotoCapture() = runTest(testDispatcher) {
+    fun remoteInputManager_eachButton_emitsExactlyOneExpectedCommand() = runTest(testDispatcher) {
         val remoteInputManager = RemoteInputManagerImpl()
         val customViewModel = CameraViewModel(
             cameraEngine = mockCameraEngine,
@@ -337,21 +404,28 @@ class CameraViewModelUnitTest {
             remoteInputManager = remoteInputManager
         )
         testScheduler.runCurrent()
+        val stateBefore = customViewModel.uiState.value
 
-        remoteInputManager.dispatchInputEvent(RemoteInputType.SHUTTER_BUTTON)
-        testScheduler.runCurrent()
+        val expected = mapOf(
+            RemoteButton.SHUTTER to CameraCommand.RemoteShutter,
+            RemoteButton.MODE to CameraCommand.RemoteButton(RemoteButton.MODE),
+            RemoteButton.MENU to CameraCommand.RemoteButton(RemoteButton.MENU),
+            RemoteButton.UP to CameraCommand.RemoteButton(RemoteButton.UP),
+            RemoteButton.DOWN to CameraCommand.RemoteButton(RemoteButton.DOWN),
+            RemoteButton.AFMF to CameraCommand.RemoteButton(RemoteButton.AFMF)
+        )
+        customViewModel.cameraCommands.test {
+            expected.forEach { (button, command) ->
+                remoteInputManager.dispatchInputEvent(button)
+                testScheduler.runCurrent()
+                assertEquals("button $button", command, awaitItem())
+            }
+            expectNoEvents()
+        }
 
-        coVerify(atLeast = 1) { mockCapturePhotoUseCase(any()) }
-    }
-
-    @Test
-    fun takePicture_invokesCapturePhotoUseCase() = runTest(testDispatcher) {
-        coEvery { mockCapturePhotoUseCase(any()) } returns flowOf(CaptureProgress.Completed(byteArrayOf(1, 2)))
-
-        viewModel.takePicture()
-        testScheduler.runCurrent()
-
-        coVerify(atLeast = 1) { mockCapturePhotoUseCase(any()) }
+        assertEquals(stateBefore.zoomRatio, customViewModel.uiState.value.zoomRatio)
+        assertEquals(stateBefore.facing, customViewModel.uiState.value.facing)
+        coVerify(exactly = 0) { mockCapturePhotoUseCase(any()) }
     }
 
     @Test
