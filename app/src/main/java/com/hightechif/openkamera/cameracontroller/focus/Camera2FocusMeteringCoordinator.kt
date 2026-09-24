@@ -238,7 +238,7 @@ class Camera2FocusMeteringCoordinator(
             meteringRectangles[0].rect.right == sensorRect.width() - 1 &&
             meteringRectangles[0].rect.bottom == sensorRect.height() - 1
         ) {
-            // Default full-screen region is treated as null (consistent with CameraController1)
+            // Default full-screen region is treated as null (consistent with the old Camera1 behaviour)
             return null
         }
 

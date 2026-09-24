@@ -31,17 +31,17 @@ The camera preview streams directly into the underlying hardware texture buffer 
 
 ## Modular Renderers Architecture
 
-Rather than having a single massive drawing method inside `onDraw(canvas)`, OpenKamera splits HUD rendering into focused, testable components in [`ui/renderers/`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/):
+Rather than having a single massive drawing method inside `onDraw(canvas)`, OpenKamera splits HUD rendering into focused, testable components in [`ui/renderers/`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers):
 
 | Renderer | Responsibility |
 |---|---|
-| [`GridOverlayRenderer.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/GridOverlayRenderer.kt) | Draws compositional grid lines (3x3, golden ratio, phi). |
-| [`HistogramOverlayRenderer.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/HistogramOverlayRenderer.kt) | Draws live histogram curves over a dark translucent backdrop. |
-| [`HorizonAngleOverlayRenderer.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/HorizonAngleOverlayRenderer.kt) | Draws artificial horizon level lines reacting to gyro/accelerometer data. |
-| [`TelemetryHudOverlayRenderer.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/TelemetryHudOverlayRenderer.kt) | Draws text badges for ISO, exposure time, battery, and free storage space. |
-| [`CropGuideOverlayRenderer.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/CropGuideOverlayRenderer.kt) | Draws aspect ratio letterboxing crop masks. |
+| [`GridOverlayRenderer.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/GridOverlayRenderer.kt) | Draws compositional grid lines (3x3, golden ratio, phi). |
+| [`HistogramOverlayRenderer.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/HistogramOverlayRenderer.kt) | Draws live histogram curves over a dark translucent backdrop. |
+| [`HorizonAngleOverlayRenderer.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/HorizonAngleOverlayRenderer.kt) | Draws artificial horizon level lines reacting to gyro/accelerometer data. |
+| [`TelemetryHudOverlayRenderer.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/TelemetryHudOverlayRenderer.kt) | Draws text badges for ISO, exposure time, battery, and free storage space. |
+| [`CropGuideOverlayRenderer.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/CropGuideOverlayRenderer.kt) | Draws aspect ratio letterboxing crop masks. |
 
-All renderers share state through [`DrawPreviewContext`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/renderers/DrawPreviewContext.kt).
+All renderers share state through [`DrawPreviewContext`](../../app/src/main/java/com/hightechif/openkamera/ui/renderers/DrawPreviewContext.kt).
 
 ---
 

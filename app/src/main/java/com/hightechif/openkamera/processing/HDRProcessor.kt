@@ -546,7 +546,7 @@ class HDRProcessor(private val context: Context, private val isTest: Boolean) {
      * And we now need Android 5.0 (API level 21, Lollipop) for forEach_Dot with LaunchOptions.
      * Using the support libraries (set via project.properties renderscript.support.mode) would bloat the APK
      * by around 1799KB! We don't care about pre-Android 4.4 (HDR requires CameraController2 which requires
-     * Android 5.0 anyway; even if we later added support for CameraController1, we can simply say HDR requires
+     * Android 5.0 anyway; even if we later added support for the old Camera1 API, we can simply say HDR requires
      * Android 5.0).
      */
     private fun processHDRCore(

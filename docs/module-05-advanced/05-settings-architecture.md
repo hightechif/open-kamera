@@ -43,7 +43,7 @@ OpenKamera organizes settings into three clean layers:
 
 ## 1. Centralized Keys in `PreferenceKeys.kt`
 
-All preference strings and default values are centralized in [`PreferenceKeys.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/preferences/PreferenceKeys.kt):
+All preference strings and default values are centralized in [`PreferenceKeys.kt`](../../app/src/main/java/com/hightechif/openkamera/preferences/PreferenceKeys.kt):
 
 ```kotlin
 object PreferenceKeys {
@@ -60,7 +60,7 @@ object PreferenceKeys {
 
 ## 2. Domain Repositories
 
-Rather than passing raw shared preferences to domain use cases, settings are exposed through typed domain repositories in [`domain/repository/preferences/`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/domain/repository/preferences/):
+Rather than passing raw shared preferences to domain use cases, settings are exposed through typed domain repositories in [`domain/repository/preferences/`](../../app/src/main/java/com/hightechif/openkamera/domain/repository/preferences):
 
 ```kotlin
 interface PhotoPreferencesRepository {

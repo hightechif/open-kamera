@@ -29,7 +29,7 @@ Without a clear architecture, this complexity becomes unmanageable. OpenKamera a
 │                        Domain Layer                               │
 │  Use Cases, ICameraEngine, Domain Models, Repository Interfaces   │
 │  - Pure business logic (no Android framework dependencies)        │
-│  - Use cases: CapturePhotoUseCase, ZoomUseCase, etc.             │
+│  - Use cases: SetZoomUseCase, ToggleFlashUseCase, etc.           │
 │  - Interfaces: ICameraEngine, ISettingsRepository, etc.           │
 ├───────────────────────────────────────────────────────────────────┤
 │                         Data Layer                                │
@@ -55,11 +55,10 @@ com.hightechif.openkamera/
 │
 ├── cameracontroller/ # The Camera2 implementation layer (data layer)
 │   ├── Camera2EngineBridge.kt    # ICameraEngine adapter for Camera2
-│   ├── Camera2EngineImpl.kt      # Core Camera2 state management
 │   ├── Camera2PhotoPipeline.kt   # Photo capture state machine
 │   ├── Camera2VideoPipeline.kt   # Video recording orchestration
 │   ├── Camera2BurstCoordinator.kt# Burst counter state
-│   ├── CameraController.kt       # Abstract interface for Camera1/Camera2
+│   ├── CameraController.kt       # Abstract controller interface (implemented by CameraController2)
 │   ├── CameraController2.kt      # Full Camera2 HAL implementation
 │   └── capabilities/             # Feature detection (zoom, focus, flash)
 │
@@ -71,7 +70,7 @@ com.hightechif.openkamera/
 │   ├── interactor/   # Multi-use-case orchestrators
 │   ├── model/        # Data classes: CaptureConfig, FlashMode, etc.
 │   ├── repository/   # ISettingsRepository, ILocationRepository, etc.
-│   └── usecase/      # CapturePhotoUseCase, ZoomUseCase, etc.
+│   └── usecase/      # SetZoomUseCase, ToggleFlashUseCase, etc.
 │
 ├── lifecycle/        # Camera and orientation lifecycle coordinators
 ├── preferences/      # SharedPreferences keys, Settings UI fragments
@@ -102,7 +101,11 @@ abstract fun bindCameraEngine(impl: Camera2EngineBridge): ICameraEngine
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val cameraEngine: ICameraEngine,
-    private val capturePhotoUseCase: CapturePhotoUseCase,
+    private val adjustExposureUseCase: AdjustExposureUseCase,
+    private val toggleFlashUseCase: ToggleFlashUseCase,
+    private val setZoomUseCase: SetZoomUseCase,
+    private val tapToFocusUseCase: TapToFocusUseCase,
+    private val switchCameraFacingUseCase: SwitchCameraFacingUseCase,
     ...
 )
 ```

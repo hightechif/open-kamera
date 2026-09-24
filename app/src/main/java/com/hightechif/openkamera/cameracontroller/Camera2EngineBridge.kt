@@ -20,12 +20,9 @@ import com.hightechif.openkamera.cameracontroller.dispatcher.CaptureEventListene
 import com.hightechif.openkamera.di.DefaultDispatcher
 import com.hightechif.openkamera.di.IoDispatcher
 import com.hightechif.openkamera.domain.engine.CameraEngineState
-import com.hightechif.openkamera.domain.engine.CaptureProgress
-import com.hightechif.openkamera.domain.engine.IAudioController
 import com.hightechif.openkamera.domain.engine.ICameraEngine
 import com.hightechif.openkamera.domain.model.CameraFacing
 import com.hightechif.openkamera.domain.model.CameraFrameMetadata
-import com.hightechif.openkamera.domain.model.CaptureConfig
 import com.hightechif.openkamera.domain.model.ExposureCompensation
 import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.FocusState
@@ -40,14 +37,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -58,9 +50,10 @@ import kotlin.math.exp
  * - Backing [ICameraEngine] with the active [CameraController2] hardware instance
  * - Streaming real-time HAL metadata (ISO, exposure time, aperture, focus distance) via [frameMetadataFlow]
  * - Mapping AF mode and state transitions to domain [FocusState] via [focusStateFlow]
- * - Emitting reactive [engineStateFlow] reflecting preview, capturing, recording, and error states
+ * - Emitting reactive [engineStateFlow] reflecting the camera lifecycle (uninitialized, opening, ready)
  * - Calculating and streaming preview histogram telemetry via [histogramFlow]
- * - Routing domain use cases (CapturePhoto, RecordVideo, Zoom, Focus, Exposure) to the active controller
+ * - Routing domain control use cases (Zoom, Focus, Exposure, Flash) to the active controller.
+ *   Still capture and video recording are executed by the legacy pipeline, not by this bridge
  * - Eliminating dual-client Camera2 HAL contention
  *
  * 📖 Learn more: `docs/module-05-advanced/01-camera-engine-abstraction.md` and `02-reactive-metadata-flows.md`
@@ -69,7 +62,6 @@ import kotlin.math.exp
 class Camera2EngineBridge @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val previewSurfaceManager: PreviewSurfaceManager,
-    private val audioController: IAudioController,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher
 ) : ICameraEngine {
@@ -199,11 +191,7 @@ class Camera2EngineBridge @Inject constructor(
             if (MyDebug.LOG) Log.w(TAG, "Error initializing camera features: ${e.message}")
         }
 
-        _engineStateFlow.value = if (controller.videoPipeline.isRecording) {
-            CameraEngineState.Recording
-        } else {
-            CameraEngineState.Ready
-        }
+        _engineStateFlow.value = CameraEngineState.Ready
     }
 
     /**
@@ -276,146 +264,6 @@ class Camera2EngineBridge @Inject constructor(
             controller.stopPreview()
             _engineStateFlow.value = CameraEngineState.Ready
         }
-    }
-
-    override suspend fun captureStillImage(config: CaptureConfig): Flow<CaptureProgress> = flow {
-        emit(CaptureProgress.Starting)
-        val controller = activeController
-        if (controller == null) {
-            emit(CaptureProgress.Failed(IllegalStateException("No active CameraController2 attached to bridge")))
-            return@flow
-        }
-
-        _engineStateFlow.value = CameraEngineState.Capturing
-
-        var capturedJpeg: ByteArray? = null
-        var capturedRaw: ByteArray? = null
-
-        val result = suspendCancellableCoroutine { continuation ->
-            var resumed = false
-
-            val pictureCallback = object : CameraController.PictureCallback {
-                override fun onStarted() {}
-
-                override fun onPictureTaken(data: ByteArray) {
-                    capturedJpeg = data
-                }
-
-                override fun onRawPictureTaken(rawImage: RawImage?) {
-                    if (rawImage != null) {
-                        try {
-                            val byteStream = java.io.ByteArrayOutputStream()
-                            rawImage.writeImage(byteStream)
-                            capturedRaw = byteStream.toByteArray()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Error reading RAW image: ${e.message}")
-                        } finally {
-                            rawImage.close()
-                        }
-                    }
-                }
-
-                override fun onBurstPictureTaken(images: List<ByteArray>) {
-                    if (images.isNotEmpty()) {
-                        capturedJpeg = images.first()
-                    }
-                }
-
-                override fun onRawBurstPictureTaken(rawImages: List<RawImage>) {
-                    for (raw in rawImages) {
-                        raw.close()
-                    }
-                }
-
-                override fun onExtensionProgress(progress: Int) {}
-
-                override fun imageQueueWouldBlock(nRaw: Int, nJpegs: Int): Boolean = false
-
-                override fun onFrontScreenTurnOn() {}
-
-                override fun onCompleted() {
-                    if (!resumed) {
-                        resumed = true
-                        val jpeg = capturedJpeg
-                        if (jpeg != null) {
-                            continuation.resume(Result.success(Pair(jpeg, capturedRaw)))
-                        } else {
-                            continuation.resume(Result.failure(IllegalStateException("Picture callback completed without JPEG bytes")))
-                        }
-                    }
-                }
-            }
-
-            val errorCallback = object : CameraController.ErrorCallback {
-                override fun onError() {
-                    if (!resumed) {
-                        resumed = true
-                        continuation.resume(Result.failure(IllegalStateException("Photo capture failed in CameraController")))
-                    }
-                }
-            }
-
-            try {
-                controller.photoPipeline.initiate(pictureCallback, errorCallback)
-            } catch (e: Exception) {
-                if (!resumed) {
-                    resumed = true
-                    continuation.resume(Result.failure(e))
-                }
-            }
-        }
-
-        if (result.isSuccess) {
-            val (jpeg, raw) = result.getOrThrow()
-            emit(CaptureProgress.Completed(jpeg, raw))
-        } else {
-            emit(
-                CaptureProgress.Failed(
-                    result.exceptionOrNull() ?: IllegalStateException("Capture failed")
-                )
-            )
-        }
-
-        _engineStateFlow.value = if (controller.videoPipeline.isRecording) {
-            CameraEngineState.Recording
-        } else {
-            CameraEngineState.Ready
-        }
-    }.flowOn(ioDispatcher)
-
-    override suspend fun startVideoRecording(outputFile: File): Result<Unit> =
-        withContext(ioDispatcher) {
-            val controller = activeController
-                ?: return@withContext Result.failure(IllegalStateException("No active camera controller attached to bridge"))
-            val result = controller.videoPipeline.startRecording(outputFile)
-            if (result.isSuccess) {
-                audioController.playShutterSound()
-                _engineStateFlow.value = CameraEngineState.Recording
-            }
-            result
-        }
-
-    override suspend fun pauseVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
-        val controller = activeController
-            ?: return@withContext Result.failure(IllegalStateException("No active camera controller attached to bridge"))
-        controller.videoPipeline.pauseRecording()
-    }
-
-    override suspend fun resumeVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
-        val controller = activeController
-            ?: return@withContext Result.failure(IllegalStateException("No active camera controller attached to bridge"))
-        controller.videoPipeline.resumeRecording()
-    }
-
-    override suspend fun stopVideoRecording(): Result<Unit> = withContext(ioDispatcher) {
-        val controller = activeController
-            ?: return@withContext Result.failure(IllegalStateException("No active camera controller attached to bridge"))
-        val result = controller.videoPipeline.stopRecording()
-        if (result.isSuccess) {
-            audioController.playShutterSound()
-            _engineStateFlow.value = CameraEngineState.Ready
-        }
-        result
     }
 
     override suspend fun setZoom(zoomRatio: Float) = withContext(ioDispatcher) {

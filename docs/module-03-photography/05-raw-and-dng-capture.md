@@ -66,7 +66,7 @@ To capture RAW frames:
 
 ## Code Reference in OpenKamera
 
-- See [`CameraController2.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController2.kt):
+- See [`CameraController2.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController2.kt):
   - RAW `ImageReader` instantiation with `ImageFormat.RAW_SENSOR`.
   - Concurrent dispatch of JPEG and RAW buffers.
   - Integration with `DngCreator` for saving `.dng` files.

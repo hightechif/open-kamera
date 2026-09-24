@@ -41,7 +41,6 @@ data class CameraUiState(
     val frameMetadata: CameraFrameMetadata? = null,
     val isRawEnabled: Boolean = false,
     val timerSecondsRemaining: Int = 0,
-    val isStorageLow: Boolean = false,
     val isVideoPaused: Boolean = false,
     val errorMessage: String? = null
 )
@@ -59,7 +58,6 @@ sealed interface CameraUiEvent {
     object OnRecordVideoClicked : CameraUiEvent
     object OnPauseVideoRecordingClicked : CameraUiEvent
     object OnResumeVideoRecordingClicked : CameraUiEvent
-    object OnLowStorageDetected : CameraUiEvent
     object OnSwitchCameraClicked : CameraUiEvent
     object OnFlashModeToggleClicked : CameraUiEvent
     data class OnZoomChanged(val ratio: Float) : CameraUiEvent

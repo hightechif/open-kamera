@@ -47,7 +47,7 @@ Key reactive streams include:
 
 ## ViewModel Consumption & Lifecycle Safety
 
-In [`CameraViewModel.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt), these flows are consumed using structured coroutines:
+In [`CameraViewModel.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt), these flows are consumed using structured coroutines:
 
 ```kotlin
 viewModelScope.launch {

@@ -20,9 +20,7 @@ import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.domain.usecase.AdjustExposureUseCase
-import com.hightechif.openkamera.domain.usecase.CapturePhotoUseCase
 import com.hightechif.openkamera.domain.usecase.GetCameraCapabilitiesUseCase
-import com.hightechif.openkamera.domain.usecase.RecordVideoUseCase
 import com.hightechif.openkamera.domain.usecase.SetZoomUseCase
 import com.hightechif.openkamera.domain.usecase.SwitchCameraFacingUseCase
 import com.hightechif.openkamera.domain.usecase.TapToFocusUseCase
@@ -53,8 +51,6 @@ class MainActivityInteractionUnitTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private val mockCameraEngine = mockk<ICameraEngine>(relaxed = true)
-    private val mockCapturePhotoUseCase = mockk<CapturePhotoUseCase>(relaxed = true)
-    private val mockRecordVideoUseCase = mockk<RecordVideoUseCase>(relaxed = true)
     private val mockAdjustExposureUseCase = mockk<AdjustExposureUseCase>(relaxed = true)
     private val mockToggleFlashUseCase = mockk<ToggleFlashUseCase>(relaxed = true)
     private val mockSetZoomUseCase = mockk<SetZoomUseCase>(relaxed = true)
@@ -100,8 +96,6 @@ class MainActivityInteractionUnitTest {
 
         viewModel = CameraViewModel(
             cameraEngine = mockCameraEngine,
-            capturePhotoUseCase = mockCapturePhotoUseCase,
-            recordVideoUseCase = mockRecordVideoUseCase,
             adjustExposureUseCase = mockAdjustExposureUseCase,
             toggleFlashUseCase = mockToggleFlashUseCase,
             setZoomUseCase = mockSetZoomUseCase,

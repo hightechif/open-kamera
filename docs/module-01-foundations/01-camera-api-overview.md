@@ -56,7 +56,7 @@ OpenKamera uses Camera2 exclusively (via [`CameraController2.kt`](../../app/src/
 
 4. **Future-proofing** — Android's continued camera investment (CameraX, Camera Extensions) is built on Camera2's HAL3 foundation.
 
-> **Note on Camera1 legacy:** OpenKamera's codebase still contains [`CameraController1.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController1.kt), inherited from Open Camera. It implements the same `CameraController` interface as `CameraController2`, but it exists only for legacy device compatibility. All modern code paths use Camera2.
+> **Note on Camera1 legacy:** OpenKamera no longer ships a Camera1 implementation. The inherited `CameraController1` and `CameraControllerManager1` were removed because nothing in the app used them; the last commit that contains them is `ec680bf` (see "What was removed and why" in [Camera Engine Abstraction](../module-05-advanced/01-camera-engine-abstraction.md)). All code paths use Camera2. The comparison below is conceptual.
 
 ---
 

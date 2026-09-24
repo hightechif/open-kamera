@@ -23,9 +23,7 @@ import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.domain.usecase.AdjustExposureUseCase
-import com.hightechif.openkamera.domain.usecase.CapturePhotoUseCase
 import com.hightechif.openkamera.domain.usecase.GetCameraCapabilitiesUseCase
-import com.hightechif.openkamera.domain.usecase.RecordVideoUseCase
 import com.hightechif.openkamera.domain.usecase.SetZoomUseCase
 import com.hightechif.openkamera.domain.usecase.SwitchCameraFacingUseCase
 import com.hightechif.openkamera.domain.usecase.TapToFocusUseCase
@@ -38,7 +36,6 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -46,7 +43,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -60,8 +56,6 @@ class CameraViewModelUnitTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private val mockCameraEngine = mockk<ICameraEngine>(relaxed = true)
-    private val mockCapturePhotoUseCase = mockk<CapturePhotoUseCase>(relaxed = true)
-    private val mockRecordVideoUseCase = mockk<RecordVideoUseCase>(relaxed = true)
     private val mockAdjustExposureUseCase = mockk<AdjustExposureUseCase>(relaxed = true)
     private val mockToggleFlashUseCase = mockk<ToggleFlashUseCase>(relaxed = true)
     private val mockSetZoomUseCase = mockk<SetZoomUseCase>(relaxed = true)
@@ -106,8 +100,6 @@ class CameraViewModelUnitTest {
 
         viewModel = CameraViewModel(
             cameraEngine = mockCameraEngine,
-            capturePhotoUseCase = mockCapturePhotoUseCase,
-            recordVideoUseCase = mockRecordVideoUseCase,
             adjustExposureUseCase = mockAdjustExposureUseCase,
             toggleFlashUseCase = mockToggleFlashUseCase,
             setZoomUseCase = mockSetZoomUseCase,
@@ -202,19 +194,6 @@ class CameraViewModelUnitTest {
     }
 
     @Test
-    fun shutter_neverInvokesCapturePhotoUseCase() = runTest(testDispatcher) {
-        viewModel.onEvent(CameraUiEvent.OnShutterClicked)
-        viewModel.onEvent(CameraUiEvent.OnShutterKeyPressed)
-        viewModel.onEvent(CameraUiEvent.OnAudioTrigger)
-        viewModel.onEvent(CameraUiEvent.OnVideoSnapshotClicked)
-        viewModel.onEvent(CameraUiEvent.OnContinuousBurstRequested)
-        viewModel.onEvent(CameraUiEvent.OnRemoteCaptureTriggered)
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { mockCapturePhotoUseCase(any()) }
-    }
-
-    @Test
     fun commandsEmittedWithoutCollector_areNotReplayed() = runTest(testDispatcher) {
         viewModel.onEvent(CameraUiEvent.OnShutterClicked)
 
@@ -265,23 +244,6 @@ class CameraViewModelUnitTest {
     }
 
     @Test
-    fun videoRecording_startAndStopLifecycle_togglesRecordingState() = runTest(testDispatcher) {
-        val mockFile = mockk<File>(relaxed = true)
-        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockFile)
-        coEvery { mockRecordVideoUseCase.stopRecording(any(), any()) } returns Result.success(mockk(relaxed = true))
-
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isRecording)
-        coVerify { mockRecordVideoUseCase.startRecording() }
-
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
-        assertFalse(viewModel.uiState.value.isRecording)
-        coVerify { mockRecordVideoUseCase.stopRecording(any(), any()) }
-    }
-
-    @Test
     fun videoRecording_pauseAndResume_emitsPauseResumeCommands() = runTest(testDispatcher) {
         viewModel.cameraCommands.test {
             viewModel.onEvent(CameraUiEvent.OnPauseVideoRecordingClicked)
@@ -290,75 +252,32 @@ class CameraViewModelUnitTest {
             assertEquals(CameraCommand.PauseResumeVideo, awaitItem())
             expectNoEvents()
         }
-        coVerify(exactly = 0) { mockRecordVideoUseCase.pauseRecording() }
-        coVerify(exactly = 0) { mockRecordVideoUseCase.resumeRecording() }
     }
 
     @Test
     fun videoRecording_flashToggle_cyclesTorchModeDuringRecording() = runTest(testDispatcher) {
-        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockk(relaxed = true))
         coEvery { mockToggleFlashUseCase(FlashMode.TORCH) } returns FlashMode.TORCH
         coEvery { mockToggleFlashUseCase(FlashMode.OFF) } returns FlashMode.OFF
 
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
+        // The recording timer never goes idle, so use runCurrent() (not advanceUntilIdle())
+        viewModel.onLegacyVideoStarted()
+        testScheduler.runCurrent()
         assertTrue(viewModel.uiState.value.isRecording)
 
         // Toggling flash during recording should target TORCH
         viewModel.onEvent(CameraUiEvent.OnFlashModeToggleClicked)
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(FlashMode.TORCH, viewModel.uiState.value.flashMode)
         coVerify { mockToggleFlashUseCase(FlashMode.TORCH) }
 
         // Toggling flash again during recording should target OFF
         viewModel.onEvent(CameraUiEvent.OnFlashModeToggleClicked)
-        advanceUntilIdle()
+        testScheduler.runCurrent()
         assertEquals(FlashMode.OFF, viewModel.uiState.value.flashMode)
         coVerify { mockToggleFlashUseCase(FlashMode.OFF) }
-    }
 
-    @Test
-    fun videoRecording_lowStorage_blocksRecordingWhenSpaceCritical() = runTest(testDispatcher) {
-        // Critical threshold is 10MB; supply 5MB
-        coEvery { mockMediaRepository.getAvailableStorageBytes() } returns 5L * 1024 * 1024
-
-        viewModel.uiEffect.test {
-            viewModel.toggleVideoRecording()
-            advanceUntilIdle()
-
-            assertTrue(viewModel.uiState.value.isStorageLow)
-            assertFalse(viewModel.uiState.value.isRecording)
-            coVerify(exactly = 0) { mockRecordVideoUseCase.startRecording() }
-
-            val effect = awaitItem()
-            assertTrue(effect is CameraUiEffect.ShowToast)
-            assertEquals("Cannot record: Low storage space", (effect as CameraUiEffect.ShowToast).message)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun videoRecording_lowStorageInterruption_stopsActiveRecording() = runTest(testDispatcher) {
-        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockk(relaxed = true))
-        coEvery { mockRecordVideoUseCase.stopRecording(any(), any()) } returns Result.success(mockk(relaxed = true))
-
-        viewModel.toggleVideoRecording()
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isRecording)
-
-        viewModel.uiEffect.test {
-            viewModel.onEvent(CameraUiEvent.OnLowStorageDetected)
-            advanceUntilIdle()
-
-            assertFalse(viewModel.uiState.value.isRecording)
-            assertTrue(viewModel.uiState.value.isStorageLow)
-            coVerify { mockRecordVideoUseCase.stopRecording(any(), any()) }
-
-            val effect = awaitItem()
-            assertTrue(effect is CameraUiEffect.ShowToast)
-            assertEquals("Recording stopped: Low storage space", (effect as CameraUiEffect.ShowToast).message)
-            cancelAndIgnoreRemainingEvents()
-        }
+        // Cancel the endless timer so the test can finish
+        viewModel.onLegacyVideoStopped()
     }
 
     @Test
@@ -390,8 +309,6 @@ class CameraViewModelUnitTest {
         val remoteInputManager = RemoteInputManagerImpl()
         val customViewModel = CameraViewModel(
             cameraEngine = mockCameraEngine,
-            capturePhotoUseCase = mockCapturePhotoUseCase,
-            recordVideoUseCase = mockRecordVideoUseCase,
             adjustExposureUseCase = mockAdjustExposureUseCase,
             toggleFlashUseCase = mockToggleFlashUseCase,
             setZoomUseCase = mockSetZoomUseCase,
@@ -425,18 +342,17 @@ class CameraViewModelUnitTest {
 
         assertEquals(stateBefore.zoomRatio, customViewModel.uiState.value.zoomRatio)
         assertEquals(stateBefore.facing, customViewModel.uiState.value.facing)
-        coVerify(exactly = 0) { mockCapturePhotoUseCase(any()) }
     }
 
     @Test
-    fun toggleRecording_invokesRecordVideoUseCase() = runTest(testDispatcher) {
-        val mockFile = mockk<File>(relaxed = true)
-        coEvery { mockRecordVideoUseCase.startRecording() } returns Result.success(mockFile)
-
-        viewModel.toggleRecording()
-        testScheduler.runCurrent()
-
-        coVerify(atLeast = 1) { mockRecordVideoUseCase.startRecording() }
+    fun recordVideoClickAndToggleRecording_emitLegacyCommand() = runTest(testDispatcher) {
+        viewModel.cameraCommands.test {
+            viewModel.onEvent(CameraUiEvent.OnRecordVideoClicked)
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            viewModel.toggleRecording()
+            assertEquals(CameraCommand.TakePicture(), awaitItem())
+            expectNoEvents()
+        }
     }
 
     @Test

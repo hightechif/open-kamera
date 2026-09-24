@@ -19,7 +19,7 @@ Any production Android camera app must anticipate and work around these hardware
 
 ## Real-World Quirk Examples in OpenKamera
 
-OpenKamera isolates hardware compatibility logic in [`Camera2DeviceQuirks.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/extension/Camera2DeviceQuirks.kt):
+OpenKamera isolates hardware compatibility logic in [`Camera2DeviceQuirks.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/extension/Camera2DeviceQuirks.kt):
 
 ### 1. The Samsung Post-Capture AE Trigger Quirk
 On several Samsung Galaxy models running early Android versions, issuing an explicit `CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL` after taking a photo causes subsequent preview frames to freeze with underexposed parameters.

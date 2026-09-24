@@ -68,7 +68,7 @@ When transitioning from preview to still capture, the request switches from `TEM
 
 ## The Photo Pipeline State Machine
 
-OpenKamera isolates this complex orchestration in [`Camera2PhotoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt).
+OpenKamera isolates this complex orchestration in [`Camera2PhotoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt).
 
 The state machine manages:
 - **`STATE_NORMAL`**: Streaming live preview frames.
@@ -102,7 +102,7 @@ The state machine manages:
 
 ## Code Reference & Implementation in OpenKamera
 
-- Check out [`Camera2PhotoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt):
+- Check out [`Camera2PhotoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt):
   - `initiate()`: Entry point invoked when user requests a photo capture.
   - `runPrecapture()`: Triggers AE metering before still capture.
   - `takePictureAfterPrecapture()`: Dispatches the still capture request to the camera hardware.

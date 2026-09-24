@@ -74,7 +74,7 @@ The codebase is organized into modular packages under `com.hightechif.openkamera
 ```
 com.hightechif.openkamera/
 ├── audio/            # Audio trigger, speech recognition, and sound effects
-├── cameracontroller/ # Unified abstraction for Camera1 and Camera2 APIs
+├── cameracontroller/ # Camera2 controller, engine bridge and pipelines
 │   └── capabilities/ # Camera feature resolution (zoom, focus, flash, etc.)
 ├── di/               # Hilt dependency injection modules (camera, coroutines, prefs, etc.)
 ├── domain/           # Clean architecture domain layer

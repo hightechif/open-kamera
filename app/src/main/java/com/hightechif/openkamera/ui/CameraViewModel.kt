@@ -22,9 +22,7 @@ import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.domain.usecase.AdjustExposureUseCase
-import com.hightechif.openkamera.domain.usecase.CapturePhotoUseCase
 import com.hightechif.openkamera.domain.usecase.GetCameraCapabilitiesUseCase
-import com.hightechif.openkamera.domain.usecase.RecordVideoUseCase
 import com.hightechif.openkamera.domain.usecase.SetZoomUseCase
 import com.hightechif.openkamera.domain.usecase.SwitchCameraFacingUseCase
 import com.hightechif.openkamera.domain.usecase.TapToFocusUseCase
@@ -54,8 +52,6 @@ import kotlin.time.Duration.Companion.milliseconds
 @HiltViewModel
 class CameraViewModel @Inject constructor(
     private val cameraEngine: ICameraEngine,
-    private val capturePhotoUseCase: CapturePhotoUseCase,
-    private val recordVideoUseCase: RecordVideoUseCase,
     private val adjustExposureUseCase: AdjustExposureUseCase,
     private val toggleFlashUseCase: ToggleFlashUseCase,
     private val setZoomUseCase: SetZoomUseCase,
@@ -74,11 +70,6 @@ class CameraViewModel @Inject constructor(
 
     private val _captureState = MutableStateFlow<CaptureProgress>(CaptureProgress.Idle)
     val captureState: StateFlow<CaptureProgress> = _captureState.asStateFlow()
-
-    companion object {
-        const val LOW_STORAGE_THRESHOLD_BYTES = 50L * 1024 * 1024 // 50MB
-        const val CRITICAL_STORAGE_THRESHOLD_BYTES = 10L * 1024 * 1024 // 10MB
-    }
 
     private var recordingTimerJob: Job? = null
 
@@ -204,7 +195,7 @@ class CameraViewModel @Inject constructor(
     }
 
     fun toggleVideoRecording() {
-        handleRecordVideoClicked()
+        emitCommand(CameraCommand.TakePicture())
     }
 
     fun toggleRecording() {
@@ -259,10 +250,9 @@ class CameraViewModel @Inject constructor(
             is CameraUiEvent.OnVolumeKeyPressed -> {
                 // Volume key action dispatched based on configured preference
             }
-            is CameraUiEvent.OnRecordVideoClicked -> handleRecordVideoClicked()
+            is CameraUiEvent.OnRecordVideoClicked -> emitCommand(CameraCommand.TakePicture())
             is CameraUiEvent.OnPauseVideoRecordingClicked,
             is CameraUiEvent.OnResumeVideoRecordingClicked -> emitCommand(CameraCommand.PauseResumeVideo)
-            is CameraUiEvent.OnLowStorageDetected -> handleLowStorageInterruption()
             is CameraUiEvent.OnSwitchCameraClicked -> handleSwitchCameraClicked()
             is CameraUiEvent.OnFlashModeToggleClicked -> handleFlashToggleClicked()
             is CameraUiEvent.OnZoomChanged -> handleZoomChanged(event.ratio)
@@ -311,13 +301,6 @@ class CameraViewModel @Inject constructor(
                         state.copy(recordingDurationSeconds = state.recordingDurationSeconds + 1)
                     }
                 }
-                val availableBytes = mediaRepository.getAvailableStorageBytes()
-                if (availableBytes in 1L until CRITICAL_STORAGE_THRESHOLD_BYTES) {
-                    handleLowStorageInterruption()
-                    break
-                } else if (availableBytes in CRITICAL_STORAGE_THRESHOLD_BYTES until LOW_STORAGE_THRESHOLD_BYTES) {
-                    _uiState.update { it.copy(isStorageLow = true) }
-                }
             }
         }
     }
@@ -331,68 +314,6 @@ class CameraViewModel @Inject constructor(
 
     fun onLegacyVideoPaused(paused: Boolean) {
         _uiState.update { it.copy(isVideoPaused = paused) }
-    }
-
-    private fun handleRecordVideoClicked() {
-        viewModelScope.launch {
-            if (_uiState.value.isRecording) {
-                recordingTimerJob?.cancel()
-                val stopResult = recordVideoUseCase.stopRecording()
-                _uiState.update {
-                    it.copy(
-                        isRecording = false,
-                        isVideoPaused = false,
-                        recordingDurationSeconds = 0L
-                    )
-                }
-                if (stopResult.isSuccess) {
-                    _uiEffect.tryEmit(CameraUiEffect.ShowToast("Video saved"))
-                } else {
-                    _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to save video"))
-                }
-            } else {
-                val freeStorage = mediaRepository.getAvailableStorageBytes()
-                if (freeStorage in 1L until CRITICAL_STORAGE_THRESHOLD_BYTES) {
-                    _uiState.update { it.copy(isStorageLow = true) }
-                    _uiEffect.tryEmit(CameraUiEffect.ShowToast("Cannot record: Low storage space"))
-                    return@launch
-                }
-                val startResult = recordVideoUseCase.startRecording()
-                if (startResult.isSuccess) {
-                    _uiState.update {
-                        it.copy(
-                            isRecording = true,
-                            isVideoPaused = false,
-                            isStorageLow = freeStorage in CRITICAL_STORAGE_THRESHOLD_BYTES until LOW_STORAGE_THRESHOLD_BYTES
-                        )
-                    }
-                    _uiEffect.tryEmit(CameraUiEffect.Vibrate(100))
-                } else {
-                    _uiEffect.tryEmit(CameraUiEffect.ShowToast("Failed to start recording"))
-                }
-            }
-        }
-    }
-
-    private fun handleLowStorageInterruption() {
-        viewModelScope.launch {
-            if (_uiState.value.isRecording) {
-                recordingTimerJob?.cancel()
-                recordVideoUseCase.stopRecording()
-                _uiState.update {
-                    it.copy(
-                        isRecording = false,
-                        isVideoPaused = false,
-                        recordingDurationSeconds = 0L,
-                        isStorageLow = true
-                    )
-                }
-                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Recording stopped: Low storage space"))
-            } else {
-                _uiState.update { it.copy(isStorageLow = true) }
-                _uiEffect.tryEmit(CameraUiEffect.ShowToast("Storage space low"))
-            }
-        }
     }
 
     private fun handleSwitchCameraClicked() {

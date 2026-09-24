@@ -51,8 +51,8 @@ If the CPU or encoder becomes overwhelmed and drops frames, PTS ensures the vide
 
 ## Code Reference in OpenKamera
 
-- [`VideoProfile.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/preview/VideoProfile.kt): Stores `audioSource`, `audioChannels`, `audioBitRate`, and `audioSampleRate`.
-- [`Camera2VideoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2VideoPipeline.kt): Configures `MediaRecorder` audio settings before recording begins.
+- [`VideoProfile.kt`](../../app/src/main/java/com/hightechif/openkamera/preview/VideoProfile.kt): Stores `audioSource`, `audioChannels`, `audioBitRate`, and `audioSampleRate`.
+- [`Camera2VideoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2VideoPipeline.kt): Hooks into the legacy recording flow (recorder pre/post-prepare). `Preview.kt` applies the `MediaRecorder` audio settings from `VideoProfile` before recording begins.
 
 ---
 

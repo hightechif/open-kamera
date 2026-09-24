@@ -60,8 +60,8 @@ Common tone-mapping techniques:
 ## Implementation in OpenKamera
 
 OpenKamera performs HDR processing via:
-- [`HDRProcessor.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/processing/HDRProcessor.kt): Coordinates multi-frame acquisition, downsampling, alignment pyramids, and invokes rendering algorithms.
-- [`JavaImageFunctionsHDR.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/processing/JavaImageFunctionsHDR.kt): Provides pure CPU fallback implementations for pixel blending, histogram analysis, and tone curve computations when GPU/RenderScript acceleration is unavailable or during background testing.
+- [`HDRProcessor.kt`](../../app/src/main/java/com/hightechif/openkamera/processing/HDRProcessor.kt): Coordinates multi-frame acquisition, downsampling, alignment pyramids, and invokes rendering algorithms.
+- [`JavaImageFunctionsHDR.kt`](../../app/src/main/java/com/hightechif/openkamera/processing/JavaImageFunctionsHDR.kt): Provides pure CPU fallback implementations for pixel blending, histogram analysis, and tone curve computations when GPU/RenderScript acceleration is unavailable or during background testing.
 
 ---
 
