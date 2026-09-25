@@ -896,6 +896,7 @@
     <string name="preference_camera_api_summary">Select Camera2 API to enable extra features such as manual modes for exposure, focus, white balance, along with RAW (if supported by the device). Changing the API will cause a restart.\n%s</string>
     <string name="preference_camera_api_old">Original camera API</string>
     <string name="preference_camera_api_camera2">Camera2 API</string>
+    <string name="camera1_fallback_notice">Using the original camera API (no manual controls or RAW).</string>
 
     <string name="preference_audio_control_summary">Take photo/video when a noise is detected.
         When enabled, use the on-screen microphone button to start/stop listening.

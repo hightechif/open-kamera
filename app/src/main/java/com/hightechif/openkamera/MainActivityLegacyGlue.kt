@@ -70,6 +70,7 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
@@ -95,6 +96,7 @@ import com.hightechif.openkamera.domain.repository.ISettingsRepository
 import com.hightechif.openkamera.lifecycle.CameraLifecycleCoordinator
 import com.hightechif.openkamera.lifecycle.OrientationLifecycleManager
 import com.hightechif.openkamera.preferences.MyPreferenceFragment
+import com.hightechif.openkamera.preferences.CameraApiSelection
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preferences.SettingsManager
 import com.hightechif.openkamera.preview.Preview
@@ -198,6 +200,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
     private var supportsAutoStabilise = false
     private var supportsForceVideo4k = false
     private var supportsCamera2 = false
+    // true if every camera has at least LIMITED support for Camera2 (see the camera-api-selection spec)
+    private var allCamerasSupportCamera2 = false
     lateinit var saveLocationHandler: SaveLocationHandler
     val saveLocationHistory: SaveLocationHistory
         get() = saveLocationHandler.saveLocationHistory
@@ -502,6 +506,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
         // set up the camera and its preview
         preview = Preview(applicationInterface, (this.findViewById(R.id.preview)))
+        logCameraApiChoice()
         if (MyDebug.LOG)
             Log.d(
                 TAG,
@@ -774,8 +779,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         if (isMultiCamEnabled) {
             val cameraId = actualCameraId
             when (preview.cameraControllerManager.getFacing(cameraId)) {
-                CameraController.Facing.FACING_BACK -> if (backCameraIds.size > 1) return true
-                CameraController.Facing.FACING_FRONT -> if (frontCameraIds.size > 1) return true
+                Facing.FACING_BACK -> if (backCameraIds.size > 1) return true
+                Facing.FACING_FRONT -> if (frontCameraIds.size > 1) return true
                 else -> {}
             }
         }
@@ -840,50 +845,8 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                 putBoolean(PreferenceKeys.CAMERA2_FAST_BURST_PREFERENCE_KEY, false)
             }
         }
-        if (supportsCamera2 && !isTest) {
-            // n.b., when testing, we explicitly decide whether to run with Camera2 API or not
-            val manager2 = CameraControllerManager2(this)
-            val nCameras: Int = manager2.numberOfCameras
-            var allSupportsCamera2 =
-                true // whether all cameras have at least LIMITED support for Camera2 (risky to default to Camera2 if any cameras are LEGACY, as not easy to test such devices)
-            var i = 0
-            while (i < nCameras && allSupportsCamera2) {
-                if (!manager2.allowCamera2Support(i)) {
-                    if (MyDebug.LOG) Log.d(
-                        TAG,
-                        "camera $i doesn't have at least LIMITED support for Camera2 API"
-                    )
-                    allSupportsCamera2 = false
-                }
-                i++
-            }
-
-            if (allSupportsCamera2) {
-                var defaultToCamera2 = false
-                val isGoogle = Build.MANUFACTURER.lowercase().contains("google")
-                val isNokia = Build.MANUFACTURER.lowercase().contains("hmd global")
-                val isOneplus = Build.MANUFACTURER.lowercase().contains("oneplus")
-                if (isGoogle && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) defaultToCamera2 =
-                    true
-                else if (isNokia && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) defaultToCamera2 =
-                    true
-                else if (isSamsung && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) defaultToCamera2 =
-                    true
-                else if (isOneplus && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) defaultToCamera2 =
-                    true
-
-                if (defaultToCamera2) {
-                    if (MyDebug.LOG) Log.d(TAG, "default to camera2 API")
-                    val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
-                    sharedPreferences.edit {
-                        putString(
-                            PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-                            "preference_camera_api_camera2"
-                        )
-                    }
-                }
-            }
-        }
+        // n.b. no per-manufacturer defaulting of the Camera API preference: the default depends on the hardware
+        // (see CameraApiSelection and the camera-api-selection spec).
     }
 
     /** Switches modes if required, if called from a relevant intent/tile.
@@ -986,6 +949,25 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
         }
     }
 
+    /** Logs which camera API is in use and why, and on the Camera1 fallback shows a one-time notice that
+     * manual controls and RAW need Camera2-capable hardware (see the camera-api-selection spec).
+     */
+    private fun logCameraApiChoice() {
+        val choice = applicationInterface.cameraApiChoice()
+        Log.i(TAG, CameraApiSelection.describe(choice))
+        val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        val alreadyShown = sharedPreferences.getBoolean(
+            PreferenceKeys.CAMERA1_NOTICE_SHOWN_PREFERENCE_KEY,
+            false
+        )
+        if (CameraApiSelection.shouldShowCamera1Notice(choice, alreadyShown)) {
+            Toast.makeText(this, R.string.camera1_fallback_notice, Toast.LENGTH_LONG).show()
+            sharedPreferences.edit {
+                putBoolean(PreferenceKeys.CAMERA1_NOTICE_SHOWN_PREFERENCE_KEY, true)
+            }
+        }
+    }
+
     /** Determine whether we support Camera2 API.
      */
     private fun initCamera2Support() {
@@ -1003,23 +985,30 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                 if (MyDebug.LOG) Log.d(TAG, "Camera2 reports 0 cameras")
                 supportsCamera2 = false
             }
-            var i = 0
-            while (i < nCameras && !supportsCamera2) {
+            // Check every camera: supportsCamera2 needs at least one camera with LIMITED or better support,
+            // allCamerasSupportCamera2 needs all of them. Only then do we default to Camera2, as it is risky to run a
+            // LEGACY camera on Camera2 (see the camera-api-selection spec).
+            var nLimited = 0
+            for (i in 0 until nCameras) {
                 if (manager2.allowCamera2Support(i)) {
                     if (MyDebug.LOG) Log.d(
                         TAG,
                         "camera $i has at least limited support for Camera2 API"
                     )
-                    supportsCamera2 = true
+                    nLimited++
+                } else if (MyDebug.LOG) {
+                    Log.d(TAG, "camera $i doesn't have at least LIMITED support for Camera2 API")
                 }
-                i++
             }
+            supportsCamera2 = nLimited > 0
+            allCamerasSupportCamera2 = nCameras > 0 && nLimited == nCameras
         }
 
         //testForceSupportsCamera2 = true // test
         if (testForceSupportsCamera2) {
             if (MyDebug.LOG) Log.d(TAG, "forcing supports_camera2")
             supportsCamera2 = true
+            allCamerasSupportCamera2 = true
         }
 
         if (MyDebug.LOG) Log.d(
@@ -1549,7 +1538,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                     TAG,
                     "front_facing: $frontFacing"
                 )
-                if ((cameraControllerManager.numberOfCameras ?: 0) > 2 || cameraIdSPhysical != null
+                if (cameraControllerManager.numberOfCameras > 2 || cameraIdSPhysical != null
                 ) {
                     var cameraIsDefault = true
                     if (cameraIdSPhysical != null) cameraIsDefault = false
@@ -3312,9 +3301,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
             TAG,
             "enablePopupOnBackPressedCallback: $enabled"
         )
-        if (popupOnBackPressedCallback != null) {
-            popupOnBackPressedCallback!!.isEnabled = enabled
-        }
+        popupOnBackPressedCallback.isEnabled = enabled
     }
 
     private lateinit var pausePreviewOnBackPressedCallback: PausePreviewOnBackPressedCallback
@@ -3345,9 +3332,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
             TAG,
             "enablePausePreviewOnBackPressedCallback: $enabled"
         )
-        if (pausePreviewOnBackPressedCallback != null) {
-            pausePreviewOnBackPressedCallback!!.isEnabled = enabled
-        }
+        pausePreviewOnBackPressedCallback.isEnabled = enabled
     }
 
     private lateinit var screenLockOnBackPressedCallback: ScreenLockOnBackPressedCallback
@@ -3376,9 +3361,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
             TAG,
             "enableScreenLockOnBackPressedCallback: $enabled"
         )
-        if (screenLockOnBackPressedCallback != null) {
-            screenLockOnBackPressedCallback!!.isEnabled = enabled
-        }
+        screenLockOnBackPressedCallback.isEnabled = enabled
     }
 
     // should no longer use onBackPressed() - instead use OnBackPressedCallback, for upcoming changes in Android 14+ (predictive back gestures)
@@ -4291,7 +4274,7 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
                     // check for getContentResolver() != null, as have had reported Google Play crashes
 
                     uri = media.getMediaStoreUri(this@MainActivityLegacyGlue)
-                    isRaw = media.filename != null && StorageUtils.filenameIsRaw(media.filename)
+                    isRaw = media.filename.isNotEmpty() && StorageUtils.filenameIsRaw(media.filename)
                     isVideo = media.video
 
                     if (ghostImageLast && !media.video) {
@@ -5944,6 +5927,11 @@ abstract class MainActivityLegacyGlue : AppCompatActivity(),
 
     fun supportsCamera2(): Boolean {
         return this.supportsCamera2
+    }
+
+    /** Whether every camera has at least LIMITED support for Camera2 (see the camera-api-selection spec). */
+    fun allCamerasSupportCamera2(): Boolean {
+        return this.allCamerasSupportCamera2
     }
 
     private fun disableForceVideo4K() {

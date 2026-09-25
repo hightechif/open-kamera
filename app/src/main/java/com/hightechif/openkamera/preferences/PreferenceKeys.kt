@@ -45,8 +45,11 @@ object PreferenceKeys {
      */
     const val MAGNETIC_ACCURACY_PREFERENCE_KEY: String = "done_magnetic_accuracy"
 
-    const val CAMERA_API_PREFERENCE_DEFAULT: String = "preference_camera_api_old"
+    const val CAMERA_API_PREFERENCE_OLD: String = "preference_camera_api_old"
+    const val CAMERA_API_PREFERENCE_CAMERA2: String = "preference_camera_api_camera2"
+    // n.b. no CAMERA_API_PREFERENCE_DEFAULT: the default depends on the hardware (see CameraApiSelection)
     const val CAMERA_API_PREFERENCE_KEY: String = "preference_camera_api"
+    const val CAMERA1_NOTICE_SHOWN_PREFERENCE_KEY: String = "preference_camera1_notice_shown"
 
     private fun getCameraIDKey(cameraId: Int, cameraIdSPhysical: String?): String {
         return if (cameraIdSPhysical != null) cameraId.toString() + "_" + cameraIdSPhysical

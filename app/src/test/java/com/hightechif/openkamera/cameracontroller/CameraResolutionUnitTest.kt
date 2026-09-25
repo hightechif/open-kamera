@@ -272,4 +272,47 @@ class CameraResolutionUnitTest {
             )
         )
     }
+
+    @Test
+    fun testCameraController1CreateInstance() {
+        val dummyCb = object : CameraController.ErrorCallback {
+            override fun onError() {}
+        }
+        var caught1 = false
+        try {
+            CameraController1.createInstance(0, dummyCb)
+        } catch (e: Throwable) {
+            caught1 = e is CameraControllerException || e is RuntimeException
+        }
+        assertTrue(
+            "createInstance call 1 should throw CameraControllerException or RuntimeException when hardware camera is unmocked",
+            caught1
+        )
+
+        var caught2 = false
+        try {
+            CameraController1.createInstance(0, dummyCb)
+        } catch (e: Throwable) {
+            caught2 = e is CameraControllerException || e is RuntimeException
+        }
+        assertTrue(
+            "createInstance call 2 should throw CameraControllerException or RuntimeException when hardware camera is unmocked",
+            caught2
+        )
+    }
+
+    @Test
+    fun testCameraController1Nullability() {
+        val sceneModeMethod = CameraController1::class.java.getMethod("getSceneMode")
+        assertEquals(String::class.java, sceneModeMethod.returnType)
+
+        val colorEffectMethod = CameraController1::class.java.getMethod("getColorEffect")
+        assertEquals(String::class.java, colorEffectMethod.returnType)
+
+        val whiteBalanceMethod = CameraController1::class.java.getMethod("getWhiteBalance")
+        assertEquals(String::class.java, whiteBalanceMethod.returnType)
+
+        val antiBandingMethod = CameraController1::class.java.getMethod("getAntiBanding")
+        assertEquals(String::class.java, antiBandingMethod.returnType)
+    }
 }

@@ -32,9 +32,9 @@ import android.system.Os
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import com.hightechif.openkamera.MainActivity
 import com.hightechif.openkamera.MyApplicationInterface
 import com.hightechif.openkamera.preferences.PreferenceKeys
+import com.hightechif.openkamera.useScopedStorage
 import com.hightechif.openkamera.utils.MyDebug
 import java.io.File
 import java.io.FileNotFoundException
@@ -44,7 +44,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.concurrent.Volatile
-import com.hightechif.openkamera.useScopedStorage
 
 //import android.content.ContentValues;
 //import android.location.Location;

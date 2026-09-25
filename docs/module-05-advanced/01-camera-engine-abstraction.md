@@ -85,19 +85,39 @@ Before this change, one `KEYCODE_HEADSETHOOK` press called the ViewModel *and* t
 
 ---
 
+## The Bridge and the Camera1 Fallback
+
+`Camera2EngineBridge` only ever wraps a `CameraController2`. When OpenKamera falls back to Camera1 (see [Choosing Camera1 or Camera2](../module-01-foundations/01-camera-api-overview.md#choosing-camera1-or-camera2-in-openkamera)), `Preview` never attaches a controller to the bridge. The bridge then degrades quietly:
+
+- Every control (`setZoom`, `setManualFocus`, `unlockFocus`, `setExposureCompensation`, `setFlashMode`) returns without doing anything.
+- `frameMetadataFlow`, `focusStateFlow` and the histogram keep their default values, because Camera1 has no `TotalCaptureResult`.
+- Capture and recording are unaffected. They run through the legacy pipeline, which works with either controller.
+
+This is a deliberate trade-off: the reactive layer is a Camera2 feature, and the fallback exists for devices where Camera2 is not worth using.
+
+## Maintaining the Fallback
+
+Keeping ~1,900 lines of Camera1 code alive is only safe if it cannot silently drift away from `CameraController2`. Two guards enforce this:
+
+1. **The compiler.** `CameraController1` extends the abstract `CameraController`. Adding an abstract member to it breaks the build until Camera1 implements it.
+2. **`Camera1ApiParityTest`.** For members with a default implementation in `CameraController` that `CameraController2` overrides, the test requires `CameraController1` to override them too, or the member must be listed in the test's allow-list **with a reason** (for example "Camera1 has no per-frame capture result"). A new Camera2-only behavior therefore fails the test until someone decides, on purpose, whether Camera1 needs it.
+
+When you change `CameraController`, ask: does Camera1 need this too?
+
+---
+
 ## What Was Removed and Why
 
-Earlier versions of this repo contained a second, parallel implementation of the same ideas. None of it ran in the app, so it was deleted:
+Earlier versions of this repo contained a second, parallel implementation of the same ideas. None of it ran in the app, so it was deleted. (The Camera1 controller was briefly deleted too, then restored as an isolated fallback; see above.)
 
-| Removed | Why it was dead |
-|---|---|
-| `Camera2EngineImpl` | A second `ICameraEngine`; only its own tests used it. `Camera2EngineBridge` is the real one. |
-| `CameraController1`, `CameraControllerManager1` | The Camera1 controller inherited from Open Camera. Nothing created it. |
-| `CapturePhotoUseCase`, `RecordVideoUseCase`, `ProcessHdrUseCase`, `ProcessPanoramaUseCase` | A domain capture path that the ViewModel no longer called once shutter intents became `CameraCommand`s. |
-| `IImageProcessor`, `ImageProcessorImpl`, `MediaProcessingWorker` | Support code for those use cases. |
-| Engine methods `captureStillImage` and `start/pause/resume/stopVideoRecording`, and the matching `Camera2VideoPipeline` recording lifecycle | No caller left. |
+| Removed                                                                                                                                     | Why it was dead                                                                                         |
+|---------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `Camera2EngineImpl`                                                                                                                         | A second `ICameraEngine`; only its own tests used it. `Camera2EngineBridge` is the real one.            |
+| `CapturePhotoUseCase`, `RecordVideoUseCase`, `ProcessHdrUseCase`, `ProcessPanoramaUseCase`                                                  | A domain capture path that the ViewModel no longer called once shutter intents became `CameraCommand`s. |
+| `IImageProcessor`, `ImageProcessorImpl`, `MediaProcessingWorker`                                                                            | Support code for those use cases.                                                                       |
+| Engine methods `captureStillImage` and `start/pause/resume/stopVideoRecording`, and the matching `Camera2VideoPipeline` recording lifecycle | No caller left.                                                                                         |
 
-**Why this matters for learners:** code that looks clean but never runs is the most misleading thing in a codebase. You read a tidy class, learn its design, and then discover the app does something else. Pruning keeps every remaining class one you can follow to a real caller. When a real parity migration happens, the domain path should be rebuilt against the legacy behaviour rather than revived.
+**Why this matters for learners:** code that looks clean but never runs is the most misleading thing in a codebase. You read a tidy class, learn its design, and then discover the app does something else. Pruning keeps every remaining class one you can follow to a real caller. When a real parity migration happens, the domain path should be rebuilt against the legacy behavior rather than revived.
 
 **Finding it again:** everything is in git history. The last commit that contains all of the above is `ec680bf`; for example `git show ec680bf:app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2EngineImpl.kt`.
 

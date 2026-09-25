@@ -360,7 +360,9 @@ class MyPreferenceFragment : PreferenceFragment(), OnSharedPreferenceChangeListe
                 cameraApiValues.toTypedArray<String>(),
                 cameraApiEntries.toTypedArray<String>(),
                 "preference_camera_api",
-                PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT,
+                // readFromBundle persists the value it shows, so with nothing stored show the API currently in use:
+                // opening settings must never switch the API (see the camera-api-selection spec)
+                if (usingAndroidL) PreferenceKeys.CAMERA_API_PREFERENCE_CAMERA2 else PreferenceKeys.CAMERA_API_PREFERENCE_OLD,
                 "preference_category_online"
             )
             if (cameraApiValues.size >= 2) {

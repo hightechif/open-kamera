@@ -162,4 +162,23 @@ class Camera2EngineBridgeTest {
         verify { mockController.cancelAutoFocus() }
         assertTrue(bridge.focusStateFlow.value is FocusState.Idle)
     }
+
+    @Test
+    fun controlsWithoutActiveController_areNoOps() = runTest(testDispatcher) {
+        // Camera1 fallback: Preview never attaches a CameraController2, so the bridge has no active controller
+        assertNull(bridge.activeController)
+        val metadataBefore = bridge.frameMetadataFlow.value
+
+        bridge.setZoom(2.0f)
+        bridge.setManualFocus(android.graphics.PointF(0.5f, 0.5f))
+        bridge.unlockFocus()
+        bridge.setExposureCompensation(1)
+        bridge.setFlashMode(FlashMode.ON)
+        bridge.startPreview()
+        bridge.stopPreview()
+
+        assertNull(bridge.activeController)
+        assertEquals(metadataBefore, bridge.frameMetadataFlow.value)
+        assertEquals(CameraEngineState.Uninitialized, bridge.engineStateFlow.value)
+    }
 }

@@ -58,7 +58,8 @@ import java.util.Locale
 object TestUtils {
     private const val TAG = "TestUtils"
 
-    const val TEST_CAMERA2 = false
+    // true: run the instrumented suite on Camera2; false: on the Camera1 fallback (see the camera-api-selection spec)
+    const val TEST_CAMERA2 = true
 
     private val images_base_path =
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
@@ -92,11 +93,12 @@ object TestUtils {
         val settings: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
         val editor = settings.edit()
         editor.clear()
-        if (TEST_CAMERA2) {
-            editor.putString(
-                PreferenceKeys.CAMERA_API_PREFERENCE_KEY, "preference_camera_api_camera2"
-            )
-        }
+        // Always store the API explicitly: with nothing stored, the hardware decides (see CameraApiSelection), so a
+        // test run would otherwise depend on the device's camera hardware levels.
+        editor.putString(
+            PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
+            if (TEST_CAMERA2) PreferenceKeys.CAMERA_API_PREFERENCE_CAMERA2 else PreferenceKeys.CAMERA_API_PREFERENCE_OLD
+        )
         editor.apply()
 
         Log.d(TAG, "initTest: done")
