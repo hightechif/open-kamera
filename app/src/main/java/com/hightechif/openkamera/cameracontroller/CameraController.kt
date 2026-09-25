@@ -359,7 +359,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
         fun onFrontScreenTurnOn()
     }
 
-    /** Interface to define callback for autofocus completing. This callback may be called on the UI thread (CameraController1)
+    /** Interface to define callback for autofocus completing. This callback may be called on the UI thread (the removed Camera1 controller)
      * or a background thread (CameraController2).
      */
     interface AutoFocusCallback {
@@ -367,7 +367,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
     }
 
     /** Interface to define callback for continuous focus starting/stopping. This callback may be called on the
-     * UI thread (CameraController1) or a background thread (CameraController2).
+     * UI thread (as in the old Camera1 API) or a background thread (CameraController2).
      */
     interface ContinuousFocusMoveCallback {
         fun onContinuousFocusMove(start: Boolean)
@@ -624,7 +624,7 @@ abstract class CameraController internal constructor(val cameraId: Int) {
     /** Set the zoom. Unlike setZoom(value), this allows specifying any zoom level within the
      * supported range.
      * @param value The index into the CameraFeatures.zoomRatios array.
-     * @param smoothZoom The desired zoom. With CameraController1 (old Camera API), this is ignored.
+     * @param smoothZoom The desired zoom. With the old Camera1 API, this is ignored.
      * With CameraController2 (Camera2 API), this is used instead of the zoomRatios
      * value. Note that getZoom() will return the value passed to this method, so
      * passing an appropriate value (e.g., whatever zoomRatio is closest to the

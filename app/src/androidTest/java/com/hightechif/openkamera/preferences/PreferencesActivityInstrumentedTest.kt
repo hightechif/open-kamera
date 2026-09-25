@@ -53,11 +53,12 @@ class PreferencesActivityInstrumentedTest : BaseInstrumentedTest() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
         assertNotNull(prefs)
 
-        // Verify camera API default
-        val apiPref = prefs.getString(
-            PreferenceKeys.CAMERA_API_PREFERENCE_KEY,
-            PreferenceKeys.CAMERA_API_PREFERENCE_DEFAULT
-        )
-        assertNotNull(apiPref)
+        // The camera API has no fixed default: it is either stored (TestUtils stores it) or decided by the hardware
+        val apiPref = prefs.getString(PreferenceKeys.CAMERA_API_PREFERENCE_KEY, null)
+        if (apiPref != null) {
+            assertTrue(
+                apiPref == PreferenceKeys.CAMERA_API_PREFERENCE_CAMERA2 || apiPref == PreferenceKeys.CAMERA_API_PREFERENCE_OLD
+            )
+        }
     }
 }

@@ -45,13 +45,13 @@ OpenKamera implements a **Fake Precapture Routine**:
 3. Fire the still capture.
 4. Turn off torch mode and restore preview state.
 
-This logic is coordinated inside [`Camera2PhotoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt).
+This logic is coordinated inside [`Camera2PhotoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt).
 
 ---
 
 ## Code Reference in OpenKamera
 
-- [`Camera2PhotoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt):
+- [`Camera2PhotoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt):
   - `runPrecapture()`: Dispatches `CONTROL_AE_PRECAPTURE_TRIGGER_START`.
   - `runFakePrecapture()`: Activates torch mode and initializes frame count tracking.
   - `onCaptureResultReceived()`: Checks `CaptureResult.CONTROL_AE_STATE` for convergence.

@@ -60,6 +60,7 @@ import androidx.core.graphics.createBitmap
 import com.hightechif.openkamera.R
 import com.hightechif.openkamera.TakePhoto
 import com.hightechif.openkamera.cameracontroller.CameraController
+import com.hightechif.openkamera.cameracontroller.CameraController1
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeatures
 import com.hightechif.openkamera.cameracontroller.CameraController.CameraFeaturesCache
 import com.hightechif.openkamera.cameracontroller.CameraController.Facing
@@ -68,6 +69,7 @@ import com.hightechif.openkamera.cameracontroller.CameraController.TonemapProfil
 import com.hightechif.openkamera.cameracontroller.CameraController2
 import com.hightechif.openkamera.cameracontroller.CameraControllerException
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager
+import com.hightechif.openkamera.cameracontroller.CameraControllerManager1
 import com.hightechif.openkamera.cameracontroller.CameraControllerManager2
 import com.hightechif.openkamera.cameracontroller.RawImage
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
@@ -78,6 +80,7 @@ import com.hightechif.openkamera.preview.analysis.PreShotsRingBuffer
 import com.hightechif.openkamera.preview.analysis.PreviewFrameAnalyzer
 import com.hightechif.openkamera.preview.camerasurface.CameraSurface
 import com.hightechif.openkamera.preview.camerasurface.MyTextureView
+import com.hightechif.openkamera.preview.camerasurface.MySurfaceView
 import com.hightechif.openkamera.preview.camerasurface.PreviewSurfaceManager
 import com.hightechif.openkamera.preview.faces.PreviewFaceDetectionEngine
 import com.hightechif.openkamera.preview.geometry.ViewportTransformHelper
@@ -1762,16 +1765,23 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
                         applicationInterface.onFailedStartPreview()
                     }
                 }
-            cameraControllerLocal = CameraController2(
-                this@Preview.context,
-                cameraId,
-                cameraIdSPhysical,
-                cameraFeaturesCaches,
-                previewErrorCallback,
-                cameraErrorCallback
-            )
-            if (applicationInterface.useCamera2FakeFlash()) {
-                cameraControllerLocal.useCamera2FakeFlash = true
+            if (usingAndroidL) {
+                cameraControllerLocal = CameraController2(
+                    this@Preview.context,
+                    cameraId,
+                    cameraIdSPhysical,
+                    cameraFeaturesCaches,
+                    previewErrorCallback,
+                    cameraErrorCallback
+                )
+                if (applicationInterface.useCamera2FakeFlash()) {
+                    cameraControllerLocal.useCamera2FakeFlash = true
+                }
+            } else {
+                // Camera1 fallback: no camera with LIMITED+ Camera2 support, or the user chose the old API
+                // (see the camera-api-selection spec)
+                cameraControllerLocal =
+                    CameraController1.createInstance(cameraId, cameraErrorCallback)
             }
             //throw new CameraControllerException; // uncomment to test camera not opening
         } catch (e: CameraControllerException) {
@@ -7992,15 +8002,22 @@ class Preview(applicationInterface: ApplicationInterface, parent: ViewGroup) :
             Log.d(TAG, "is_test_junit4: $isTestJunit4")
         }
 
-        this.usingAndroidL = true
+        this.usingAndroidL = applicationInterface.useCamera2()
         if (MyDebug.LOG) {
             Log.d(TAG, "using_android_l?: $usingAndroidL")
         }
 
-        this.cameraSurface = MyTextureView.createInstance(context, this)
-        // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
-        this.canvasView = CanvasView(context, this)
-        cameraControllerManager = CameraControllerManager2(context)
+        if (usingAndroidL) {
+            // use a TextureView for Camera2 - had bugs with SurfaceView not resizing properly on Nexus 7; and good to use a TextureView anyway
+            // ideally we'd use a TextureView for the old camera API too, but sticking with SurfaceView to avoid risk of breaking behavior
+            this.cameraSurface = MyTextureView.createInstance(context, this)
+            // a TextureView can't be used both as a camera preview, and used for drawing on, so we use a separate CanvasView
+            this.canvasView = CanvasView(context, this)
+            cameraControllerManager = CameraControllerManager2(context)
+        } else {
+            this.cameraSurface = MySurfaceView(context, this)
+            cameraControllerManager = CameraControllerManager1()
+        }
 
         /*{
 			FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);

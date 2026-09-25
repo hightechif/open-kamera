@@ -17,6 +17,10 @@
 
 OpenKamera is designed with privacy and user control in mind: **no ads, no tracking, and no unnecessary permissions**.
 
+### Device support
+
+OpenKamera uses the **Camera2 API** by default on devices where every camera reports at least `LIMITED` Camera2 hardware support, which manual controls, RAW capture and the live metadata overlays need. If no camera has that support, or at least one camera is `LEGACY` (Camera2 only wrapping the old driver), OpenKamera falls back to the original Camera1 API with a reduced feature set and tells you once. Where at least one camera supports Camera2 you can choose either API in **Settings → Camera API**. See [Choosing Camera1 or Camera2](docs/module-01-foundations/01-camera-api-overview.md#choosing-camera1-or-camera2-in-openkamera).
+
 ---
 
 ## 📚 Learn & Explore
@@ -74,7 +78,7 @@ The codebase is organized into modular packages under `com.hightechif.openkamera
 ```
 com.hightechif.openkamera/
 ├── audio/            # Audio trigger, speech recognition, and sound effects
-├── cameracontroller/ # Unified abstraction for Camera1 and Camera2 APIs
+├── cameracontroller/ # Camera2 controller, engine bridge and pipelines
 │   └── capabilities/ # Camera feature resolution (zoom, focus, flash, etc.)
 ├── di/               # Hilt dependency injection modules (camera, coroutines, prefs, etc.)
 ├── domain/           # Clean architecture domain layer
@@ -142,13 +146,13 @@ Clone the repository and open the `OpenKamera` directory:
 
 OpenKamera has a multi-layer test suite covering unit logic, ViewModel state, and real-device UI flows:
 
-| Suite | Type | Key areas |
-|---|---|---|
-| `MainInstrumentedTest` | Instrumented (Espresso) | Camera lifecycle, zoom, focus, flash, UI controls |
-| `PhotoInstrumentedTest` | Instrumented (Espresso) | Photo capture, EXIF tags, burst mode |
-| `Camera2InstrumentedTest` | Instrumented | Camera2 API feature resolution |
-| `EspressoCameraUiInstrumentedTest` | Instrumented (Espresso) | Full UI interaction flows |
-| `*UnitTest` / `*RobolectricTest` | JVM (Robolectric + MockK + Turbine) | ViewModel, use cases, capabilities |
+| Suite                              | Type                                | Key areas                                         |
+|------------------------------------|-------------------------------------|---------------------------------------------------|
+| `MainInstrumentedTest`             | Instrumented (Espresso)             | Camera lifecycle, zoom, focus, flash, UI controls |
+| `PhotoInstrumentedTest`            | Instrumented (Espresso)             | Photo capture, EXIF tags, burst mode              |
+| `Camera2InstrumentedTest`          | Instrumented                        | Camera2 API feature resolution                    |
+| `EspressoCameraUiInstrumentedTest` | Instrumented (Espresso)             | Full UI interaction flows                         |
+| `*UnitTest` / `*RobolectricTest`   | JVM (Robolectric + MockK + Turbine) | ViewModel, use cases, capabilities                |
 
 ```bash
 # Run all JVM unit tests (Robolectric, MockK, Turbine)

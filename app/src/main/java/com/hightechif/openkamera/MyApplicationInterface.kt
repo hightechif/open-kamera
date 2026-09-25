@@ -9,6 +9,7 @@ package com.hightechif.openkamera
 
 //import android.location.Address; // don't use until we have info for data privacy!
 //import android.location.Geocoder; // don't use until we have info for data privacy!
+import com.hightechif.openkamera.ui.CameraUiEvent
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
@@ -59,6 +60,7 @@ import com.hightechif.openkamera.domain.repository.preferences.LocationPreferenc
 import com.hightechif.openkamera.domain.repository.preferences.PhotoPreferencesRepository
 import com.hightechif.openkamera.domain.repository.preferences.UiHudPreferencesRepository
 import com.hightechif.openkamera.domain.repository.preferences.VideoPreferencesRepository
+import com.hightechif.openkamera.preferences.CameraApiSelection
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preview.ApplicationInterface
 import com.hightechif.openkamera.preview.ApplicationInterface.CameraResolutionConstraints
@@ -259,9 +261,20 @@ class MyApplicationInterface internal constructor(
     override val context: Context
         get() = mainActivity
 
-    override fun useCamera2(): Boolean {
-        return mainActivity.supportsCamera2()
+    /** The `camera-api-selection` decision (see [CameraApiSelection]) for this device and preference. */
+    fun cameraApiChoice(): CameraApiSelection.Choice {
+        // no default: "nothing stored" means the hardware decides (see CameraApiSelection)
+        val cameraApi = (settingsRepository?.getStringPreference(PreferenceKeys.CAMERA_API_PREFERENCE_KEY, "")
+            ?: sharedPreferences.getString(PreferenceKeys.CAMERA_API_PREFERENCE_KEY, null))
+            ?.takeIf { it.isNotEmpty() }
+        return CameraApiSelection.choose(
+            mainActivity.supportsCamera2(),
+            mainActivity.allCamerasSupportCamera2(),
+            cameraApi
+        )
     }
+
+    override fun useCamera2(): Boolean = cameraApiChoice().useCamera2
 
     override fun getLocation(): Location? {
         val repoLocation = locationRepository?.getLastKnownLocation()
@@ -2290,6 +2303,7 @@ class MyApplicationInterface internal constructor(
 
     override fun startedVideo() {
         if (MyDebug.LOG) Log.d(TAG, "startedVideo()")
+        mainActivity.cameraViewModel.onLegacyVideoStarted()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             if (!(mainActivity.mainUI
                     .inImmersiveMode() && mainActivity.usingKitKatImmersiveModeEverything())
@@ -2340,6 +2354,7 @@ class MyApplicationInterface internal constructor(
             Log.d(TAG, "uri $uri")
             Log.d(TAG, "filename $filename")
         }
+        mainActivity.cameraViewModel.onLegacyVideoStopped()
         val pauseVideoButton: View = mainActivity.findViewById(R.id.pause_video)
         pauseVideoButton.visibility = View.GONE
         val takePhotoVideoButton: View =
@@ -2718,6 +2733,7 @@ class MyApplicationInterface internal constructor(
 
     override fun onCaptureStarted() {
         if (MyDebug.LOG) Log.d(TAG, "onCaptureStarted")
+        mainActivity.cameraViewModel.onLegacyCaptureStarted()
         nCaptureImages = 0
         nCaptureImagesRaw = 0
         drawPreview.onCaptureStarted()
@@ -2730,6 +2746,7 @@ class MyApplicationInterface internal constructor(
 
     override fun onPictureCompleted() {
         if (MyDebug.LOG) Log.d(TAG, "onPictureCompleted")
+        mainActivity.cameraViewModel.onLegacyCaptureCompleted()
 
         // clear any toasts displayed during progress (e.g., preferenceNrModeLowLightMessage, or onExtensionProgress())
         mainActivity.preview.clearActiveFakeToast()
@@ -2820,7 +2837,7 @@ class MyApplicationInterface internal constructor(
 
     override fun requestTakePhoto() {
         if (MyDebug.LOG) Log.d(TAG, "requestTakePhoto")
-        mainActivity.takePicture(false)
+        mainActivity.cameraViewModel.onEvent(CameraUiEvent.OnShutterClicked)
     }
 
     /** Switch to the first available camera that is front or back facing as desired.

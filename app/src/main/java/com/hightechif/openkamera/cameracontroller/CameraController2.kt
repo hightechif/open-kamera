@@ -2810,7 +2810,7 @@ class CameraController2(
         /** Returns the viewable rect - this is crop region if available.
          * We need this as callers will pass in (or expect returned) CameraController.Area values that
          * are relative to the current view (i.e., taking Zoom into account) (the old Camera API in
-         * CameraController1 always works in terms of the current view, whilst Camera2 works in terms
+         * The old Camera1 API always worked in terms of the current view, whilst Camera2 works in terms
          * of the full view always). Similarly, for the rect field in CameraController.Face.
          */
         get() {
@@ -3642,7 +3642,7 @@ class CameraController2(
                 }
                 e.printStackTrace()
             }
-            // simulate CameraController1 behavior where face detection is stopped when we stop preview
+            // simulate Camera1 behavior where face detection is stopped when we stop preview
             if (cameraSettings.hasFaceDetectMode && closeCaptureSession) {
                 if (MyDebug.LOG) Log.d(TAG, "cancel face detection")
                 cameraSettings.hasFaceDetectMode = false
@@ -6563,7 +6563,7 @@ class CameraController2(
                     val cameraFaces = result.get(CaptureResult.STATISTICS_FACES)
                     if (cameraFaces != null) {
                         if (cameraFaces.size == 0 && lastFacesDetected == 0) {
-                            // no point continually calling the callback if 0 faces detected (same behavior as CameraController1)
+                            // no point continually calling the callback if 0 faces detected (same behavior as Camera1)
                         } else {
                             lastFacesDetected = cameraFaces.size
                             val faces = arrayOfNulls<Face>(cameraFaces.size)

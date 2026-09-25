@@ -8,32 +8,27 @@
 package com.hightechif.openkamera.cameracontroller
 
 import android.hardware.camera2.CameraAccessException
-import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CaptureRequest
-import android.hardware.camera2.params.OutputConfiguration
-import android.hardware.camera2.params.SessionConfiguration
 import android.media.MediaActionSound
 import android.media.MediaRecorder
-import android.os.Build
-import android.os.Handler
 import android.util.Log
 import android.view.Surface
 import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
 import com.hightechif.openkamera.cameracontroller.lifecycle.Camera2SessionManager
 import com.hightechif.openkamera.utils.MyDebug
-import java.io.File
-import java.util.concurrent.Executor
 
 /**
- * Encapsulates the video recording pipeline and session coordinator for [CameraController2].
+ * Hooks into the legacy video recording flow for [CameraController2].
+ *
+ * `Preview` owns the [MediaRecorder] lifecycle (configure, start, pause, stop) and calls
+ * these hooks around it. This class does not start or stop recording itself.
  *
  * Responsibilities:
- * - Managing video recording state (idle, preparing, recording, paused, stopping)
- * - MediaRecorder setup, video profile resolution, and output file preparation
- * - Video capture session and constrained high-speed capture session management
+ * - Pre-prepare hook: audio cue for video start and recorder hand-off
+ * - Post-prepare hook: TEMPLATE_RECORD request and video capture session creation
  * - Video snapshot (still picture capture during active recording) capture request creation
- * - Audio cues for video start/stop
+ * - Tracking the high-speed video flags read by [CameraController2]
  *
  * 📖 Learn more: `docs/module-04-video/01-video-pipeline-overview.md`
  *
@@ -59,12 +54,6 @@ class Camera2VideoPipeline(
     var videoRecorderSurface: Surface? = null
 
     var activeVideoRecorder: MediaRecorder? = null
-        private set
-    var isRecording: Boolean = false
-        private set
-    var isPaused: Boolean = false
-        private set
-    var activeOutputFile: File? = null
         private set
 
     /**
@@ -106,44 +95,12 @@ class Camera2VideoPipeline(
             cameraSettings.setupBuilder(builder, false)
             createVideoSession(videoRecorder, wantPhotoVideoRecording)
             activeVideoRecorder = videoRecorder
-            isRecording = true
-            isPaused = false
         } catch (e: CameraAccessException) {
             if (MyDebug.LOG) {
                 Log.e(TAG, "failed to create capture request for video: ${e.message}")
             }
             e.printStackTrace()
             throw CameraControllerException()
-        }
-    }
-
-    /**
-     * Configures a [MediaRecorder] with video resolution, fps, encoders, and output file.
-     */
-    fun setupMediaRecorder(
-        outputFile: File,
-        width: Int = 1920,
-        height: Int = 1080,
-        fps: Int = 30,
-        bitRate: Int = 10_000_000
-    ): MediaRecorder {
-        val recorder = MediaRecorder()
-        try {
-            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-            recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
-            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            recorder.setVideoSize(width, height)
-            recorder.setVideoFrameRate(fps)
-            recorder.setVideoEncodingBitRate(bitRate)
-            recorder.setOutputFile(outputFile.absolutePath)
-            recorder.prepare()
-            activeOutputFile = outputFile
-            return recorder
-        } catch (e: Exception) {
-            recorder.release()
-            throw e
         }
     }
 
@@ -160,35 +117,6 @@ class Camera2VideoPipeline(
             if (MyDebug.LOG) Log.d(TAG, "videoRecorderSurface: $videoRecorderSurface")
         }
         controller.createCaptureSession(videoRecorder, wantPhotoVideoRecording)
-    }
-
-    /**
-     * Creates a high speed capture session for constrained high-speed recording (slow-motion).
-     */
-    @Throws(CameraAccessException::class)
-    fun createHighSpeedCaptureSession(
-        camera: CameraDevice,
-        surfaces: List<Surface>,
-        callback: CameraCaptureSession.StateCallback,
-        handler: Handler?,
-        executor: Executor? = null,
-        outputs: List<OutputConfiguration>? = null
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && outputs != null && executor != null) {
-            val sessionConfiguration = SessionConfiguration(
-                SessionConfiguration.SESSION_HIGH_SPEED,
-                outputs,
-                executor,
-                callback
-            )
-            camera.createCaptureSession(sessionConfiguration)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            @Suppress("DEPRECATION")
-            camera.createConstrainedHighSpeedCaptureSession(surfaces, callback, handler)
-        } else {
-            throw UnsupportedOperationException("High speed video requires Android M (API 23)+")
-        }
-        isVideoHighSpeed = true
     }
 
     /**
@@ -210,92 +138,5 @@ class Camera2VideoPipeline(
         )
         cameraSettings.setupBuilder(stillBuilder, true)
         return stillBuilder
-    }
-
-    /**
-     * High-level entry point to start video recording to a specific [outputFile].
-     */
-    fun startRecording(outputFile: File): Result<Unit> = runCatching {
-        val recorder = setupMediaRecorder(outputFile)
-        initVideoRecorderPrePrepare(recorder)
-        initVideoRecorderPostPrepare(recorder, wantPhotoVideoRecording = true)
-        recorder.start()
-        isRecording = true
-        isPaused = false
-        activeOutputFile = outputFile
-    }
-
-    /**
-     * Pauses active video recording (API 24+).
-     */
-    fun pauseRecording(): Result<Unit> = runCatching {
-        if (!isRecording) error("No active video recording to pause")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            activeVideoRecorder?.pause()
-            isPaused = true
-        } else {
-            error("Pause video recording is only supported on Android N (API 24)+")
-        }
-    }
-
-    /**
-     * Resumes paused video recording (API 24+).
-     */
-    fun resumeRecording(): Result<Unit> = runCatching {
-        if (!isRecording) error("No active video recording to resume")
-        if (!isPaused) return@runCatching
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            activeVideoRecorder?.resume()
-            isPaused = false
-        } else {
-            error("Resume video recording is only supported on Android N (API 24)+")
-        }
-    }
-
-    /**
-     * Stops and finalizes video recording.
-     */
-    fun stopRecording(): Result<Unit> = runCatching {
-        if (!isRecording && activeVideoRecorder == null) {
-            return@runCatching
-        }
-        val recorder = activeVideoRecorder
-        try {
-            recorder?.stop()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping MediaRecorder: ${e.message}", e)
-        } finally {
-            try {
-                recorder?.reset()
-                recorder?.release()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error releasing MediaRecorder: ${e.message}", e)
-            }
-            activeVideoRecorder = null
-            isRecording = false
-            isPaused = false
-            activeOutputFile = null
-            previewIsVideoMode = false
-            isVideoHighSpeed = false
-            controller.reconnect()
-        }
-    }
-
-    /**
-     * Releases video pipeline resources.
-     */
-    fun release() {
-        if (isRecording) {
-            try {
-                stopRecording()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error stopping recording on release: ${e.message}")
-            }
-        }
-        activeVideoRecorder = null
-        videoRecorderSurface = null
-        previewIsVideoMode = false
-        isVideoHighSpeed = false
-        wantVideoHighSpeed = false
     }
 }

@@ -13,7 +13,6 @@ import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import com.hightechif.openkamera.cameracontroller.dispatcher.Camera2StateCallbackDispatcher
 import com.hightechif.openkamera.domain.engine.CameraEngineState
-import com.hightechif.openkamera.domain.engine.IAudioController
 import com.hightechif.openkamera.domain.model.FlashMode
 import com.hightechif.openkamera.domain.model.FocusState
 import io.mockk.every
@@ -30,7 +29,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -39,7 +37,6 @@ class Camera2EngineBridgeTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val mockContext = mockk<Context>(relaxed = true)
-    private val mockAudioController = mockk<IAudioController>(relaxed = true)
     private lateinit var previewSurfaceManager: PreviewSurfaceManager
     private lateinit var bridge: Camera2EngineBridge
 
@@ -53,7 +50,6 @@ class Camera2EngineBridgeTest {
         bridge = Camera2EngineBridge(
             context = mockContext,
             previewSurfaceManager = previewSurfaceManager,
-            audioController = mockAudioController,
             ioDispatcher = testDispatcher,
             defaultDispatcher = testDispatcher
         )
@@ -64,7 +60,6 @@ class Camera2EngineBridgeTest {
 
         every { mockController.callbackDispatcher } returns callbackDispatcher
         every { mockController.videoPipeline } returns mockVideoPipeline
-        every { mockVideoPipeline.isRecording } returns false
     }
 
     @Test
@@ -169,21 +164,21 @@ class Camera2EngineBridgeTest {
     }
 
     @Test
-    fun testVideoRecording_stateTransitionsAndAudioCue() = runTest(testDispatcher) {
-        bridge.attachController(mockController)
-        val dummyFile = File("/tmp/test_video.mp4")
+    fun controlsWithoutActiveController_areNoOps() = runTest(testDispatcher) {
+        // Camera1 fallback: Preview never attaches a CameraController2, so the bridge has no active controller
+        assertNull(bridge.activeController)
+        val metadataBefore = bridge.frameMetadataFlow.value
 
-        every { mockVideoPipeline.startRecording(dummyFile) } returns Result.success(Unit)
-        every { mockVideoPipeline.stopRecording() } returns Result.success(Unit)
+        bridge.setZoom(2.0f)
+        bridge.setManualFocus(android.graphics.PointF(0.5f, 0.5f))
+        bridge.unlockFocus()
+        bridge.setExposureCompensation(1)
+        bridge.setFlashMode(FlashMode.ON)
+        bridge.startPreview()
+        bridge.stopPreview()
 
-        val startResult = bridge.startVideoRecording(dummyFile)
-        assertTrue(startResult.isSuccess)
-        assertEquals(CameraEngineState.Recording, bridge.engineStateFlow.value)
-        verify { mockAudioController.playShutterSound() }
-
-        val stopResult = bridge.stopVideoRecording()
-        assertTrue(stopResult.isSuccess)
-        assertEquals(CameraEngineState.Ready, bridge.engineStateFlow.value)
-        verify(exactly = 2) { mockAudioController.playShutterSound() }
+        assertNull(bridge.activeController)
+        assertEquals(metadataBefore, bridge.frameMetadataFlow.value)
+        assertEquals(CameraEngineState.Uninitialized, bridge.engineStateFlow.value)
     }
 }

@@ -52,7 +52,7 @@ builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evIndex)
 
 Because burst captures arrive asynchronously through `ImageReader.OnImageAvailableListener` and capture callbacks, tracking how many frames were requested versus received requires robust synchronization.
 
-In OpenKamera, this is encapsulated in [`Camera2BurstCoordinator.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2BurstCoordinator.kt):
+In OpenKamera, this is encapsulated in [`Camera2BurstCoordinator.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2BurstCoordinator.kt):
 
 - `initBurst(nBurst, isSingleRequest)`: Prepares the counters before dispatching capture requests.
 - `onJpegReceived()` / `onRawReceived()`: Increments completed count as images arrive from the HAL.

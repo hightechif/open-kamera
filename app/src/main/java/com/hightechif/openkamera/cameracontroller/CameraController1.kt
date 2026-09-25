@@ -22,13 +22,10 @@ import java.util.Collections
 import kotlin.math.max
 import kotlin.math.min
 
-/** Provides support using Android's original camera API
- * android.hardware.Camera.
+/** Camera1 fallback: provides support using Android's original camera API
+ * android.hardware.Camera. Used only when Camera2 is unavailable (no camera with LIMITED
+ * or better support) or the user selects the old API. See the `camera-api-selection` spec.
  */
-@Deprecated(
-    message = "Legacy Camera1 HAL. Use Camera2EngineImpl / ICameraEngine.",
-    level = DeprecationLevel.WARNING
-)
 class CameraController1 private constructor(cameraId: Int) : CameraController(cameraId) {
 
     private var camera: Camera? = null
@@ -165,7 +162,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                 outputModes.add("flash_frontscreen_torch")
             } else {
                 if (MyDebug.LOG) Log.d(TAG, "no flash")
-                // probably best to not return any modes, rather than one mode (see note about about Samsung Galaxy S7)
+                // probably best to not return any modes, rather than one mode (see note about Samsung Galaxy S7)
                 outputModes.clear()
             }
         }
@@ -301,7 +298,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             cameraFeatures.exposureStep = exposureCompensationStep
             cameraFeatures.supportsExpoBracketing =
                 (cameraFeatures.minExposure !== 0 && cameraFeatures.maxExposure !== 0) // require both a darker and brighter exposure, in order to support expo bracketing
-            cameraFeatures.maxExpoBracketingNImages = maxExpoBracketingNImages
+            cameraFeatures.maxExpoBracketingNImages = MAX_EXPO_BRACKETING_N_IMAGES
 
             var cameraVideoSizes = parameters.supportedVideoSizes
             if (cameraVideoSizes == null) {
@@ -332,7 +329,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             cameraFeatures.canDisableShutterSound = cameraInfo.canDisableShutterSound
 
             // Determine view angles. Note that these can vary based on the resolution - and since we read these before the caller has
-            // set the desired resolution, this isn't strictly correct. However these are presumably view angles for the photo anyway,
+            // set the desired resolution, this isn't strictly correct. However, these are presumably view angles for the photo anyway,
             // when some callers (e.g., DrawPreview) want view angles for the preview anyway - so these will only be an approximation for
             // what we want anyway.
             val defaultViewAngleX = 55.0f
@@ -351,7 +348,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                 Log.d(TAG, "view_angle_x: " + cameraFeatures.viewAngleX)
                 Log.d(TAG, "view_angle_y: " + cameraFeatures.viewAngleY)
             }
-            // need to handle some devices reporting rubbish
+            // need to handle some devices reporting garbage
             if (cameraFeatures.viewAngleX > 150.0f || cameraFeatures.viewAngleY > 150.0f) {
                 Log.e(TAG, "camera API reporting stupid view angles, set to sensible defaults")
                 cameraFeatures.viewAngleX = defaultViewAngleX
@@ -488,7 +485,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         if (supportedValues != null) {
             // for antibanding, if the requested value isn't available, we don't modify it at all
             // (so we stick with the device's default setting)
-            if (supportedValues.selectedValue.equals(value)) {
+            if (supportedValues.selectedValue == value) {
                 val antibanding = parameters.antibanding
                 if (antibanding == null || antibanding != supportedValues.selectedValue) {
                     parameters.antibanding = supportedValues.selectedValue
@@ -532,7 +529,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             }
         }
         var values = mutableListOf<String>()
-        if (isoValues != null && isoValues.length > 0) {
+        if (isoValues != null && isoValues.isNotEmpty()) {
             if (MyDebug.LOG) Log.d(
                 TAG,
                 "iso_values: $isoValues"
@@ -540,7 +537,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             val isosArray =
                 isoValues.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
             // split shouldn't return null
-            if (isosArray.size > 0) {
+            if (isosArray.isNotEmpty()) {
                 // remove duplicates (OnePlus 3T has several duplicate "auto" entries)
                 val hashSet = HashSet<String>()
                 // use hashset for efficiency
@@ -756,8 +753,8 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             if (MyDebug.LOG) Log.e(TAG, "n_images should be an odd number greater than 1")
             throw RuntimeException() // throw as RuntimeException, as this is a programming error
         }
-        if (nImages > maxExpoBracketingNImages) {
-            nImages = maxExpoBracketingNImages
+        if (nImages > MAX_EXPO_BRACKETING_N_IMAGES) {
+            nImages = MAX_EXPO_BRACKETING_N_IMAGES
             if (MyDebug.LOG) Log.e(
                 TAG,
                 "limiting n_images to max of $nImages"
@@ -965,22 +962,31 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             "convertFocusModeToValue: $focusMode"
         )
         var focusValue = ""
-        if (focusMode == null) {
-            // ignore, leave focusValue at ""
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_AUTO) {
-            focusValue = "focus_mode_auto"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_INFINITY) {
-            focusValue = "focus_mode_infinity"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_MACRO) {
-            focusValue = "focus_mode_macro"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_FIXED) {
-            focusValue = "focus_mode_fixed"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_EDOF) {
-            focusValue = "focus_mode_edof"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE) {
-            focusValue = "focus_mode_continuous_picture"
-        } else if (focusMode == Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO) {
-            focusValue = "focus_mode_continuous_video"
+        when (focusMode) {
+            null -> {
+                // ignore, leave focusValue at ""
+            }
+            Camera.Parameters.FOCUS_MODE_AUTO -> {
+                focusValue = "focus_mode_auto"
+            }
+            Camera.Parameters.FOCUS_MODE_INFINITY -> {
+                focusValue = "focus_mode_infinity"
+            }
+            Camera.Parameters.FOCUS_MODE_MACRO -> {
+                focusValue = "focus_mode_macro"
+            }
+            Camera.Parameters.FOCUS_MODE_FIXED -> {
+                focusValue = "focus_mode_fixed"
+            }
+            Camera.Parameters.FOCUS_MODE_EDOF -> {
+                focusValue = "focus_mode_edof"
+            }
+            Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE -> {
+                focusValue = "focus_mode_continuous_picture"
+            }
+            Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO -> {
+                focusValue = "focus_mode_continuous_video"
+            }
         }
         return focusValue
     }
@@ -1075,18 +1081,25 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             "convertFlashModeToValue: $flashMode"
         )
         var flashValue = ""
-        if (flashMode == null) {
-            // ignore, leave focusValue at ""
-        } else if (flashMode == Camera.Parameters.FLASH_MODE_OFF) {
-            flashValue = "flash_off"
-        } else if (flashMode == Camera.Parameters.FLASH_MODE_AUTO) {
-            flashValue = "flash_auto"
-        } else if (flashMode == Camera.Parameters.FLASH_MODE_ON) {
-            flashValue = "flash_on"
-        } else if (flashMode == Camera.Parameters.FLASH_MODE_TORCH) {
-            flashValue = "flash_torch"
-        } else if (flashMode == Camera.Parameters.FLASH_MODE_RED_EYE) {
-            flashValue = "flash_red_eye"
+        when (flashMode) {
+            null -> {
+                // ignore, leave focusValue at ""
+            }
+            Camera.Parameters.FLASH_MODE_OFF -> {
+                flashValue = "flash_off"
+            }
+            Camera.Parameters.FLASH_MODE_AUTO -> {
+                flashValue = "flash_auto"
+            }
+            Camera.Parameters.FLASH_MODE_ON -> {
+                flashValue = "flash_on"
+            }
+            Camera.Parameters.FLASH_MODE_TORCH -> {
+                flashValue = "flash_torch"
+            }
+            Camera.Parameters.FLASH_MODE_RED_EYE -> {
+                flashValue = "flash_red_eye"
+            }
         }
         return flashValue
     }
@@ -1107,7 +1120,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
 
             this.frontscreenFlash = false
             if (flashValue == "flash_frontscreen_on") {
-                // we do this check first due to weird behaviour on Samsung Galaxy S7 front camera where parameters.getFlashMode() returns values (auto, beach, portrait)
+                // we do this check first due to weird behavior on Samsung Galaxy S7 front camera where parameters.getFlashMode() returns values (auto, beach, portrait)
                 this.frontscreenFlash = true
                 return
             }
@@ -1118,7 +1131,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
             }
 
             val flashMode = convertFlashValueToMode(flashValue)
-            if (flashMode.length > 0 && flashMode != parameters.flashMode) {
+            if (flashMode.isNotEmpty() && flashMode != parameters.flashMode) {
                 if (parameters.flashMode == Camera.Parameters.FLASH_MODE_TORCH && flashMode != Camera.Parameters.FLASH_MODE_OFF) {
                     // workaround for bug on Nexus 5 and Nexus 6 where torch doesn't switch off until we set FLASH_MODE_OFF
                     if (MyDebug.LOG) Log.d(TAG, "first turn torch off")
@@ -1126,16 +1139,14 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                     setCameraParameters(parameters)
                     // need to set the correct flash mode after a delay
                     val handler = Handler()
-                    handler.postDelayed(object : Runnable {
-                        override fun run() {
-                            if (MyDebug.LOG) Log.d(
-                                TAG,
-                                "now set actual flash mode after turning torch off"
-                            )
-                            if (camera != null) { // make sure camera wasn't released in the meantime (has a Google Play crash as a result of this)
-                                parameters.flashMode = flashMode
-                                setCameraParameters(parameters)
-                            }
+                    handler.postDelayed({
+                        if (MyDebug.LOG) Log.d(
+                            TAG,
+                            "now set actual flash mode after turning torch off"
+                        )
+                        if (camera != null) { // make sure camera wasn't released in the meantime (has a Google Play crash as a result of this)
+                            parameters.flashMode = flashMode
+                            setCameraParameters(parameters)
                         }
                     }, 100)
                 } else {
@@ -1211,7 +1222,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         if (MyDebug.LOG) Log.d(TAG, "setLocationInfo")
         val parameters = this.parameters
         parameters.removeGpsData()
-        parameters.setGpsTimestamp(System.currentTimeMillis() / 1000) // initialise to a value (from Android camera source)
+        parameters.setGpsTimestamp(System.currentTimeMillis() / 1000) // initialize to a value (from Android camera source)
         parameters.setGpsLatitude(location.latitude)
         parameters.setGpsLongitude(location.longitude)
         parameters.setGpsProcessingMethod(location.provider) // from http://boundarydevices.com/how-to-write-an-android-camera-app/
@@ -1442,7 +1453,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         if (MyDebug.LOG) Log.d(TAG, "startFaceDetection")
         try {
             camera?.startFaceDetection()
-        } catch (e: RuntimeException) {
+        } catch (_: RuntimeException) {
             if (MyDebug.LOG) Log.d(TAG, "face detection failed or already started")
             countCameraParametersException++
             return false
@@ -1479,7 +1490,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                 if (!doneAutofocus) {
                     Log.e(TAG, "autofocus timeout!")
                     doneAutofocus = true
-                    cb?.onAutoFocus(false)
+                    cb.onAutoFocus(false)
                 }
             }
 
@@ -1492,14 +1503,14 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                 handler.removeCallbacks(runnable)
                 autofocusTimeoutRunnable = null
                 autofocusTimeoutHandler = null
-                // in theory we should only ever get one call to onAutoFocus(), but some Samsung phones at least can call the callback multiple times
+                // in theory, we should only ever get one call to onAutoFocus(), but some Samsung phones at least can call the callback multiple times
                 // see http://stackoverflow.com/questions/36316195/take-picture-fails-on-samsung-phones
                 // needed to fix problem on Samsung S7 with flash auto/on and continuous picture focus where it would claim failed to take picture even though it'd succeeded,
                 // because we repeatedly call takePicture(), and the subsequent ones cause a runtime exception
                 // update: also the doneAutofocus flag is needed in case we had an autofocus timeout, see above
                 if (!doneAutofocus) {
                     doneAutofocus = true
-                    cb?.onAutoFocus(success)
+                    cb.onAutoFocus(success)
                 } else {
                     if (MyDebug.LOG) Log.e(TAG, "ignore repeated autofocus")
                 }
@@ -1526,7 +1537,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
                 autofocusTimeoutHandler = null
             }
             // should call the callback, so the application isn't left waiting (e.g., when we autofocus before trying to take a photo)
-            cb?.onAutoFocus(false)
+            cb.onAutoFocus(false)
         }
     }
 
@@ -1557,7 +1568,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         run {
             try {
                 if (cb != null) {
-                    camera?.setAutoFocusMoveCallback { start, camera ->
+                    camera?.setAutoFocusMoveCallback { start, _ ->
                         if (MyDebug.LOG) Log.d(
                             TAG,
                             "onAutoFocusMoving: $start"
@@ -1593,83 +1604,80 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         if (MyDebug.LOG) Log.d(TAG, "takePictureNow")
 
         // only set the shutter callback if sounds enabled
-        val shutter: ShutterCallback? =
-            if (soundsEnabled) CameraController1.TakePictureShutterCallback() else null
+        val shutter: ShutterCallback? = if (soundsEnabled) TakePictureShutterCallback() else null
         val cameraJpeg: Camera.PictureCallback? =
-            if (picture == null) null else object : Camera.PictureCallback {
-                override fun onPictureTaken(data: ByteArray, cam: Camera) {
-                    if (MyDebug.LOG) Log.d(TAG, "onPictureTaken")
+            if (picture == null) null else Camera.PictureCallback { data, _ ->
+                if (MyDebug.LOG) Log.d(TAG, "onPictureTaken")
 
-                    // n.b., this is automatically run in a different thread
-                    if (wantExpoBracketing && burstTotal > 1) {
-                        pendingBurstImages.add(data)
-                        if (pendingBurstImages.size >= burstTotal) { // shouldn't ever be greater, but just in case
-                            if (MyDebug.LOG) Log.d(TAG, "all burst images available")
-                            if (pendingBurstImages.size > burstTotal) {
-                                Log.e(
-                                    TAG,
-                                    "pending_burst_images size " + pendingBurstImages.size + " is greater than n_burst " + burstTotal
-                                )
-                            }
+                // n.b., this is automatically run in a different thread
+                if (wantExpoBracketing && burstTotal > 1) {
+                    pendingBurstImages.add(data)
+                    if (pendingBurstImages.size >= burstTotal) { // shouldn't ever be greater, but just in case
+                        if (MyDebug.LOG) Log.d(TAG, "all burst images available")
+                        if (pendingBurstImages.size > burstTotal) {
+                            Log.e(
+                                TAG,
+                                "pending_burst_images size " + pendingBurstImages.size + " is greater than n_burst " + burstTotal
+                            )
+                        }
 
-                            // set exposure compensation back to original
-                            burstExposures?.get(0)?.let { setExposureCompensation(it) }
+                        // set exposure compensation back to original
+                        burstExposures?.get(0)?.let { setExposureCompensation(it) }
 
-                            // take a copy, so that we can clear pendingBurstImages
-                            // also allows us to reorder from dark to light
-                            // since we took the images with the base exposure being first
-                            val nHalfImages = pendingBurstImages.size / 2
-                            val images: MutableList<ByteArray?> = ArrayList()
-                            // darker images
-                            for (i in 0..<nHalfImages) {
-                                images.add(pendingBurstImages[i + 1])
-                            }
-                            // base image
-                            images.add(pendingBurstImages[0])
-                            // lighter images
-                            for (i in 0..<nHalfImages) {
-                                images.add(pendingBurstImages[nHalfImages + 1])
-                            }
+                        // take a copy, so that we can clear pendingBurstImages
+                        // also allows us to reorder from dark to light
+                        // since we took the images with the base exposure being first
+                        val nHalfImages = pendingBurstImages.size / 2
+                        val images: MutableList<ByteArray?> = ArrayList()
+                        // darker images
+                        for (i in 0..<nHalfImages) {
+                            images.add(pendingBurstImages[i + 1])
+                        }
+                        // base image
+                        images.add(pendingBurstImages[0])
+                        // lighter images
+                        repeat(nHalfImages) {
+                            images.add(pendingBurstImages[nHalfImages + 1])
+                        }
 
-                            picture.onBurstPictureTaken(images.filterNotNull())
-                            pendingBurstImages.clear()
-                            picture.onCompleted()
-                        } else {
+                        picture.onBurstPictureTaken(images.filterNotNull())
+                        pendingBurstImages.clear()
+                        picture.onCompleted()
+                    } else {
+                        if (MyDebug.LOG) Log.d(
+                            TAG,
+                            "number of burst images is now: " + pendingBurstImages.size
+                        )
+                        // set exposure compensation for next image
+                        burstExposures?.get(pendingBurstImages.size)
+                            ?.let { setExposureCompensation(it) }
+
+                        // need to start preview again: otherwise fail to take subsequent photos on Nexus 6
+                        // and Nexus 7; on Galaxy Nexus we succeed, but exposure compensation has no effect
+                        try {
+                            startPreview()
+                        } catch (e: CameraControllerException) {
                             if (MyDebug.LOG) Log.d(
                                 TAG,
-                                "number of burst images is now: " + pendingBurstImages.size
+                                "CameraControllerException trying to startPreview"
                             )
-                            // set exposure compensation for next image
-                            burstExposures?.get(pendingBurstImages.size)
-                                ?.let { setExposureCompensation(it) }
-
-                            // need to start preview again: otherwise fail to take subsequent photos on Nexus 6
-                            // and Nexus 7; on Galaxy Nexus we succeed, but exposure compensation has no effect
-                            try {
-                                startPreview()
-                            } catch (e: CameraControllerException) {
-                                if (MyDebug.LOG) Log.d(
-                                    TAG,
-                                    "CameraControllerException trying to startPreview"
-                                )
-                                e.printStackTrace()
-                            }
-
-                            val handler = Handler()
-                            handler.postDelayed({
-                                if (MyDebug.LOG) Log.d(
-                                    TAG,
-                                    "take picture after delay for next expo"
-                                )
-                                if (camera != null) { // make sure camera wasn't released in the meantime
-                                    takePictureNow(picture, error)
-                                }
-                            }, 1000)
+                            e.printStackTrace()
                         }
-                    } else {
-                        picture.onPictureTaken(data)
-                        picture.onCompleted()
+
+                        val handler = Handler()
+                        handler.postDelayed({
+                            if (MyDebug.LOG) Log.d(
+                                TAG,
+                                "take picture after delay for next expo"
+                            )
+                            if (camera != null) { // make sure camera wasn't released in the meantime
+                                takePictureNow(picture, error)
+                            }
+                        }, 1000)
                     }
+                } else {
+                    picture.onPictureTaken(data)
+                    picture.onCompleted()
                 }
             }
 
@@ -1836,7 +1844,7 @@ class CameraController1 private constructor(cameraId: Int) : CameraController(ca
         private const val TAG = "CameraController1"
 
         // seem to have problems with 5 images in some cases, e.g., images coming out same brightness on OnePlus 3T
-        private const val maxExpoBracketingNImages = 3
+        private const val MAX_EXPO_BRACKETING_N_IMAGES = 3
 
         /** Opens the camera device.
          * @param cameraId Which camera to open (must be between 0 and CameraControllerManager1.getNumberOfCameras()-1).

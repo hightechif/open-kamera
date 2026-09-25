@@ -13,7 +13,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,14 +46,11 @@ class Camera2VideoPipelineTest {
 
     @Test
     fun testInitialState() {
-        assertFalse(videoPipeline.isRecording)
-        assertFalse(videoPipeline.isPaused)
         assertFalse(videoPipeline.previewIsVideoMode)
         assertFalse(videoPipeline.wantVideoHighSpeed)
         assertFalse(videoPipeline.isVideoHighSpeed)
         assertNull(videoPipeline.activeVideoRecorder)
         assertNull(videoPipeline.videoRecorderSurface)
-        assertNull(videoPipeline.activeOutputFile)
     }
 
     @Test
@@ -63,37 +59,5 @@ class Camera2VideoPipelineTest {
 
         verify { mockController.blockForExtensions() }
         verify { mockController.playSound(MediaActionSound.START_VIDEO_RECORDING) }
-    }
-
-    @Test
-    fun testPauseAndResumeRecording_whenNotRecording_returnsFailure() {
-        val pauseResult = videoPipeline.pauseRecording()
-        assertTrue(pauseResult.isFailure)
-
-        val resumeResult = videoPipeline.resumeRecording()
-        assertTrue(resumeResult.isFailure)
-    }
-
-    @Test
-    fun testStopRecording_whenNotRecording_succeedsSilently() {
-        val result = videoPipeline.stopRecording()
-        assertTrue(result.isSuccess)
-        assertFalse(videoPipeline.isRecording)
-    }
-
-    @Test
-    fun testRelease_cleansUpAllState() {
-        videoPipeline.previewIsVideoMode = true
-        videoPipeline.wantVideoHighSpeed = true
-        videoPipeline.isVideoHighSpeed = true
-
-        videoPipeline.release()
-
-        assertFalse(videoPipeline.isRecording)
-        assertFalse(videoPipeline.previewIsVideoMode)
-        assertFalse(videoPipeline.wantVideoHighSpeed)
-        assertFalse(videoPipeline.isVideoHighSpeed)
-        assertNull(videoPipeline.activeVideoRecorder)
-        assertNull(videoPipeline.videoRecorderSurface)
     }
 }

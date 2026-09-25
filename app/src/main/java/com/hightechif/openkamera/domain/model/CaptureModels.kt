@@ -6,8 +6,6 @@
  */
 package com.hightechif.openkamera.domain.model
 
-import android.net.Uri
-
 data class LocationCoordinates(
     val latitude: Double,
     val longitude: Double,
@@ -24,25 +22,4 @@ data class CaptureConfig(
     val location: LocationCoordinates? = null,
     val iso: Int? = null,
     val aperture: Float? = null
-)
-
-data class PhotoResult(
-    val uri: Uri,
-    val filePath: String? = null,
-    val width: Int = 0,
-    val height: Int = 0,
-    val fileSizeBytes: Long = 0L,
-    val mimeType: String = "image/jpeg",
-    val dateTakenEpochMs: Long = System.currentTimeMillis(),
-    val isRaw: Boolean = false
-)
-
-data class RecordedVideo(
-    val uri: Uri,
-    val filePath: String? = null,
-    val durationMs: Long = 0L,
-    val width: Int = 0,
-    val height: Int = 0,
-    val fileSizeBytes: Long = 0L,
-    val dateTakenEpochMs: Long = System.currentTimeMillis()
 )

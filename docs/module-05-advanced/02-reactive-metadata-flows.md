@@ -47,7 +47,7 @@ Key reactive streams include:
 
 ## ViewModel Consumption & Lifecycle Safety
 
-In [`CameraViewModel.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt), these flows are consumed using structured coroutines:
+In [`CameraViewModel.kt`](../../app/src/main/java/com/hightechif/openkamera/ui/CameraViewModel.kt), these flows are consumed using structured coroutines:
 
 ```kotlin
 viewModelScope.launch {
@@ -60,6 +60,21 @@ viewModelScope.launch {
 ```
 
 Using `StateFlow` and sampling operators prevents the UI from over-rendering while ensuring that current camera settings remain continuously accurate.
+
+---
+
+## Commands vs. Effects, and Legacy Feedback
+
+`CameraViewModel` exposes two one-shot streams, and the difference matters:
+
+| Stream | Purpose | If nobody is collecting |
+|---|---|---|
+| `uiEffect` (`CameraUiEffect`) | Cosmetic feedback: toast, haptic, navigation | May be dropped |
+| `cameraCommands` (`CameraCommand`) | Instructions that change camera state (`TakePicture`, `PauseResumeVideo`, `RemoteButton`) | Must **not** be replayed later |
+
+Both use `replay = 0`. A shutter press while the Activity is stopped is dropped rather than firing a photo when the user returns. `MainActivity` collects `cameraCommands` inside `repeatOnLifecycle(STARTED)`.
+
+State flows back the other way. Legacy callbacks in `MyApplicationInterface` (`onCaptureStarted`, `onPictureCompleted`, `startedVideo`, `stoppedVideo`, pause/resume) call `onLegacyCaptureStarted()`, `onLegacyVideoStarted()` and friends on the ViewModel. `captureState`, `isRecording` and `isVideoPaused` therefore reflect what the camera is really doing, and the UI keeps observing plain `StateFlow`s.
 
 ---
 

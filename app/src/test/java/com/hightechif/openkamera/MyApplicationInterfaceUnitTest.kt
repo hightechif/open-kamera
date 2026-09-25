@@ -11,6 +11,7 @@ import com.hightechif.openkamera.domain.repository.ILocationRepository
 import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
+import com.hightechif.openkamera.preferences.CameraApiSelection
 import com.hightechif.openkamera.preferences.FakeSharedPreferences
 import com.hightechif.openkamera.preferences.PreferenceKeys
 import com.hightechif.openkamera.preferences.SettingsRepositoryImpl
@@ -105,10 +106,21 @@ class MyApplicationInterfaceUnitTest {
     }
 
     @Test
-    fun useCamera2_returnsTrueWhenHardwareSupportsCamera2() {
-        // MainActivity in Robolectric environment supports Camera2
-        val useCamera2 = applicationInterface.useCamera2()
-        assertEquals(activity.supportsCamera2(), useCamera2)
+    fun useCamera2_withNothingStored_followsTheHardware() {
+        // No stored Camera API preference: the camera-api-selection rule decides from the hardware levels
+        val expected = CameraApiSelection.choose(activity.supportsCamera2(), activity.allCamerasSupportCamera2(), null)
+        assertEquals(expected, applicationInterface.cameraApiChoice())
+        assertEquals(expected.useCamera2, applicationInterface.useCamera2())
+    }
+
+    @Test
+    fun useCamera2_readsTheStoredPreferenceThroughTheSettingsRepository() {
+        fakePrefs.edit().putString(PreferenceKeys.CAMERA_API_PREFERENCE_KEY, PreferenceKeys.CAMERA_API_PREFERENCE_OLD).apply()
+        assertEquals(
+            CameraApiSelection.choose(activity.supportsCamera2(), activity.allCamerasSupportCamera2(), PreferenceKeys.CAMERA_API_PREFERENCE_OLD),
+            applicationInterface.cameraApiChoice()
+        )
+        assertEquals(false, applicationInterface.useCamera2())
     }
 
     @Test

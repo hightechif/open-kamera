@@ -12,13 +12,9 @@ import android.hardware.Camera
 import android.util.Log
 import com.hightechif.openkamera.R
 
-/** Provides support using Android's original camera API
- * android.hardware.Camera.
+/** Camera1 fallback: enumerates cameras using Android's original camera API
+ * android.hardware.Camera. Used only when Camera1 is selected. See the `camera-api-selection` spec.
  */
-@Deprecated(
-    message = "Legacy Camera1 HAL Manager. Use CameraControllerManager2.",
-    level = DeprecationLevel.WARNING
-)
 class CameraControllerManager1 : CameraControllerManager() {
     override val numberOfCameras: Int
         get() = Camera.getNumberOfCameras()

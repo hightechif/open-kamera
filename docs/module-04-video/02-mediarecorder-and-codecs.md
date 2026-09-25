@@ -11,7 +11,7 @@ Android provides `CamcorderProfile` as a baseline for device-tested presets (e.g
 - It cannot easily represent arbitrary aspect ratios (such as 1:1 square or 21:9 cinema).
 - It lacks fine-grained overrides for modern codecs like HEVC / H.265.
 
-OpenKamera uses a specialized [`VideoProfile`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/preview/VideoProfile.kt) class that can initialize from `CamcorderProfile`, while permitting manual user overrides:
+OpenKamera uses a specialized [`VideoProfile`](../../app/src/main/java/com/hightechif/openkamera/preview/VideoProfile.kt) class that can initialize from `CamcorderProfile`, while permitting manual user overrides:
 - Video dimensions (`videoFrameWidth`, `videoFrameHeight`)
 - Video codec (`H.264`, `H.265 / HEVC`)
 - Video bitrate (e.g. 5 Mbps up to 100+ Mbps for 4K)

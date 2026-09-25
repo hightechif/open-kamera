@@ -8,7 +8,7 @@ package com.hightechif.openkamera.remotecontrol
 
 import com.hightechif.openkamera.domain.engine.BleConnectionState
 import com.hightechif.openkamera.domain.engine.IRemoteInputManager
-import com.hightechif.openkamera.domain.engine.RemoteInputType
+import com.hightechif.openkamera.domain.engine.RemoteButton
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,12 +22,12 @@ import javax.inject.Singleton
 @Singleton
 class RemoteInputManagerImpl @Inject constructor() : IRemoteInputManager {
 
-    private val _remoteInputEventFlow = MutableSharedFlow<RemoteInputType>(
+    private val _remoteInputEventFlow = MutableSharedFlow<RemoteButton>(
         replay = 0,
         extraBufferCapacity = 16,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    override val remoteInputEventFlow: Flow<RemoteInputType> = _remoteInputEventFlow.asSharedFlow()
+    override val remoteInputEventFlow: Flow<RemoteButton> = _remoteInputEventFlow.asSharedFlow()
 
     private val _connectionStateFlow =
         MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
@@ -49,21 +49,22 @@ class RemoteInputManagerImpl @Inject constructor() : IRemoteInputManager {
     }
 
     override fun onRemoteCommandReceived(command: Int) {
-        val type = when (command) {
-            BluetoothLeService.COMMAND_SHUTTER -> RemoteInputType.SHUTTER_BUTTON
-            BluetoothLeService.COMMAND_UP -> RemoteInputType.ZOOM_IN
-            BluetoothLeService.COMMAND_DOWN -> RemoteInputType.ZOOM_OUT
-            BluetoothLeService.COMMAND_AFMF -> RemoteInputType.FOCUS_BUTTON
-            BluetoothLeService.COMMAND_MODE -> RemoteInputType.SWITCH_CAMERA
+        val button = when (command) {
+            BluetoothLeService.COMMAND_SHUTTER -> RemoteButton.SHUTTER
+            BluetoothLeService.COMMAND_MODE -> RemoteButton.MODE
+            BluetoothLeService.COMMAND_MENU -> RemoteButton.MENU
+            BluetoothLeService.COMMAND_UP -> RemoteButton.UP
+            BluetoothLeService.COMMAND_DOWN -> RemoteButton.DOWN
+            BluetoothLeService.COMMAND_AFMF -> RemoteButton.AFMF
             else -> null
         }
-        if (type != null) {
-            dispatchInputEvent(type)
+        if (button != null) {
+            dispatchInputEvent(button)
         }
     }
 
-    override fun dispatchInputEvent(type: RemoteInputType): Boolean {
+    override fun dispatchInputEvent(button: RemoteButton): Boolean {
         if (!isListening) return false
-        return _remoteInputEventFlow.tryEmit(type)
+        return _remoteInputEventFlow.tryEmit(button)
     }
 }

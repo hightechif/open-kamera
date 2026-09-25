@@ -65,12 +65,11 @@ session.setRepeatingRequest(recordRequestBuilder.build(), captureCallback, backg
 
 Coordinating `MediaRecorder` state with Camera2 session state requires careful handling to prevent crashes or corrupted video files.
 
-In OpenKamera, this orchestration is managed by [`Camera2VideoPipeline.kt`](file:///Users/ridhanfadhilah/Public/Fadhil/mobile/android/studio-lab/project-open-camera/OpenKamera/app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2VideoPipeline.kt):
-1. **Preparation**: Resolving video dimensions, frame rate, bitrate, and container format via `VideoProfile`.
-2. **Session Reconfiguration**: Creating or updating the `CameraCaptureSession` to attach `videoRecorderSurface`.
-3. **Start Recording**: Calling `mediaRecorder.start()` and transitioning the repeating request to `TEMPLATE_RECORD`.
-4. **Pause/Resume**: Handling API 24+ pause/resume without resetting session connections.
-5. **Stop & Finalize**: Calling `mediaRecorder.stop()`, releasing resources, and restoring `TEMPLATE_PREVIEW`.
+In OpenKamera, the `MediaRecorder` is owned by the legacy flow: [`Preview.kt`](../../app/src/main/java/com/hightechif/openkamera/preview/Preview.kt) configures, starts, pauses and stops it, and [`CameraController2.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/CameraController2.kt) owns the capture session. [`Camera2VideoPipeline.kt`](../../app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2VideoPipeline.kt) is a small set of **hooks** that `Preview` calls around that lifecycle:
+1. **Pre-prepare hook** (`initVideoRecorderPrePrepare`): plays the start cue and hands the recorder to the pipeline before `MediaRecorder.prepare()`.
+2. **Post-prepare hook** (`initVideoRecorderPostPrepare`): builds the `TEMPLATE_RECORD` request and creates the video capture session that attaches `videoRecorderSurface` (`createVideoSession`).
+3. **Video snapshot** (`createVideoSnapshotRequest`): builds the `TEMPLATE_VIDEO_SNAPSHOT` still request used while a recording is running.
+4. **Start, pause/resume and stop** stay in `Preview`: it calls `mediaRecorder.start()`, the API 24+ pause/resume, and `mediaRecorder.stop()`, then restores `TEMPLATE_PREVIEW`.
 
 ---
 

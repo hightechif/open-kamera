@@ -25,6 +25,7 @@ import com.hightechif.openkamera.domain.repository.ILocationRepository
 import com.hightechif.openkamera.domain.repository.IMediaRepository
 import com.hightechif.openkamera.domain.repository.ISensorRepository
 import com.hightechif.openkamera.domain.repository.ISettingsRepository
+import com.hightechif.openkamera.ui.CameraCommand
 import com.hightechif.openkamera.ui.CameraUiEffect
 import com.hightechif.openkamera.ui.CameraViewModel
 import com.hightechif.openkamera.ui.SettingsViewModel
@@ -142,18 +143,31 @@ class MainActivity : MainActivityLegacyGlue() {
                         val takePhotoButton = findViewById<ImageButton>(R.id.take_photo)
                         when (progress) {
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Starting,
-                            is com.hightechif.openkamera.domain.engine.CaptureProgress.CapturingBurst,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Processing -> {
                                 takePhotoButton?.animate()?.scaleX(0.88f)?.scaleY(0.88f)
                                     ?.setDuration(70)?.start()
                             }
 
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Idle,
-                            is com.hightechif.openkamera.domain.engine.CaptureProgress.Completed,
                             is com.hightechif.openkamera.domain.engine.CaptureProgress.Failed -> {
                                 takePhotoButton?.animate()?.scaleX(1.0f)?.scaleY(1.0f)
                                     ?.setDuration(100)?.start()
                             }
+                        }
+                    }
+                }
+                launch {
+                    cameraViewModel.cameraCommands.collect { command ->
+                        when (command) {
+                            is CameraCommand.TakePicture ->
+                                if (command.continuousFastBurst) {
+                                    takePicturePressed(photoSnapshot = false, continuousFastBurst = true)
+                                } else {
+                                    takePicture(command.photoSnapshot)
+                                }
+                            is CameraCommand.RemoteShutter -> triggerRemoteControlAction()
+                            is CameraCommand.PauseResumeVideo -> pauseVideo()
+                            is CameraCommand.RemoteButton -> handleRemoteButton(command.button)
                         }
                     }
                 }
