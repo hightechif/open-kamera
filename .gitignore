@@ -198,3 +198,4 @@ graphify-out/manifest.json
 .agents/
 .claude/
 openspec/
+skills-lock.json
