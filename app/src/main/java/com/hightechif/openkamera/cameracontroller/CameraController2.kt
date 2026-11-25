@@ -168,7 +168,11 @@ class CameraController2(
 
     // used if sessionType == SESSIONTYPE_EXTENSION
     private var extensionSession: CameraExtensionSession?
-        get() = sessionManager.extensionSession as? CameraExtensionSession
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            sessionManager.extensionSession as? CameraExtensionSession
+        } else {
+            null
+        }
         set(value) {
             if (value != null) {
                 sessionManager.onExtensionSessionConfigured(value)

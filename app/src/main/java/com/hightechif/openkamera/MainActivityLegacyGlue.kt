@@ -6348,6 +6348,9 @@ $captureRateString${resources.getString(R.string.fps)}${
         mainUI.audioControlStopped()
     }
 
+    // RECORD_AUDIO is checked via permissionManager.hasRecordAudioPermission() below;
+    // lint cannot see through that helper.
+    @SuppressLint("MissingPermission")
     fun startAudioListener() {
         if (MyDebug.LOG) Log.d(TAG, "startAudioListener")
         if (!permissionManager.hasRecordAudioPermission()) {
