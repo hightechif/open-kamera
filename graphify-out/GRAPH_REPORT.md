@@ -1,16 +1,16 @@
-# Graph Report - OpenKamera  (2026-09-25)
+# Graph Report - OpenKamera  (2026-10-23)
 
 ## Corpus Check
-- 370 files · ~426,041 words
+- 372 files · ~426,609 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5515 nodes · 10523 edges · 390 communities (187 shown, 164 thin omitted)
+- 5526 nodes · 10532 edges · 405 communities (186 shown, 178 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 482 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `44688cac`
+- Built from commit: `847450a3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,7 +20,7 @@
 - MyApplicationInterface
 - CameraController
 - Preview
-- FastAccessBitmap
+- IntArray
 - Camera2RequestBuilderHelper
 - MainActivityLegacyGlue
 - HDRProcessor
@@ -39,7 +39,7 @@
 - CameraViewModel
 - Main UI
 - RemoteInputManagerImpl
-- IntArray
+- JavaImageFunctionsHDR
 - PopupView.kt
 - ImageSaver
 - Camera2StateCallbackDispatcher
@@ -49,7 +49,7 @@
 - Camera2DeviceQuirksTest
 - SeekBar
 - StorageUtils
-- .onActivity
+- .setToDefault
 - CameraPreferencesRepository
 - PhotoPreferencesRepository
 - CameraFacing
@@ -58,7 +58,7 @@
 - ImageSavePipeline
 - ICameraEngine
 - .run
-- ApplyFunctionInterface
+- JavaImageFunctionsPreview
 - FakeSharedPreferences
 - Camera2FocusMeteringCoordinator
 - VideoRecordingCoordinator
@@ -67,7 +67,7 @@
 - CaptureTimerCoordinator
 - ArraySeekBarPreference
 - CameraViewModelUnitTest
-- .putBoolean
+- LocationPreferencesRepository
 - PreviewFaceDetectionEngine
 - FolderChooserDialog
 - native_bridge.cpp
@@ -82,7 +82,7 @@
 - SystemOrientation
 - PermissionManager
 - ExifHandler
-- AudioListener
+- FakeSettingsRepository
 - .cancelAutoFocus
 - CameraControllerManager
 - OpenKamera
@@ -91,7 +91,7 @@
 - Camera2FocusMeteringCoordinatorUnitTest
 - MyDebug
 - Size
-- VideoResolutionPreset
+- AudioListener
 - .getCameraIdPref
 - .layoutUI
 - DrawPreviewContext
@@ -106,14 +106,14 @@
 - LocationSupplier
 - MediaPersistenceManager
 - BaseInstrumentedTest
-- FakeEditor
+- .putBoolean
 - CameraCaptureStateMachine
 - RectF
 - PreviewGestureHandler
 - .takePhotoWhenFocused
 - PreviewSensorManager
 - DialogCoordinator
-- SaveLocationHandler
+- FastAccessBitmap
 - ISettingsRepository
 - Module 01 — Lesson 02: The Camera2 Session Model
 - LockedBitmap
@@ -121,35 +121,35 @@
 - BluetoothLeService
 - LocationCoordinates
 - .saveImage
-- build.gradle
+- useScopedStorage
 - AudioControllerImpl
-- IRemoteInputManager
+- RemoteButton
 - .handleRemoteButton
 - CameraApiSelection
-- ISensorRepository
+- SensorRepositoryImpl
 - 01-video-pipeline-overview
 - MySurfaceView
 - .startVideoRecording
 - MyEditTextPreference
 - Lesson 01-04 Project Architecture
-- CameraController.kt
+- CachedBitmap
 - MeteringAreaConverter
 - PhotoMode
 - MyTextureView
-- .run
-- FocusState
+- .setupCamera
+- CameraUiState.kt
 - Camera2BurstCoordinator
 - Camera2PhotoPipeline.kt
 - RawImage
 - IMediaRepository
 - .rotateForExif
-- AudioListenerUnitTest
+- SupportedValues
 - PreferenceSubPhoto.kt
-- VideoProfileConfig
+- IAudioController
 - PreviewVideoManager
 - LocationRepositoryImpl
+- IRemoteInputManager
 - TelemetryHudOverlayRendererTest
-- TelemetryHudOverlayRenderer
 - KeyEventHandlerTest
 - Module 00 — Lesson 06: The Practical Field Cookbook
 - Camera23AController
@@ -162,16 +162,16 @@
 - SensorCalculationTest
 - Module 02 — Lesson 02: Preview Lifecycle
 - FrameInfo
-- .getBitmapFromFile
-- .getDisplayRotationDegrees
-- RemoteInputManagerTest
-- SoundPoolManager
-- ApplicationInterface.kt
+- .setCameraParameters
+- CameraControllerManager2
+- .onCompleted
+- Camera2InfoCache
+- Uri
 - PreviewSurfaceManager
 - ViewportDimensions
 - PreviewCaptureCoordinator
 - MyWidgetProviderTakePhoto.kt (164)
-- OverlayRenderer
+- FocusFaceOverlayRenderer
 - CameraResolutionUnitTest
 - DialogCoordinatorTest.kt (166)
 - Module 00 — Lesson 03: Shooting Modes & EV Compensation
@@ -183,16 +183,16 @@
 - PostProcessing
 - MainUI.kt
 - GyroTargetOverlayRenderer
-- SettingsViewModel
+- CaptureMode
 - .clickedSwitchMultiCamera
 - 04-hdr-image-processing
 - HdrAvgInstrumentedTest
-- PhotoInstrumentedTest
+- .onActivity
 - Camera2CaptureState
-- CameraControllerException
+- .takePictureNow
 - CameraFeaturesCache
 - VideoSessionState
-- TestUtils.kt
+- PreferenceSubCameraControlsMore.kt
 - CameraLifecycleCoordinator
 - .setNextPanoramaPoint
 - BluetoothRemoteControl.kt
@@ -212,7 +212,7 @@
 - Camera2RequestBuilderHelperUnitTest
 - HdrMathUnitTest
 - Module 00 — Lesson 02: The Exposure Triangle
-- MyTileServiceVideo.kt
+- ApplyFunctionInterface
 - FileWrapper
 - .switchToVideo
 - UriType
@@ -234,8 +234,8 @@
 - CameraSettingsInterface
 - TextFormatter
 - feature_detector.cpp
-- DimPreview
-- .onDismiss
+- Camera2EngineBridgeTest
+- Android Project Guide
 - .computeHistogram
 - HistogramType
 - GyroImageDebugInfo
@@ -243,15 +243,15 @@
 - PreviewCameraSetupHelperUnitTest
 - RendererUtilsTest
 - 05-raw-and-dng-capture
-- PreviewSurfaceManager
+- Camera2VideoPipeline
 - DispatchersModule
-- KeyEventHandlerUnitTest.kt
+- HorizonAngle
 - PreferenceSubVideo.kt
 - Type
 - ProcessType
 - .onRequestPermissionsResult
 - Camera1ApiParityTest
-- Camera2ExtensionArchitectureUnitTest
+- CameraControllerException
 - DispatchersModuleTest
 - CameraModelsTest
 - GridOverlayRendererTest
@@ -261,7 +261,7 @@
 - OpenKameraApplication
 - .onCreate
 - SaveBase
-- Type
+- .handleOnSharedPreferenceChanged
 - HistogramProcessorUnitTest
 - MtbAlignmentUnitTest
 - BluetoothRemoteControlUnitTest
@@ -271,7 +271,7 @@
 - gradlew
 - openkamera_native CMake Project
 - NRModePref
-- ImageFormat
+- CamcorderProfile
 - .setupExposureUI
 - RendererUtils
 - FocusPeakingProcessorUnitTest
@@ -283,7 +283,7 @@
 - Open Kamera Main Page
 - .onBurstPictureTaken
 - NoFreeStorageException
-- IntRange
+- PreviewSensorManagerTest
 - LocationDmsUnitTest
 - Open Kamera Version History
 - .onBurstPictureTaken
@@ -295,6 +295,19 @@
 - Apache License 2.0 (AndroidX)
 - Androidx_License 2.0
 - Gpl 3.0
+- .getOptimalPreviewSize
+- PreviewCameraSetupHelper
+- .onCreate
+- .onCreate
+- MediaRecorder
+- FocusFaceOverlayRendererTest.kt
+- .autoFocus
+- .setContinuousFocusMoveCallback
+- .setFaceDetectionListener
+- .getDisplaySize
+- .getLocation
+- .onDrawPreview
+- .touchEvent
 - Google_Material_Design_Icons_License 2.0
 - Camera1 (deprecated)
 - Camera1 vs Camera2 at a Glance
@@ -386,10 +399,10 @@
   docs/module-04-video/03-audio-sources-and-sync.md → app/src/main/java/com/hightechif/openkamera/cameracontroller/Camera2PhotoPipeline.kt
 - `Camera1 API` --semantically_similar_to--> `Camera1`  [INFERRED] [semantically similar]
   README.md → docs/module-01-foundations/01-camera-api-overview.md
-- `OpenKamera Learning Curriculum` --references--> `OpenKamera`  [EXTRACTED]
-  docs/README.md → README.md
-- `OpenKamera` --references--> `Camera API Overview Lesson`  [EXTRACTED]
-  README.md → docs/module-01-foundations/01-camera-api-overview.md
+- `Architecture and Packages` --conceptually_related_to--> `Camera2EngineBridge`  [INFERRED]
+  README.md → docs/module-05-advanced/01-camera-engine-abstraction.md
+- `Architecture and Packages` --conceptually_related_to--> `ICameraEngine`  [INFERRED]
+  README.md → docs/module-05-advanced/01-camera-engine-abstraction.md
 
 ## Import Cycles
 - None detected.
@@ -405,19 +418,19 @@
 - **HDR Bracket Align Blend Tonemap** — docs_module_03_photography_03_burst_and_bracketing_exposure_bracketing_aeb, docs_module_03_photography_04_hdr_image_processing_multi_frame_image_alignment, docs_module_03_photography_04_hdr_image_processing_weighting_and_blending, docs_module_03_photography_04_hdr_image_processing_tone_mapping [INFERRED 0.85]
 - **Video Recording Stack** — docs_module_04_video_01_video_pipeline_overview_camera2videopipeline, docs_module_04_video_02_mediarecorder_and_codecs_videoprofile, docs_module_04_video_03_audio_sources_and_sync_audio_sources, docs_module_04_video_01_video_pipeline_overview_mediarecorder [INFERRED 0.85]
 
-## Communities (390 total, 164 thin omitted)
+## Communities (405 total, 178 thin omitted)
 
 ### Community 3 - "CameraController"
 Cohesion: 0.02
-Nodes (7): AutoFocusCallback, CameraController, ContinuousFocusMoveCallback, ErrorCallback, FocusMeteringArea, PreviewCameraSetupHelper, FocusFaceOverlayRendererTest
+Nodes (9): AutoFocusCallback, CameraController, ContinuousFocusMoveCallback, ErrorCallback, Location, MediaRecorder, SurfaceHolder, TextureView (+1 more)
 
 ### Community 4 - "Preview"
 Cohesion: 0.03
 Nodes (7): com, FloatArray, HistogramType, IntArray, Preview, Callback, Resources
 
-### Community 5 - "FastAccessBitmap"
-Cohesion: 0.06
-Nodes (27): AddBitmapFunction, Blur1dXFullFunction, Blur1dXFunction, Blur1dYFullFunction, Blur1dYFunction, ComputeDerivativesFunction, ConvertToGreyscaleFunction, CornerDetectorFunction (+19 more)
+### Community 5 - "IntArray"
+Cohesion: 0.07
+Nodes (16): AddBitmapFunction, Blur1dXFullFunction, Blur1dYFullFunction, ConvertToGreyscaleFunction, ExpandBitmapFullFunction, ExpandBitmapFunction, JavaImageFunctionsPanorama, ByteArray (+8 more)
 
 ### Community 6 - "Camera2RequestBuilderHelper"
 Cohesion: 0.06
@@ -436,16 +449,16 @@ Cohesion: 0.12
 Nodes (15): DeviceScanner, AppCompatActivity, BluetoothAdapter, Bundle, Handler, IntArray, Intent, ListView (+7 more)
 
 ### Community 10 - "MainActivity"
-Cohesion: 0.14
-Nodes (5): Uri, SubTestTakePhotoInfo, TestUtils, com, MainActivity
+Cohesion: 0.10
+Nodes (10): AvgCallback, HistogramDetails, Bitmap, Context, Intent, Uri, SubTestTakePhotoInfo, TestUtils (+2 more)
 
 ### Community 11 - ".initLegacy"
 Cohesion: 0.09
 Nodes (11): Bundle, Bundle, OnLongClickListener, OnLongClickListener, PausePreviewOnBackPressedCallback, PopupOnBackPressedCallback, ScreenLockOnBackPressedCallback, OnBackPressedCallback (+3 more)
 
 ### Community 12 - "CameraController1"
-Cohesion: 0.04
-Nodes (8): CameraController1, ByteArray, ContinuousFocusMoveCallback, FaceDetectionListener, IntArray, MediaRecorder, Area, SupportedValues
+Cohesion: 0.05
+Nodes (3): CameraController1, ByteArray, IntArray
 
 ### Community 13 - "Panorama Processor"
 Cohesion: 0.12
@@ -453,7 +466,7 @@ Nodes (18): AutoAlignmentByFeatureResult, ComputeDistancesBetweenMatchesThread, 
 
 ### Community 14 - "Camera2SessionManager"
 Cohesion: 0.06
-Nodes (23): Active, Camera2SessionManager, StateCallback, CameraDeviceState, CaptureSessionState, Closed, Configured, ConfigureFailed (+15 more)
+Nodes (22): Active, Camera2SessionManager, StateCallback, CameraDeviceState, CaptureSessionState, Closed, Configured, ConfigureFailed (+14 more)
 
 ### Community 15 - "PreviewFrameEffectsProcessor"
 Cohesion: 0.07
@@ -468,36 +481,36 @@ Cohesion: 0.11
 Nodes (6): OrientationLifecycleInstrumentedTest, PreferencesActivityInstrumentedTest, StorageAccessFrameworkInstrumentedTest, T, EspressoCameraUiInstrumentedTest, VideoRecordingStateMachineInstrumentedTest
 
 ### Community 18 - "DrawPreview"
-Cohesion: 0.08
-Nodes (10): DrawPreview, Bitmap, Canvas, Context, FloatArray, HistogramType, Rect, SharedPreferences (+2 more)
+Cohesion: 0.07
+Nodes (14): DimPreview, DIM_PREVIEW_OFF, DIM_PREVIEW_ON, DIM_PREVIEW_UNTIL, DrawPreview, Bitmap, Canvas, Context (+6 more)
 
 ### Community 19 - "Camera2CaptureCoordinator"
 Cohesion: 0.06
 Nodes (10): Camera2CaptureCoordinator, StateFlow, BurstType, BURSTTYPE_CONTINUOUS, BURSTTYPE_EXPO, BURSTTYPE_FOCUS, BURSTTYPE_NONE, BURSTTYPE_NORMAL (+2 more)
 
 ### Community 21 - "CameraViewModel"
-Cohesion: 0.06
-Nodes (24): CaptureProgress, Failed, Idle, Processing, Starting, Intent, CameraCommand, CameraUiEffect (+16 more)
+Cohesion: 0.07
+Nodes (18): CaptureProgress, Failed, Idle, Processing, Starting, Intent, CameraCommand, PauseResumeVideo (+10 more)
 
 ### Community 23 - "RemoteInputManagerImpl"
-Cohesion: 0.16
-Nodes (9): BleConnectionState, Connected, Connecting, Disconnected, Error, Flow, RemoteButton, StateFlow (+1 more)
+Cohesion: 0.13
+Nodes (5): Flow, RemoteButton, StateFlow, RemoteInputManagerImpl, RemoteInputManagerTest
 
-### Community 24 - "IntArray"
-Cohesion: 0.10
-Nodes (15): AdjustHistogramApplyFunction, AlignMTBApplyFunction, AvgApplyFunction, AvgBrightenApplyFunction, ComputeHistogramApplyFunction, CreateMTBApplyFunction, DROBrightenApplyFunction, HDRApplyFunction (+7 more)
+### Community 24 - "JavaImageFunctionsHDR"
+Cohesion: 0.14
+Nodes (11): AvgApplyFunction, AvgBrightenApplyFunction, ComputeHistogramApplyFunction, CreateMTBApplyFunction, DROBrightenApplyFunction, HDRApplyFunction, HDRNApplyFunction, JavaImageFunctionsHDR (+3 more)
 
 ### Community 25 - "PopupView.kt"
 Cohesion: 0.10
 Nodes (19): ArrayOptionsPopupListener, ButtonOptionsPopupListener, Context, LinearLayout, OnGlobalLayoutListener, SharedPreferences, TextView, View (+11 more)
 
 ### Community 26 - "ImageSaver"
-Cohesion: 0.13
-Nodes (7): ImageSaver, Bitmap, ByteArray, CompressFormat, Location, Uri, Request
+Cohesion: 0.08
+Nodes (17): ImageFormat, PNG, STD, WEBP, ImageSaver, IntRange, Bitmap, ByteArray (+9 more)
 
 ### Community 27 - "Camera2StateCallbackDispatcher"
-Cohesion: 0.07
-Nodes (24): Camera2VideoPipeline, CameraDevice, CaptureRequest, MediaRecorder, Surface, Camera2StateCallbackDispatcher, CaptureEventListener, CameraCaptureSession (+16 more)
+Cohesion: 0.16
+Nodes (10): Camera2StateCallbackDispatcher, CaptureEventListener, CameraCaptureSession, CaptureRequest, CaptureResult, Surface, TotalCaptureResult, Camera2VideoPipelineTest (+2 more)
 
 ### Community 28 - "MyApplicationInterface.kt"
 Cohesion: 0.11
@@ -511,49 +524,53 @@ Nodes (4): com, VideoPreferencesRepository, SharedPreferences, VideoPreferencesR
 Cohesion: 0.14
 Nodes (5): Bitmap, ByteArray, FloatArray, IntArray, NativeImageProcessorBridge
 
+### Community 31 - "Camera2DeviceQuirksTest"
+Cohesion: 0.08
+Nodes (3): Camera2DeviceQuirks, Camera2DeviceQuirksTest, Camera2ExtensionArchitectureUnitTest
+
 ### Community 32 - "SeekBar"
 Cohesion: 0.09
 Nodes (10): SeekBar, performHapticFeedback(), OnSeekBarChangeListener, SeekBar, OnSeekBarChangeListener, OnSeekBarChangeListener, OnSeekBarChangeListener, OnSeekBarChangeListener (+2 more)
 
 ### Community 33 - "StorageUtils"
-Cohesion: 0.13
-Nodes (7): Context, Uri, Media, StorageUtils, UriType, MEDIASTORE_IMAGES, MEDIASTORE_VIDEOS
+Cohesion: 0.06
+Nodes (12): SaveLocationHistory, Context, Uri, Media, StorageUtils, UriType, MEDIASTORE_IMAGES, MEDIASTORE_VIDEOS (+4 more)
 
 ### Community 36 - "PhotoPreferencesRepository"
 Cohesion: 0.06
-Nodes (5): PhotoPreferencesRepository, RawPref, RAWPREF_JPEG_DNG, RAWPREF_JPEG_ONLY, PreferencesRepositoriesUnitTest
+Nodes (6): PhotoPreferencesRepository, RawPref, RAWPREF_JPEG_DNG, RAWPREF_JPEG_ONLY, SharedPreferences, PhotoPreferencesRepositoryTest
 
 ### Community 37 - "CameraFacing"
-Cohesion: 0.12
-Nodes (8): Result, Result, CameraFacing, BACK, EXTERNAL, FRONT, Result, DomainUseCasesUnitTest
+Cohesion: 0.18
+Nodes (7): Result, Result, CameraFacing, BACK, EXTERNAL, FRONT, Result
 
 ### Community 38 - "MyPreferenceFragment.kt"
-Cohesion: 0.14
-Nodes (13): AlertDialog, Bundle, OnSharedPreferenceChangeListener, Preference, PreferenceFragment, SharedPreferences, TextView, View (+5 more)
+Cohesion: 0.17
+Nodes (11): AlertDialog, Bundle, DialogInterface, OnSharedPreferenceChangeListener, PreferenceFragment, TextView, View, MyPreferenceFragment (+3 more)
 
 ### Community 39 - "Preview.kt"
 Cohesion: 0.09
-Nodes (15): Bundle, CameraResolutionConstraints, Bundle, Canvas, Context, Job, MotionEvent, RenderScript (+7 more)
+Nodes (15): CameraResolutionConstraints, Bundle, Canvas, Context, Job, OrientationEventListener, RenderScript, SensorEvent (+7 more)
 
 ### Community 40 - "ImageSavePipeline"
 Cohesion: 0.09
 Nodes (10): ImageSavePipeline, StateFlow, ImageSaveQueueState, Dummy, OnDestroy, SaveJpeg, SaveRaw, SaveTask (+2 more)
 
 ### Community 41 - "ICameraEngine"
-Cohesion: 0.06
-Nodes (21): Camera2EngineBridge, CameraController2, Flow, PointF, StateFlow, Surface, TotalCaptureResult, CameraModule (+13 more)
+Cohesion: 0.05
+Nodes (28): Camera2EngineBridge, CameraController2, Flow, PointF, StateFlow, Surface, TotalCaptureResult, CameraModule (+20 more)
 
 ### Community 42 - ".run"
 Cohesion: 0.11
 Nodes (3): AlertDialog, DialogInterface, MyFolderChooserDialog
 
-### Community 43 - "ApplyFunctionInterface"
-Cohesion: 0.10
-Nodes (15): FocusPeakingProcessor, Bitmap, Bitmap, ZebraStripesProcessor, FocusPeakingApplyFunction, FocusPeakingFilteredApplyFunction, JavaImageFunctionsPreview, ByteArray (+7 more)
+### Community 43 - "JavaImageFunctionsPreview"
+Cohesion: 0.12
+Nodes (10): FocusPeakingProcessor, Bitmap, Bitmap, ZebraStripesProcessor, FocusPeakingApplyFunction, FocusPeakingFilteredApplyFunction, JavaImageFunctionsPreview, ByteArray (+2 more)
 
 ### Community 44 - "FakeSharedPreferences"
-Cohesion: 0.07
-Nodes (6): CameraPreferencesRepositoryTest, SharedPreferences, SharedPreferences, PhotoPreferencesRepositoryTest, MyApplicationInterfaceUnitTest, FakeSharedPreferences
+Cohesion: 0.06
+Nodes (5): CameraPreferencesRepositoryTest, SharedPreferences, MyApplicationInterfaceUnitTest, FakeSharedPreferences, SettingsRepositoryUnitTest
 
 ### Community 45 - "Camera2FocusMeteringCoordinator"
 Cohesion: 0.11
@@ -564,24 +581,24 @@ Cohesion: 0.12
 Nodes (5): Location, MediaRecorder, StateFlow, VideoEventListener, VideoRecordingCoordinator
 
 ### Community 47 - "CameraUdfIntegrationTest.kt"
-Cohesion: 0.11
-Nodes (16): ExposureCompensation, SensorOrientation, AdjustExposureUseCase, GetCameraCapabilitiesUseCase, PointF, StateFlow, SetZoomUseCase, SwitchCameraFacingUseCase (+8 more)
+Cohesion: 0.07
+Nodes (20): StateFlow, Surface, PreviewSurfaceManager, SensorOrientation, ISensorRepository, Flow, AdjustExposureUseCase, GetCameraCapabilitiesUseCase (+12 more)
 
 ### Community 48 - "VideoProfile"
-Cohesion: 0.12
-Nodes (4): MediaRecorder, VideoProfile, MediaRecorder, VideoRecorderEngineTest
+Cohesion: 0.09
+Nodes (5): MediaRecorder, VideoProfile, MediaRecorder, VideoRecorderEngineTest, VideoRecordingCoordinatorTest
 
 ### Community 49 - "CaptureTimerCoordinator"
 Cohesion: 0.10
 Nodes (11): BurstScheduleConfig, CaptureTimerCoordinator, Job, StateFlow, Cancelled, CountdownState, Finished, Idle (+3 more)
 
 ### Community 50 - "ArraySeekBarPreference"
-Cohesion: 0.12
-Nodes (14): Bundle, PreferenceSubPreview, ArraySeekBarPreference, OnSeekBarChangeListener, BaseSavedState, DialogPreference, OnSeekBarChangeListener, Parcel (+6 more)
+Cohesion: 0.15
+Nodes (12): ArraySeekBarPreference, OnSeekBarChangeListener, BaseSavedState, DialogPreference, OnSeekBarChangeListener, Parcel, Parcelable, SeekBar (+4 more)
 
-### Community 52 - ".putBoolean"
+### Community 52 - "LocationPreferencesRepository"
 Cohesion: 0.10
-Nodes (3): LocationPreferencesRepository, SharedPreferences, LocationPreferencesRepositoryTest
+Nodes (4): LocationPreferencesRepository, SharedPreferences, LocationPreferencesRepositoryTest, PreferencesRepositoriesUnitTest
 
 ### Community 53 - "PreviewFaceDetectionEngine"
 Cohesion: 0.11
@@ -616,8 +633,8 @@ Cohesion: 0.10
 Nodes (8): android, com, MotionEvent, PreviewTouchCallback, PreviewTouchGestureCoordinator, Context, PreviewTouchGestureUnitTest, GestureDetector
 
 ### Community 64 - "SystemOrientation"
-Cohesion: 0.24
-Nodes (7): getRotationFromSystemOrientation(), SystemOrientation, LANDSCAPE, PORTRAIT, REVERSE_LANDSCAPE, CropGuideOverlayRenderer, Canvas
+Cohesion: 0.15
+Nodes (9): getRotationFromSystemOrientation(), SystemOrientation, LANDSCAPE, PORTRAIT, REVERSE_LANDSCAPE, CropGuideOverlayRenderer, Canvas, Canvas (+1 more)
 
 ### Community 65 - "PermissionManager"
 Cohesion: 0.12
@@ -627,21 +644,25 @@ Nodes (3): IntArray, PermissionManager, PermissionManagerTest
 Cohesion: 0.20
 Nodes (8): ExifHandler, ExifInterfaceHolder, ByteArray, Context, ExifInterface, FileDescriptor, Location, Uri
 
-### Community 67 - "AudioListener"
-Cohesion: 0.29
-Nodes (5): AudioListener, AudioListenerCallback, CoroutineScope, Job, AudioRecord
+### Community 67 - "FakeSettingsRepository"
+Cohesion: 0.10
+Nodes (3): FakeSettingsRepository, Flow, SettingsPreferenceUnitTest
+
+### Community 68 - ".cancelAutoFocus"
+Cohesion: 0.12
+Nodes (3): ContinuousFocusMoveCallback, MotionEvent, ContinuousFocusMoveCallback
 
 ### Community 69 - "CameraControllerManager"
-Cohesion: 0.11
-Nodes (11): CameraControllerManager1, Context, CameraControllerManager2, CameraCharacteristics, Context, SizeF, CameraControllerManager, CameraInfo (+3 more)
+Cohesion: 0.17
+Nodes (7): CameraControllerManager1, Context, CameraControllerManager, CameraInfo, Context, Context, MultiCamHandler
 
 ### Community 70 - "OpenKamera"
 Cohesion: 0.08
 Nodes (33): Camera API Selection Rule, Camera1, Camera1 Fallback, CameraController1, CameraController2, CameraControllerManager1, Camera2 Hardware Levels (FULL, LIMITED, LEGACY), Preview.openCameraCore (+25 more)
 
 ### Community 71 - "VideoSessionOutput"
-Cohesion: 0.10
-Nodes (7): StateFlow, VideoSessionManager, VideoSessionOutput, VideoRecordingCoordinatorTest, VideoSessionManagerUnitTest, AutoCloseable, Closeable
+Cohesion: 0.13
+Nodes (6): StateFlow, VideoSessionManager, VideoSessionOutput, VideoSessionManagerUnitTest, AutoCloseable, Closeable
 
 ### Community 72 - "VideoQualityHandler"
 Cohesion: 0.13
@@ -652,16 +673,16 @@ Cohesion: 0.09
 Nodes (7): Camera2FocusMeteringCoordinatorUnitTest, AutoFocusCallback, ContinuousFocusMoveCallback, AutoFocusCallback, AutoFocusCallback, AutoFocusCallback, ContinuousFocusMoveCallback
 
 ### Community 74 - "MyDebug"
-Cohesion: 0.16
-Nodes (8): Activity, Bundle, PreferenceSubGUI, Bundle, PreferenceSubLocation, KeyguardUtils, KeyguardDismissCallback, MyDebug
+Cohesion: 0.17
+Nodes (7): Activity, Context, KeyguardUtils, KeyguardDismissCallback, TileService, MyTileServiceVideo, MyDebug
 
 ### Community 75 - "Size"
-Cohesion: 0.08
-Nodes (11): CameraFeatures, FloatArray, Size, Camera2InfoCache, FloatArray, IntArray, Range, Rect (+3 more)
+Cohesion: 0.09
+Nodes (9): CameraFeatures, Comparator, FloatArray, IntArray, Serializable, RangeSorter, Size, SizeSorter (+1 more)
 
-### Community 76 - "VideoResolutionPreset"
-Cohesion: 0.17
-Nodes (10): AudioAmplitudeData, VideoCodecPreset, H264, HEVC_H265, VideoResolutionPreset, RES_1080P_FHD, RES_480P_SD, RES_4K_UHD (+2 more)
+### Community 76 - "AudioListener"
+Cohesion: 0.06
+Nodes (20): AudioListener, AudioListenerCallback, com, CoroutineScope, Job, AudioAmplitudeData, VideoCodecPreset, H264 (+12 more)
 
 ### Community 78 - ".layoutUI"
 Cohesion: 0.19
@@ -688,7 +709,7 @@ Cohesion: 0.15
 Nodes (5): Configuration, Configuration, OnApplyWindowInsetsListener, MyDisplayListener, WindowInsets
 
 ### Community 84 - ".closeCamera"
-Cohesion: 0.15
+Cohesion: 0.20
 Nodes (3): CloseCameraCallback, CloseCameraCallback, CloseCameraCallback
 
 ### Community 85 - "Camera2CapabilitiesResolver.kt"
@@ -700,8 +721,8 @@ Cohesion: 0.15
 Nodes (7): Camera2ImageReaderPipeline, Handler, ImageReader, Surface, ImageReaderConfig, Camera2FacadeArchitectureUnitTest, Camera2ImageReaderPipelineUnitTest
 
 ### Community 87 - "PreferenceSubScreen"
-Cohesion: 0.22
-Nodes (8): PreferenceSubCameraControlsMore, AlertDialog, Bundle, OnSharedPreferenceChangeListener, PreferenceFragment, SharedPreferences, View, PreferenceSubScreen
+Cohesion: 0.29
+Nodes (7): AlertDialog, Bundle, OnSharedPreferenceChangeListener, PreferenceFragment, SharedPreferences, View, PreferenceSubScreen
 
 ### Community 88 - "LocationSupplier"
 Cohesion: 0.14
@@ -712,12 +733,12 @@ Cohesion: 0.26
 Nodes (4): ByteArray, Uri, MediaPersistenceManager, MediaPersistenceManagerTest
 
 ### Community 91 - "BaseInstrumentedTest"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (4): CameraIntentsInstrumentedTest, BaseInstrumentedTest, Intent, View
 
-### Community 92 - "FakeEditor"
-Cohesion: 0.15
-Nodes (6): Uri, SettingsManager, FakeEditor, SharedPreferences, Editor, XmlPullParser
+### Community 92 - ".putBoolean"
+Cohesion: 0.10
+Nodes (7): Uri, SettingsManager, IntArray, FakeEditor, SharedPreferences, Editor, XmlPullParser
 
 ### Community 93 - "CameraCaptureStateMachine"
 Cohesion: 0.12
@@ -732,24 +753,24 @@ Cohesion: 0.11
 Nodes (5): android, FloatArray, Matrix, PreviewGestureHandler, PreviewGestureHandlerTest
 
 ### Community 96 - ".takePhotoWhenFocused"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (8): AutoFocusCallback, ErrorCallback, ErrorCallback, ErrorCallback, AutoFocusCallback, AutoFocusCallback, ErrorCallback, AutoFocusCallback
 
 ### Community 98 - "PreviewSensorManager"
-Cohesion: 0.10
-Nodes (7): HorizonAngle, FloatArray, SensorEvent, StateFlow, PreviewSensorManager, PreviewSensorManagerTest, DrawPreviewCalculationUnitTest
+Cohesion: 0.27
+Nodes (4): FloatArray, SensorEvent, StateFlow, PreviewSensorManager
 
 ### Community 99 - "DialogCoordinator"
 Cohesion: 0.13
 Nodes (5): DialogCoordinator, InputFilter, AlertDialog, SharedPreferences, Spanned
 
-### Community 100 - "SaveLocationHandler"
-Cohesion: 0.12
-Nodes (5): SaveLocationHistory, CheckSaveLocationResult, AlertDialog, SaveLocationHandler, StorageLocationUnitTest
+### Community 100 - "FastAccessBitmap"
+Cohesion: 0.11
+Nodes (8): Blur1dXFunction, Blur1dYFunction, ComputeDerivativesFunction, CornerDetectorFunction, MergeFunction, ReduceBitmapXFunction, ReduceBitmapYFunction, FastAccessBitmap
 
 ### Community 101 - "ISettingsRepository"
-Cohesion: 0.03
-Nodes (29): CaptureMode, BURST, HDR, PANORAMA, PHOTO, SLOW_MOTION, VIDEO, FlashMode (+21 more)
+Cohesion: 0.05
+Nodes (19): FlashMode, AUTO, OFF, ON, RED_EYE, TORCH, GridType, CROSSHAIR (+11 more)
 
 ### Community 102 - "Module 01 — Lesson 02: The Camera2 Session Model"
 Cohesion: 0.12
@@ -771,25 +792,21 @@ Nodes (4): LocationCoordinates, FakeLocationRepository, Flow, LocationRepository
 Cohesion: 0.16
 Nodes (3): Bitmap, ByteArray, Location
 
-### Community 108 - "build.gradle"
-Cohesion: 0.20
-Nodes (3): useScopedStorage(), IntArray, PermissionHandler
-
 ### Community 109 - "AudioControllerImpl"
-Cohesion: 0.13
-Nodes (4): AudioControllerImpl, AudioListenerCallback, AudioListenerCallback, IAudioController
+Cohesion: 0.16
+Nodes (6): AudioControllerImpl, AudioListenerCallback, AudioListenerCallback, SoundPoolManager, SoundPool, SparseIntArray
 
-### Community 110 - "IRemoteInputManager"
-Cohesion: 0.17
-Nodes (10): IRemoteInputManager, Flow, StateFlow, RemoteButton, AFMF, DOWN, MENU, MODE (+2 more)
+### Community 110 - "RemoteButton"
+Cohesion: 0.18
+Nodes (8): RemoteButton, AFMF, DOWN, MENU, MODE, SHUTTER, UP, KeyEventHandlerUnitTest
 
 ### Community 112 - "CameraApiSelection"
-Cohesion: 0.21
+Cohesion: 0.19
 Nodes (4): CameraApiSelection, Choice, CameraApiSelectionTest, Case
 
-### Community 113 - "ISensorRepository"
-Cohesion: 0.09
-Nodes (10): ServiceModule, ISensorRepository, Flow, FloatArray, Flow, Sensor, SensorEvent, SensorEventListener (+2 more)
+### Community 113 - "SensorRepositoryImpl"
+Cohesion: 0.17
+Nodes (7): FloatArray, Flow, Sensor, SensorEvent, SensorEventListener, SensorManager, SensorRepositoryImpl
 
 ### Community 114 - "01-video-pipeline-overview"
 Cohesion: 0.18
@@ -807,9 +824,9 @@ Nodes (9): BaseSavedState, DialogPreference, Parcel, Parcelable, TypedArray, Vie
 Cohesion: 0.17
 Nodes (17): Camera2EngineBridge, CameraViewModel, Clean Architecture Layers (UI, Domain, Data), Lesson 01-04 Project Architecture, Hilt Dependency Injection, ICameraEngine, Package Map, Reactive State with Kotlin Flows (+9 more)
 
-### Community 120 - "CameraController.kt"
-Cohesion: 0.13
-Nodes (9): Comparator, IntArray, Location, MediaRecorder, Serializable, SurfaceHolder, TextureView, RangeSorter (+1 more)
+### Community 120 - "CachedBitmap"
+Cohesion: 0.19
+Nodes (7): AdjustHistogramApplyFunction, AlignMTBApplyFunction, ByteArray, IntArray, CachedBitmap, ByteArray, IntArray
 
 ### Community 121 - "MeteringAreaConverter"
 Cohesion: 0.23
@@ -823,20 +840,20 @@ Nodes (14): PhotoMode, DRO, ExpoBracketing, FastBurst, FocusBracketing, HDR, Noi
 Cohesion: 0.19
 Nodes (7): Context, Matrix, MediaRecorder, MotionEvent, TextureView, View, MyTextureView
 
-### Community 124 - ".run"
-Cohesion: 0.18
-Nodes (5): Point, Runnable, Runnable, Runnable, Runnable
+### Community 124 - ".setupCamera"
+Cohesion: 0.17
+Nodes (4): Runnable, Runnable, Runnable, Runnable
 
-### Community 125 - "FocusState"
-Cohesion: 0.11
-Nodes (9): Failed, Focused, FocusState, Idle, Locked, Scanning, CameraUiState, HudOverlayState (+1 more)
+### Community 125 - "CameraUiState.kt"
+Cohesion: 0.10
+Nodes (9): CameraUiEffect, CameraUiState, NavigateToGallery, OpenSettings, ShowErrorDialog, ShowToast, Vibrate, HudOverlayState (+1 more)
 
 ### Community 127 - "Camera2PhotoPipeline.kt"
 Cohesion: 0.11
 Nodes (17): Camera2PhotoPipeline, CaptureStateListener, CaptureRequest, CaptureResult, ErrorCallback, Handler, PictureCallback, PipelineContext (+9 more)
 
 ### Community 128 - "RawImage"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (3): ByteArray, PictureCallback, RawImage
 
 ### Community 129 - "IMediaRepository"
@@ -847,25 +864,21 @@ Nodes (7): RepositoryModule, IMediaRepository, Flow, Uri, Flow, Uri, MediaStorag
 Cohesion: 0.30
 Nodes (8): ImageUtils, Bitmap, ByteArray, Context, ExifInterface, Thread, Uri, LoadBitmapThread
 
-### Community 131 - "AudioListenerUnitTest"
-Cohesion: 0.18
-Nodes (3): com, AudioListenerUnitTest, ShortArray
-
 ### Community 134 - "PreviewVideoManager"
-Cohesion: 0.42
+Cohesion: 0.36
 Nodes (4): Location, MediaRecorder, StateFlow, PreviewVideoManager
 
 ### Community 135 - "LocationRepositoryImpl"
 Cohesion: 0.21
 Nodes (5): Bundle, Flow, Location, LocationListener, LocationRepositoryImpl
 
-### Community 136 - "TelemetryHudOverlayRendererTest"
-Cohesion: 0.31
-Nodes (4): Canvas, Context, SharedPreferences, TelemetryHudOverlayRendererTest
+### Community 136 - "IRemoteInputManager"
+Cohesion: 0.19
+Nodes (8): BleConnectionState, Connected, Connecting, Disconnected, Error, IRemoteInputManager, Flow, StateFlow
 
-### Community 137 - "TelemetryHudOverlayRenderer"
-Cohesion: 0.29
-Nodes (4): Bitmap, Canvas, Rect, TelemetryHudOverlayRenderer
+### Community 137 - "TelemetryHudOverlayRendererTest"
+Cohesion: 0.15
+Nodes (9): Bitmap, Canvas, Rect, TelemetryHudOverlayRenderer, Canvas, Context, SharedPreferences, TelemetryHudOverlayRendererTest (+1 more)
 
 ### Community 139 - "Module 00 — Lesson 06: The Practical Field Cookbook"
 Cohesion: 0.39
@@ -903,21 +916,17 @@ Nodes (32): Module 02 — Lesson 01: Surface & SurfaceTexture, How Camera2 Uses 
 Cohesion: 0.21
 Nodes (11): vector, FrameInfo, offset_x, offset_y, param_a, param_b, pixels, fu2_tonemap() (+3 more)
 
-### Community 150 - ".getBitmapFromFile"
-Cohesion: 0.36
-Nodes (3): AvgCallback, HistogramDetails, Bitmap
+### Community 151 - "CameraControllerManager2"
+Cohesion: 0.30
+Nodes (5): CameraControllerManager2, CameraCharacteristics, Context, SizeF, CameraManager
 
-### Community 151 - ".getDisplayRotationDegrees"
-Cohesion: 0.17
-Nodes (5): FaceDetectionListener, Matrix, OrientationEventListener, OrientationEventListener, FaceDetectionListener
+### Community 152 - ".onCompleted"
+Cohesion: 0.24
+Nodes (6): Camera2StateCallbackDispatcherUnitTest, CaptureEventListener, CameraCaptureSession, CaptureRequest, TotalCaptureResult, CaptureEventListener
 
-### Community 153 - "SoundPoolManager"
-Cohesion: 0.36
-Nodes (3): SoundPoolManager, SoundPool, SparseIntArray
-
-### Community 154 - "ApplicationInterface.kt"
-Cohesion: 0.12
-Nodes (6): Canvas, Context, Location, MotionEvent, Point, Uri
+### Community 153 - "Camera2InfoCache"
+Cohesion: 0.25
+Nodes (7): Camera2InfoCache, FloatArray, IntArray, Range, Rect, SizeF, Camera2InfoCacheTest
 
 ### Community 155 - "PreviewSurfaceManager"
 Cohesion: 0.29
@@ -926,10 +935,6 @@ Nodes (4): Matrix, T, PreviewSurfaceManager, PreviewSurfaceManagerTest
 ### Community 158 - "MyWidgetProviderTakePhoto.kt (164)"
 Cohesion: 0.24
 Nodes (8): Context, IntArray, MyWidgetProviderTakePhoto, AppCompatActivity, Bundle, TakePhoto, AppWidgetManager, AppWidgetProvider
-
-### Community 160 - "OverlayRenderer"
-Cohesion: 0.19
-Nodes (4): FocusFaceOverlayRenderer, Canvas, Canvas, OverlayRenderer
 
 ### Community 161 - "CameraResolutionUnitTest"
 Cohesion: 0.17
@@ -963,9 +968,9 @@ Nodes (7): AlertDialog, KeyEvent, LinearLayout, OnGlobalLayoutListener, View, On
 Cohesion: 0.23
 Nodes (5): GyroTargetOverlayRenderer, Bitmap, Canvas, FloatArray, BitmapFactory
 
-### Community 173 - "SettingsViewModel"
-Cohesion: 0.12
-Nodes (4): StateFlow, ViewModel, SettingsViewModel, SettingsViewModelUnitTest
+### Community 173 - "CaptureMode"
+Cohesion: 0.08
+Nodes (11): CaptureMode, BURST, HDR, PANORAMA, PHOTO, SLOW_MOTION, VIDEO, StateFlow (+3 more)
 
 ### Community 175 - "04-hdr-image-processing"
 Cohesion: 0.29
@@ -975,9 +980,9 @@ Nodes (12): 03-burst-and-bracketing, Burst Capture, Camera2BurstCoordinator, CON
 Cohesion: 0.29
 Nodes (6): Camera2CaptureState, Cancelled, Capturing, Completed, Idle, Preparing
 
-### Community 179 - "CameraControllerException"
-Cohesion: 0.11
-Nodes (13): CameraErrorCallback, AutoFocusCallback, ErrorCallback, Handler, Location, PictureCallback, SurfaceHolder, TextureView (+5 more)
+### Community 179 - ".takePictureNow"
+Cohesion: 0.20
+Nodes (7): CameraErrorCallback, ErrorCallback, Handler, PictureCallback, TakePictureShutterCallback, Camera, ShutterCallback
 
 ### Community 180 - "CameraFeaturesCache"
 Cohesion: 0.40
@@ -986,6 +991,10 @@ Nodes (5): CameraFeaturesCache, android, Camera2VendorTagsExtension, android, Ca
 ### Community 181 - "VideoSessionState"
 Cohesion: 0.33
 Nodes (5): Idle, Recording, RestartingMaxFileSize, Stopped, VideoSessionState
+
+### Community 182 - "PreferenceSubCameraControlsMore.kt"
+Cohesion: 0.29
+Nodes (5): Bundle, PreferenceSubCameraControlsMore, Bundle, PreferenceSubPreview, ListPreference
 
 ### Community 185 - "BluetoothRemoteControl.kt"
 Cohesion: 0.33
@@ -1031,9 +1040,17 @@ Nodes (4): Bitmap, Runnable, Uri, Runnable
 Cohesion: 0.27
 Nodes (4): CameraSurface, Matrix, MediaRecorder, View
 
+### Community 198 - "SurfaceTexture"
+Cohesion: 0.11
+Nodes (5): FaceDetectionListener, Matrix, SurfaceHolder, FaceDetectionListener, SurfaceTexture
+
 ### Community 202 - "Module 00 — Lesson 02: The Exposure Triangle"
 Cohesion: 0.20
 Nodes (10): 1. The Three Controls & Their Creative Trade-offs, 2. The Smartphone Reality Check, 3. The Two-Way Seesaw in Mobile: Shutter vs ISO, 4. In OpenKamera: Direct Hardware Control, A. Aperture (The Pupil of the Lens), B. Shutter Speed (The Slicing of Time), C. ISO (Sensor Gain), Module 00 — Lesson 02: The Exposure Triangle (+2 more)
+
+### Community 203 - "ApplyFunctionInterface"
+Cohesion: 0.31
+Nodes (5): ApplyFunctionInterface, ApplyFunctionThread, JavaImageProcessing, Bitmap, Thread
 
 ### Community 206 - "UriType"
 Cohesion: 0.50
@@ -1046,10 +1063,6 @@ Nodes (4): CanvasView, Canvas, View, run()
 ### Community 208 - "PreviewMatrixCalculator"
 Cohesion: 0.39
 Nodes (3): FloatArray, Matrix, PreviewMatrixCalculator
-
-### Community 209 - "VideoProfileResolver"
-Cohesion: 0.15
-Nodes (3): VideoProfileResolver, VideoProfileResolverTest, CamcorderProfile
 
 ### Community 211 - "MediaStorageRepositoryUnitTest.kt"
 Cohesion: 0.42
@@ -1079,17 +1092,17 @@ Nodes (16): AudioListenerCallback, MyAudioTriggerListenerCallback, AppCompatActi
 Cohesion: 0.50
 Nodes (4): Bundle, DialogInterface, LoadSettingsFileChooserDialog, PreferenceSubSettingsManager
 
-### Community 223 - "TextFormatter"
-Cohesion: 0.28
-Nodes (3): Location, TextFormatter, DateFormat
-
 ### Community 224 - "feature_detector.cpp"
 Cohesion: 0.38
 Nodes (5): vector, detect_harris_corners(), Point2D, x, y
 
-### Community 225 - "DimPreview"
-Cohesion: 0.50
-Nodes (4): DimPreview, DIM_PREVIEW_OFF, DIM_PREVIEW_ON, DIM_PREVIEW_UNTIL
+### Community 225 - "Camera2EngineBridgeTest"
+Cohesion: 0.20
+Nodes (3): Camera2EngineBridgeTest, CameraController2, PreviewSurfaceManager
+
+### Community 226 - "Android Project Guide"
+Cohesion: 0.20
+Nodes (9): Agent Workflow, Android Project Guide, Build Flavors, Important Local References, Mandatory Reading Order, Package layout (`app/src/main/java/com/hightechif/openkamera`), Project Commands, Project Identity (+1 more)
 
 ### Community 227 - ".computeHistogram"
 Cohesion: 0.57
@@ -1099,25 +1112,25 @@ Nodes (4): HistogramProcessor, Bitmap, HistogramType, IntArray
 Cohesion: 0.29
 Nodes (6): HistogramType, HISTOGRAM_TYPE_INTENSITY, HISTOGRAM_TYPE_LIGHTNESS, HISTOGRAM_TYPE_LUMINANCE, HISTOGRAM_TYPE_RGB, HISTOGRAM_TYPE_VALUE
 
-### Community 229 - "GyroImageDebugInfo"
-Cohesion: 0.33
-Nodes (3): GyroDebugInfo, GyroImageDebugInfo, FloatArray
-
 ### Community 234 - "05-raw-and-dng-capture"
 Cohesion: 0.48
 Nodes (7): 05-raw-and-dng-capture, Bayer Color Filter Array, CameraController2, DNG Format, DngCreator, RAW Data, RAW_SENSOR ImageReader
 
-### Community 236 - "PreviewSurfaceManager"
-Cohesion: 0.53
-Nodes (3): StateFlow, Surface, PreviewSurfaceManager
+### Community 236 - "Camera2VideoPipeline"
+Cohesion: 0.40
+Nodes (5): Camera2VideoPipeline, CameraDevice, CaptureRequest, MediaRecorder, Surface
 
 ### Community 240 - "Type"
 Cohesion: 0.33
 Nodes (6): Type, TYPE_INTENSITY, TYPE_LIGHTNESS, TYPE_LUMINANCE, TYPE_RGB, TYPE_VALUE
 
 ### Community 241 - "ProcessType"
-Cohesion: 0.33
-Nodes (6): ProcessType, AVERAGE, HDR, NORMAL, PANORAMA, X_NIGHT
+Cohesion: 0.16
+Nodes (11): ProcessType, AVERAGE, HDR, NORMAL, PANORAMA, X_NIGHT, Type, DUMMY (+3 more)
+
+### Community 244 - "CameraControllerException"
+Cohesion: 0.36
+Nodes (4): SurfaceHolder, TextureView, CameraControllerException, Exception
 
 ### Community 250 - "Lesson 03-02 Flash & Precapture"
 Cohesion: 0.25
@@ -1131,9 +1144,9 @@ Nodes (5): Facing, FACING_BACK, FACING_EXTERNAL, FACING_FRONT, FACING_UNKNOWN
 Cohesion: 0.40
 Nodes (5): SaveBase, SAVEBASE_ALL, SAVEBASE_ALL_PLUS_DEBUG, SAVEBASE_FIRST, SAVEBASE_NONE
 
-### Community 258 - "Type"
-Cohesion: 0.19
-Nodes (9): RemoveDeviceExif, KEEP_DATETIME, OFF, ON, Type, DUMMY, JPEG, ON_DESTROY (+1 more)
+### Community 258 - ".handleOnSharedPreferenceChanged"
+Cohesion: 0.39
+Nodes (3): Preference, SharedPreferences, OnPreferenceClickListener
 
 ### Community 265 - "gradlew"
 Cohesion: 0.70
@@ -1147,30 +1160,26 @@ Nodes (4): HDR Native Module, MTB (Multi-frame Tone Balance) Native Module, open
 Cohesion: 0.50
 Nodes (3): NRModePref, NRMODE_LOW_LIGHT, NRMODE_NORMAL
 
-### Community 272 - "ImageFormat"
-Cohesion: 0.50
-Nodes (4): ImageFormat, PNG, STD, WEBP
-
 ### Community 282 - "Open Kamera Main Page"
 Cohesion: 0.67
 Nodes (3): Open Kamera Help Documentation, Open Kamera Main Page, Open Camera Privacy Policy
 
 ## Knowledge Gaps
-- **445 isolated node(s):** `MEDIASTORE_IMAGES`, `MEDIASTORE_VIDEOS`, `STORAGE_ACCESS_FRAMEWORK`, `pixels`, `offset_x` (+440 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1895 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **164 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **452 isolated node(s):** `MEDIASTORE_IMAGES`, `MEDIASTORE_VIDEOS`, `STORAGE_ACCESS_FRAMEWORK`, `pixels`, `offset_x` (+447 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1904 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **178 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Preview` connect `Preview` to `Application Interface Contract`, `CameraController`, `PreferenceSubPhoto.kt`, `MainActivityLegacyGlue`, `TelemetryHudOverlayRendererTest`, `TelemetryHudOverlayRenderer`, `KeyEventHandlerTest`, `.initLegacy`, `PreviewFrameEffectsProcessor`, `DrawPreview`, `Preshots.kt`, `.getDisplayRotationDegrees`, `PopupView.kt`, `PreviewSurfaceManager`, `MyApplicationInterface.kt`, `OverlayRenderer`, `CameraResolutionUnitTest`, `Preview.kt`, `MainUI.kt`, `GyroTargetOverlayRenderer`, `VideoRecordingCoordinator`, `VideoProfile`, `CaptureTimerCoordinator`, `CameraFeaturesCache`, `PreviewFaceDetectionEngine`, `CameraLifecycleCoordinator`, `.freePreviewBitmap`, `BluetoothRemoteControl.kt`, `EffectOverlayRenderer`, `PreviewTouchCallback`, `SystemOrientation`, `.cancelAutoFocus`, `CameraControllerManager`, `CameraSurface`, `SurfaceTexture`, `VideoSessionOutput`, `VideoQualityHandler`, `CanvasView`, `DrawPreviewContext`, `VideoProfileResolver`, `OrientationLifecycleManager`, `.closeCamera`, `HistogramOverlayRenderer.kt`, `MainActivityLegacyGlue.kt`, `CameraCaptureStateMachine`, `RectF`, `.takePhotoWhenFocused`, `.showToast`, `PreviewSensorManager`, `MySurfaceView`, `.startVideoRecording`, `MyTextureView`, `.run`, `FocusState`?**
-  _High betweenness centrality (0.177) - this node is a cross-community bridge._
-- **Why does `MyApplicationInterface` connect `MyApplicationInterface` to `.getDoubleTapCapturePref`, `Basic Application Interface`, `CameraController`, `MainActivityLegacyGlue`, `HDRProcessor`, `TelemetryHudOverlayRendererTest`, `MainActivity`, `.initLegacy`, `.getEdgeModePref`, `.getISOPref`, `.getLockOrientationPref`, `Panorama Processor`, `GyroSensor`, `.getPreviewSizePref`, `DrawPreview`, `On-Screen Icons`, `CameraLifecycleCoordinator`, `ImageSaver`, `MyApplicationInterface.kt`, `VideoPreferencesRepository`, `NoFreeStorageException`, `.getRecordAudioChannelsPref`, `StorageUtils`, `CameraPreferencesRepository`, `PhotoPreferencesRepository`, `.getRecordAudioPref`, `.getRecordAudioSourcePref`, `.getRecordVideoOutputFormatPref`, `.canTakeNewPhoto`, `.getRepeatIntervalPref`, `Preview.kt`, `MainUI.kt`, `PostProcessing`, `CameraResolutionUnitTest`, `FakeSharedPreferences`, `VideoProfile`, `.getShowToastsPref`, `.getVideoFlashPref`, `.getVideoStabilizationPref`, `.putBoolean`, `.getWhiteBalancePref`, `.hasThumbnailAnimation`, `.isVideoPref`, `VideoMethod`, `.setNextPanoramaPoint`, `.onCaptureStarted`, `.onContinuousFocusMove`, `.requestRecordAudioPermission`, `.requestStoragePermission`, `.setExposureCompensationPref`, `.setWhiteBalancePref`, `.turnFrontScreenFlashOn`, `BluetoothRemoteControl.kt`, `.remove`, `.getCameraIdPref`, `DrawPreviewContext`, `UiHudPreferencesRepository`, `LastImagesType`, `LocationSupplier`, `FakeEditor`, `PreferenceKeys`, `.saveImage`, `build.gradle`, `PreferenceSubVideo.kt`, `.getAntiBandingPref`, `PhotoMode`, `FocusState`?**
+- **Why does `Preview` connect `Preview` to `Application Interface Contract`, `CameraController`, `PreferenceSubPhoto.kt`, `MainActivityLegacyGlue`, `TelemetryHudOverlayRendererTest`, `KeyEventHandlerTest`, `.initLegacy`, `PreviewFrameEffectsProcessor`, `CamcorderProfile`, `DrawPreview`, `Preshots.kt`, `PopupView.kt`, `PreviewSurfaceManager`, `MyApplicationInterface.kt`, `FocusFaceOverlayRenderer`, `CameraResolutionUnitTest`, `Preview.kt`, `MainUI.kt`, `GyroTargetOverlayRenderer`, `VideoRecordingCoordinator`, `VideoProfile`, `CaptureTimerCoordinator`, `CameraFeaturesCache`, `PreviewFaceDetectionEngine`, `CameraLifecycleCoordinator`, `.freePreviewBitmap`, `BluetoothRemoteControl.kt`, `EffectOverlayRenderer`, `PreviewTouchCallback`, `.getOptimalPreviewSize`, `SystemOrientation`, `.cancelAutoFocus`, `CameraControllerManager`, `CameraSurface`, `SurfaceTexture`, `VideoSessionOutput`, `VideoQualityHandler`, `CanvasView`, `DrawPreviewContext`, `VideoProfileResolver`, `OrientationLifecycleManager`, `.closeCamera`, `HistogramOverlayRenderer.kt`, `MainActivityLegacyGlue.kt`, `CameraCaptureStateMachine`, `RectF`, `.takePhotoWhenFocused`, `.showToast`, `PreviewSensorManager`, `MySurfaceView`, `.startVideoRecording`, `MyTextureView`, `.setupCamera`, `CameraUiState.kt`?**
+  _High betweenness centrality (0.175) - this node is a cross-community bridge._
+- **Why does `MyApplicationInterface` connect `MyApplicationInterface` to `.getDoubleTapCapturePref`, `Basic Application Interface`, `CameraController`, `MainActivityLegacyGlue`, `HDRProcessor`, `TelemetryHudOverlayRendererTest`, `MainActivity`, `.initLegacy`, `.getEdgeModePref`, `.getISOPref`, `.getLockOrientationPref`, `Panorama Processor`, `GyroSensor`, `.getPreviewSizePref`, `DrawPreview`, `On-Screen Icons`, `CameraLifecycleCoordinator`, `ImageSaver`, `MyApplicationInterface.kt`, `VideoPreferencesRepository`, `NoFreeStorageException`, `.getRecordAudioChannelsPref`, `StorageUtils`, `CameraPreferencesRepository`, `PhotoPreferencesRepository`, `.getRecordAudioPref`, `.getRecordAudioSourcePref`, `.getRecordVideoOutputFormatPref`, `.canTakeNewPhoto`, `.getRepeatIntervalPref`, `Preview.kt`, `MainUI.kt`, `PostProcessing`, `CameraResolutionUnitTest`, `FakeSharedPreferences`, `VideoProfile`, `.getShowToastsPref`, `.getVideoFlashPref`, `.getVideoStabilizationPref`, `LocationPreferencesRepository`, `.getWhiteBalancePref`, `.hasThumbnailAnimation`, `.isVideoPref`, `VideoMethod`, `.setNextPanoramaPoint`, `.onCaptureStarted`, `.onContinuousFocusMove`, `.requestRecordAudioPermission`, `.requestStoragePermission`, `.setExposureCompensationPref`, `.setWhiteBalancePref`, `.turnFrontScreenFlashOn`, `BluetoothRemoteControl.kt`, `.remove`, `MyDebug`, `.getCameraIdPref`, `DrawPreviewContext`, `UiHudPreferencesRepository`, `LastImagesType`, `LocationSupplier`, `.putBoolean`, `PreferenceKeys`, `.saveImage`, `PreferenceSubVideo.kt`, `.getAntiBandingPref`, `PhotoMode`, `CameraUiState.kt`?**
   _High betweenness centrality (0.149) - this node is a cross-community bridge._
-- **Why does `MyDebug` connect `MyDebug` to `RawImage`, `.onCreate`, `PreferenceSubPhoto.kt`, `CameraController`, `Camera2RequestBuilderHelper`, `DeviceScanner`, `Panorama Processor`, `Camera2SessionManager`, `PreviewFrameEffectsProcessor`, `VideoRecorderEngine`, `GyroSensor`, `MagneticSensor`, `BitmapPostProcessor`, `DrawPreview`, `CameraViewModel`, `ManualSeekbars`, `SoundPoolManager`, `ApplicationInterface.kt`, `Camera2StateCallbackDispatcher`, `MyApplicationInterface.kt`, `ImageSaver`, `MyWidgetProviderTakePhoto.kt (164)`, `PopupView.kt`, `StorageUtils`, `Camera2PipelineManager.kt (170)`, `MyPreferenceFragment.kt`, `Preview.kt`, `ImageSavePipeline`, `ICameraEngine`, `ApplyFunctionInterface`, `MainUI.kt`, `VideoRecordingCoordinator`, `VideoProfile`, `CaptureTimerCoordinator`, `ArraySeekBarPreference`, `CameraControllerException`, `CameraFeaturesCache`, `PreviewFaceDetectionEngine`, `FolderChooserDialog`, `CameraLifecycleCoordinator`, `BluetoothRemoteControl.kt`, `KeyEventHandler`, `CameraController2.kt`, `MyTileService.kt`, `MyTileServiceFrontCamera.kt`, `PreviewTouchCallback`, `AudioListener`, `CameraControllerManager`, `VideoSessionOutput`, `VideoQualityHandler`, `MyTileServiceVideo.kt`, `CanvasView`, `Camera2ThreadManager`, `VideoProfileResolver`, `OrientationLifecycleManager`, `Camera2CapabilitiesResolver.kt`, `Camera2FacadeArchitectureUnitTest.kt`, `PreferenceSubScreen`, `LocationSupplier`, `PreferenceSubProcessing.kt`, `.onCreate`, `MainActivityLegacyGlue.kt`, `PreferenceSubSettingsManager.kt`, `FakeEditor`, `PreviewSensorManager`, `DialogCoordinator`, `BluetoothLeService`, `build.gradle`, `PreferenceSubVideo.kt`, `MySurfaceView`, `OpenKameraApplication`, `CameraController.kt`, `MyTextureView`, `Camera2BurstCoordinator`, `Camera2PhotoPipeline.kt`?**
-  _High betweenness centrality (0.135) - this node is a cross-community bridge._
+- **Why does `MyDebug` connect `MyDebug` to `RawImage`, `CameraController`, `.onCreate`, `PreferenceSubPhoto.kt`, `Camera2RequestBuilderHelper`, `DeviceScanner`, `Panorama Processor`, `Camera2SessionManager`, `PreviewFrameEffectsProcessor`, `CamcorderProfile`, `VideoRecorderEngine`, `GyroSensor`, `MagneticSensor`, `BitmapPostProcessor`, `CameraViewModel`, `DrawPreview`, `CameraControllerManager2`, `ManualSeekbars`, `PopupView.kt`, `Camera2StateCallbackDispatcher`, `MyApplicationInterface.kt`, `MyWidgetProviderTakePhoto.kt (164)`, `StorageUtils`, `Camera2PipelineManager.kt (170)`, `MyPreferenceFragment.kt`, `Preview.kt`, `ImageSavePipeline`, `ICameraEngine`, `MainUI.kt`, `VideoRecordingCoordinator`, `VideoProfile`, `CaptureTimerCoordinator`, `CameraFeaturesCache`, `PreviewFaceDetectionEngine`, `PreferenceSubCameraControlsMore.kt`, `CameraLifecycleCoordinator`, `FolderChooserDialog`, `BluetoothRemoteControl.kt`, `KeyEventHandler`, `CameraController2.kt`, `MyTileService.kt`, `MyTileServiceFrontCamera.kt`, `PreviewTouchCallback`, `PreviewCameraSetupHelper`, `.onCreate`, `.onCreate`, `VideoSessionOutput`, `VideoQualityHandler`, `ApplyFunctionInterface`, `AudioListener`, `CanvasView`, `Camera2ThreadManager`, `OrientationLifecycleManager`, `Camera2CapabilitiesResolver.kt`, `Camera2FacadeArchitectureUnitTest.kt`, `PreferenceSubScreen`, `LocationSupplier`, `PreferenceSubProcessing.kt`, `.onCreate`, `MainActivityLegacyGlue.kt`, `PreferenceSubSettingsManager.kt`, `.putBoolean`, `PreviewSensorManager`, `DialogCoordinator`, `BluetoothLeService`, `Camera2VideoPipeline`, `AudioControllerImpl`, `useScopedStorage`, `PreferenceSubVideo.kt`, `MySurfaceView`, `OpenKameraApplication`, `MyTextureView`, `Camera2BurstCoordinator`, `Camera2PhotoPipeline.kt`?**
+  _High betweenness centrality (0.132) - this node is a cross-community bridge._
 - **What connects `MEDIASTORE_IMAGES`, `MEDIASTORE_VIDEOS`, `STORAGE_ACCESS_FRAMEWORK` to the rest of the system?**
-  _445 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _452 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Application Interface Contract` be split into smaller, more focused modules?**
   _Cohesion score 0.015625 - nodes in this community are weakly interconnected._
 - **Should `Basic Application Interface` be split into smaller, more focused modules?**
